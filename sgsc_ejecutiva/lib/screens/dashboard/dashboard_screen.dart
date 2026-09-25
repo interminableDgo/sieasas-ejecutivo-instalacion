@@ -133,6 +133,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     applyFilters(next, undo: removing ? 'Filtro quitado' : null);
   }
 
+  void selectMapMunicipality(String? id) {
+    final next = copyFilters(filters)..remove('municipio_id');
+    if (id != null) next['municipio_id'] = [id];
+    applyFilters(next);
+  }
+
   void removeFilter(String key, String id) {
     final next = copyFilters(filters);
     next[key]?.remove(id);
@@ -769,17 +775,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           // The map asset covers Nuevo León (INEGI 19).
                           if ('${widget.user['clave_inegi']}' == '19')
                             ExecutiveCard(
+                              key: const ValueKey('municipality-map-card'),
                               title: 'Mapa de solicitudes por municipio',
                               source:
                                   'Municipios de Nuevo León coloreados según la cantidad de solicitudes con los filtros actuales. '
-                                  'Toca un municipio para ver cuántas tiene y, si quieres, aplicarlo como filtro. '
+                                  'Toca un municipio para filtrar y acercar; vuelve a tocarlo para quitarlo. '
                                   'Límites municipales: INEGI, Marco Geoestadístico.',
                               child: MunicipalityMap(
                                 rows: group('municipios'),
                                 catalog: catalogs?['municipios'] as List? ?? [],
                                 active: {...?filters['municipio_id']},
-                                onFilter: (id) =>
-                                    toggleFilter('municipio_id', id),
+                                onFilter: selectMapMunicipality,
+                                loading: loading,
+                                error: error,
+                                onRetry: load,
                               ),
                             ),
                           bars(

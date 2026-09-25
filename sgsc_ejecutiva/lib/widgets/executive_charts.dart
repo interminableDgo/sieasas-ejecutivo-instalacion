@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_drawing/path_drawing.dart';
 
@@ -233,11 +234,7 @@ class _TrendPainter extends CustomPainter {
   bool shouldRepaint(covariant _TrendPainter old) => true;
 }
 
-/// Nuevo León by municipality, coloured by the requests of each one with the
-/// current filters. Tapping selects a municipality (orange) and shows its
-/// count; "Filtrar" applies it as a filter. "Acercar" zooms on the selection
-/// so the small metropolitan municipalities are easy to tap — a button
-/// instead of pinch/pan, which would fight with the page scroll on phones.
+/// The dashboard owns active municipality ids; the map owns only its viewport.
 class MunicipalityMap extends StatefulWidget {
   /// Dashboard rows: {id, nombre, total}.
   final List<dynamic> rows;
@@ -245,13 +242,19 @@ class MunicipalityMap extends StatefulWidget {
   /// Catalog rows: {id, nombre, clave_inegi}; links INEGI shapes to ids.
   final List<dynamic> catalog;
   final Set<String> active;
-  final ValueChanged<String> onFilter;
+  final ValueChanged<String?> onFilter;
+  final bool loading;
+  final String? error;
+  final VoidCallback? onRetry;
   const MunicipalityMap({
     super.key,
     required this.rows,
     required this.catalog,
     required this.onFilter,
     this.active = const {},
+    this.loading = false,
+    this.error,
+    this.onRetry,
   });
   @override
   State<MunicipalityMap> createState() => _MunicipalityMapState();
@@ -271,8 +274,8 @@ class _MapData {
 }
 
 class _MunicipalityMapState extends State<MunicipalityMap> {
-  static final Future<_MapData> _data = rootBundle
-      .loadString('assets/nl-municipios.json')
+  late final Future<_MapData> _data = rootBundle
+      .loadString('assets/nl-municipios.json', cache: false)
       .then((raw) {
         final json = jsonDecode(raw) as Map<String, dynamic>;
         return _MapData(
@@ -290,11 +293,25 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
           ],
         );
       });
-  String? selected;
-  bool zoomed = false;
+  String? get selected {
+    if (widget.active.length != 1) return null;
+    for (final entry in idByCvegeo.entries) {
+      if (widget.active.contains(entry.value)) return entry.key;
+    }
+    return null;
+  }
+
+  bool zoomed = true;
+  @override
+  void didUpdateWidget(covariant MunicipalityMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!setEquals(oldWidget.active, widget.active)) zoomed = true;
+  }
 
   Map<String, String> get idByCvegeo => {
-    for (final r in widget.catalog) '${r['clave_inegi']}': '${r['id']}',
+    for (final r in widget.catalog)
+      if (r['clave_inegi'] != null && r['id'] != null)
+        '${r['clave_inegi']}': '${r['id']}',
   };
   Map<String, num> get totalById => {
     for (final r in widget.rows) '${r['id']}': r['total'] as num,
@@ -304,11 +321,19 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
     final full = Rect.fromLTWH(0, 0, data.width, data.height);
     if (!zoomed || selected == null) return full;
     final bounds = data.shapes
-        .firstWhere((s) => s.cvegeo == selected)
-        .path
+        .where((s) => s.cvegeo == selected)
+        .firstOrNull
+        ?.path
         .getBounds();
+    if (bounds == null) return full;
     // A window with the map's aspect, ~1/3 of its size, centred on the pick.
-    final w = math.max(data.width / 3, bounds.width * 1.6);
+    final w = math.min(
+      data.width,
+      math.max(
+        data.width / 3,
+        math.max(bounds.width, bounds.height * data.width / data.height) * 1.6,
+      ),
+    );
     final h = w * data.height / data.width;
     final left = (bounds.center.dx - w / 2).clamp(0.0, data.width - w);
     final top = (bounds.center.dy - h / 2).clamp(0.0, data.height - h);
@@ -320,18 +345,29 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
     future: _data,
     builder: (context, snapshot) {
       final data = snapshot.data;
-      if (data == null) return const SizedBox(height: 240);
+      if (snapshot.hasError) {
+        return const SizedBox(
+          height: 240,
+          child: Center(
+            child: Text('No se pudo cargar el mapa de municipios.'),
+          ),
+        );
+      }
+      if (data == null) {
+        return const SizedBox(
+          height: 240,
+          child: Center(child: CircularProgressIndicator.adaptive()),
+        );
+      }
       final ids = idByCvegeo, totals = totalById;
       num count(String cvegeo) => totals[ids[cvegeo]] ?? 0;
       final max = data.shapes.fold<num>(
         1,
         (m, s) => math.max(m, count(s.cvegeo)),
       );
-      final sum = totals.values.fold<num>(0, (a, b) => a + b);
       final pick = selected == null
           ? null
-          : data.shapes.firstWhere((s) => s.cvegeo == selected);
-      final pickId = pick == null ? null : ids[pick.cvegeo];
+          : data.shapes.where((s) => s.cvegeo == selected).firstOrNull;
       final activeCvegeo = {
         for (final e in ids.entries)
           if (widget.active.contains(e.value)) e.key,
@@ -350,49 +386,61 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
           ),
-          Text(
-            pick == null
-                ? 'para ver cuántas solicitudes tiene.'
-                : '${count(pick.cvegeo)} ${count(pick.cvegeo) == 1 ? 'solicitud' : 'solicitudes'}'
-                      '${sum > 0 ? ' · ${(count(pick.cvegeo) / sum * 100).toStringAsFixed(1)} % del total' : ''}',
-            style: const TextStyle(fontSize: 12, color: muted),
+          Semantics(
+            liveRegion: true,
+            child: SizedBox(
+              height: 36,
+              child: Text(
+                widget.loading
+                    ? 'Actualizando solicitudes...'
+                    : widget.error != null
+                    ? 'No se pudieron actualizar los datos.'
+                    : pick == null
+                    ? 'Toca para filtrar y acercar.'
+                    : count(pick.cvegeo) == 0
+                    ? 'Sin solicitudes con los filtros actuales.'
+                    : '${count(pick.cvegeo)} solicitudes; toca de nuevo para quitar',
+                maxLines: 2,
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+            ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(
+            height: 4,
+            child: widget.loading ? const LinearProgressIndicator() : null,
+          ),
           SizedBox(
             height: 44,
-            child: pick == null
-                ? null
-                : Row(
-                    children: [
-                      if (pickId != null)
-                        Flexible(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(0, 44),
-                            ),
-                            onPressed: () => widget.onFilter(pickId),
-                            icon: Icon(
-                              widget.active.contains(pickId)
-                                  ? Icons.filter_alt_off_outlined
-                                  : Icons.filter_alt_outlined,
-                              size: 18,
-                            ),
-                            label: Text(
-                              widget.active.contains(pickId)
-                                  ? 'Quitar del filtro'
-                                  : 'Filtrar',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
-                        onPressed: () => setState(() => zoomed = !zoomed),
-                        icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+            child: Row(
+              children: [
+                if (widget.active.isNotEmpty)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
                       ),
-                    ],
+                      onPressed: () => widget.onFilter(null),
+                      icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                      label: const Text(
+                        'Quitar municipio',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ),
+                if (pick != null)
+                  IconButton(
+                    tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
+                    onPressed: () => setState(() => zoomed = !zoomed),
+                    icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+                  ),
+                if (widget.error != null)
+                  IconButton(
+                    tooltip: 'Reintentar mapa',
+                    onPressed: widget.onRetry,
+                    icon: const Icon(Icons.refresh),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           LayoutBuilder(
@@ -409,8 +457,12 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                   curve: Curves.easeOutCubic,
                   builder: (context, view, _) => Semantics(
                     container: true,
-                    label: pick == null
-                        ? 'Mapa de Nuevo León por municipio. Toca un municipio para ver sus solicitudes.'
+                    label: widget.loading
+                        ? 'Actualizando solicitudes del mapa.'
+                        : widget.error != null
+                        ? 'No se pudieron actualizar los datos del mapa.'
+                        : pick == null
+                        ? 'Mapa de Nuevo León por municipio. Toca un municipio para filtrar sus solicitudes.'
                         : 'Mapa de Nuevo León. ${pick.name}: ${count(pick.cvegeo)} solicitudes.',
                     // Described, but not exposed as one big button: on web
                     // with accessibility on, a tap on a semantic button is
@@ -426,7 +478,12 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                               event.localPosition * (v.width / width);
                           for (final shape in data.shapes) {
                             if (shape.path.contains(point)) {
-                              setState(() => selected = shape.cvegeo);
+                              final id = ids[shape.cvegeo];
+                              if (id != null) {
+                                widget.onFilter(
+                                  shape.cvegeo == selected ? null : id,
+                                );
+                              }
                               return;
                             }
                           }
@@ -441,6 +498,9 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                               fill: (s) {
                                 final value = count(s.cvegeo);
                                 if (s.cvegeo == selected) return brand;
+                                if (widget.loading || widget.error != null) {
+                                  return border;
+                                }
                                 return value == 0
                                     ? border
                                     : brand.withValues(
@@ -459,7 +519,7 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
             },
           ),
           const SizedBox(height: 10),
-          const _MapLegend(),
+          if (!widget.loading && widget.error == null) const _MapLegend(),
           const SizedBox(height: 8),
           Text(
             'Límites municipales: ${data.source}.',

@@ -13,6 +13,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Keep aligned with RegisterInput and ResetInput in backend/app/schemas/auth.py.
+  static const minimumPasswordLength = 15;
+  static const maximumPasswordLength = 128;
   final form = GlobalKey<FormState>();
   final email = TextEditingController();
   final password = TextEditingController();
@@ -24,6 +27,93 @@ class _LoginScreenState extends State<LoginScreen> {
   String? error;
   String message = '';
   bool busy = false, show = false;
+
+  Widget passwordRequirements() => ValueListenableBuilder<TextEditingValue>(
+    valueListenable: password,
+    builder: (context, value, _) {
+      // Python/Pydantic count Unicode code points, including spaces.
+      final length = value.text.runes.length;
+      // Advisory only: length and confirmation remain the only requirements.
+      final variety = [
+        RegExp(r'[A-ZÁÉÍÓÚÜÑ]').hasMatch(value.text),
+        RegExp(r'[0-9]').hasMatch(value.text),
+        RegExp(r'[^\p{L}\p{N}\s]', unicode: true).hasMatch(value.text),
+      ].where((present) => present).length;
+      final strength =
+          length < minimumPasswordLength || value.text.runes.toSet().length < 5
+          ? 0
+          : length >= 24 || (length >= 20 && variety >= 2)
+          ? 3
+          : length >= 20 || variety >= 2
+          ? 2
+          : 1;
+      final strengthLabel = ['Muy débil', 'Débil', 'Buena', 'Fuerte'][strength];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final requirement in [
+              (
+                length >= minimumPasswordLength,
+                'Al menos $minimumPasswordLength caracteres',
+              ),
+              (
+                RegExp(r'[A-ZÁÉÍÓÚÜÑ]').hasMatch(value.text),
+                'Al menos una letra mayúscula',
+              ),
+              (RegExp(r'[0-9]').hasMatch(value.text), 'Al menos un número'),
+              (
+                RegExp(r'[^\p{L}\p{N}\s]', unicode: true).hasMatch(value.text),
+                'Al menos un carácter especial',
+              ),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      requirement.$1
+                          ? Icons.check_circle_outline
+                          : Icons.cancel_outlined,
+                      size: 16,
+                      color: requirement.$1 ? salud : muted,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${requirement.$2}: ${requirement.$1 ? 'cumplido' : 'pendiente'}',
+                        style: const TextStyle(fontSize: 12, color: muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              'Fortaleza estimada: ${length == 0 ? 'Sin contraseña' : strengthLabel}',
+              style: const TextStyle(fontSize: 12, color: ink),
+            ),
+            const SizedBox(height: 4),
+            LinearProgressIndicator(
+              value: length == 0 ? 0 : (strength + 1) / 4,
+              backgroundColor: border,
+              color: strength < 2 ? brand : salud,
+              semanticsLabel: 'Fortaleza estimada',
+              semanticsValue: length == 0 ? 'Sin contraseña' : strengthLabel,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Una frase larga y fácil de recordar es más segura.',
+              style: TextStyle(fontSize: 12, color: muted),
+            ),
+          ],
+        ),
+      );
+    },
+  );
   @override
   void initState() {
     super.initState();
@@ -195,14 +285,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                           validator: (v) {
                             final n = (v ?? '').runes.length;
-                            return n < (newPassword ? 15 : 1) || n > 128
+                            return n <
+                                        (newPassword
+                                            ? minimumPasswordLength
+                                            : 1) ||
+                                    n > maximumPasswordLength
                                 ? (newPassword
-                                      ? 'Usa de 15 a 128 caracteres.'
+                                      ? 'Usa de $minimumPasswordLength a $maximumPasswordLength caracteres.'
                                       : 'Ingresa tu contraseña.')
                                 : null;
                           },
                         ),
                       ),
+                      if (newPassword) passwordRequirements(),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
@@ -213,13 +308,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                     if (newPassword) ...[
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 14),
-                        child: Text(
-                          'De 15 a 128 caracteres. Puedes usar espacios y una frase larga.',
-                          style: TextStyle(fontSize: 12, color: muted),
-                        ),
-                      ),
                       LabeledField(
                         'Confirmar contraseña',
                         TextFormField(
@@ -229,6 +317,47 @@ class _LoginScreenState extends State<LoginScreen> {
                               ? null
                               : 'Las contraseñas no coinciden.',
                         ),
+                      ),
+                      ListenableBuilder(
+                        listenable: Listenable.merge([password, confirmation]),
+                        builder: (context, _) {
+                          final pending = confirmation.text.isEmpty;
+                          final matches =
+                              !pending && confirmation.text == password.text;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    pending
+                                        ? Icons.radio_button_unchecked
+                                        : matches
+                                        ? Icons.check_circle_outline
+                                        : Icons.error_outline,
+                                    size: 16,
+                                    color: matches ? salud : muted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      pending
+                                          ? 'Confirma tu contraseña.'
+                                          : matches
+                                          ? 'Las contraseñas coinciden.'
+                                          : 'Las contraseñas no coinciden.',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: muted,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                     if (mode == 'verify') ...[

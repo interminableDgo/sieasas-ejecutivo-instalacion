@@ -23,7 +23,20 @@ class NewRequestScreen extends StatefulWidget {
 }
 
 class _NewRequestScreenState extends State<NewRequestScreen> {
-  final forms = List.generate(3, (_) => GlobalKey<FormState>());
+  static const stepNames = [
+    'Beneficiario · Datos personales',
+    'Beneficiario · Domicilio',
+    'Beneficiario · Información social',
+    'Solicitante · Datos personales',
+    'Solicitante · Domicilio y contacto',
+    'Solicitud · Apoyo y recepción',
+    'Solicitud · Descripción',
+    'Revisar y registrar',
+  ];
+  final forms = List.generate(stepNames.length, (_) => GlobalKey<FormState>());
+  final labels = <String, String>{};
+  final optionsByField = <String, List<dynamic>>{};
+  final booleanFields = <String>{};
   final fields = <String, TextEditingController>{};
   final values = <String, int?>{};
   final flags = <String, bool>{};
@@ -34,20 +47,33 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   int step = 0, birthLoad = 0;
   String? error;
 
+  List<int> get visibleSteps => [
+    0,
+    if (!existingBeneficiary) ...[1, 2],
+    3,
+    if (!existingApplicant) 4,
+    5,
+    6,
+    7,
+  ];
+
+  void moveTo(int nextStep) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      step = nextStep;
+      error = null;
+    });
+  }
+
   bool get missingCatalogs {
-    final keys = step == 0
-        ? (existingBeneficiary
-              ? <String>[]
-              : [
-                  'municipios',
-                  'generos',
-                  'entidades',
-                  'seguridad_social',
-                  'grupos',
-                ])
-        : step == 1
-        ? (existingApplicant ? <String>[] : ['municipios', 'parentescos'])
-        : ['apoyos', 'origenes', 'canales', 'unidades'];
+    final keys = switch (step) {
+      0 => existingBeneficiary ? <String>[] : ['generos', 'entidades'],
+      1 || 4 => ['municipios'],
+      2 => ['seguridad_social', 'grupos'],
+      3 => existingApplicant ? <String>[] : ['parentescos'],
+      5 => ['apoyos', 'origenes', 'canales', 'unidades'],
+      _ => <String>[],
+    };
     return keys.any((key) => (widget.catalogs[key] as List? ?? []).isEmpty);
   }
 
@@ -71,6 +97,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     bool multiline = false,
     int? minimum,
   }) {
+    labels[key] = label;
     return LabeledField(
       label,
       TextFormField(
@@ -114,6 +141,8 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     ValueChanged<int?>? changed,
   }) {
     final rows = options ?? widget.catalogs[catalog] as List? ?? [];
+    labels[key] = label;
+    optionsByField[key] = rows;
     return LabeledField(
       label,
       DropdownButtonFormField<int>(
@@ -146,49 +175,56 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     );
   }
 
-  Widget birthDate(String prefix) => LabeledField(
-    'Fecha de nacimiento',
-    TextFormField(
-      controller: controller('$prefix.fecha_nacimiento'),
-      readOnly: true,
-      decoration: const InputDecoration(
-        hintText: 'Selecciona la fecha',
-        suffixIcon: Icon(Icons.calendar_month),
-      ),
-      onTap: busy
-          ? null
-          : () async {
-              final today = DateTime.now();
-              final value = await showDatePicker(
-                context: context,
-                initialDate:
-                    DateTime.tryParse(
-                      controller('$prefix.fecha_nacimiento').text,
-                    ) ??
-                    DateTime(today.year - 25),
-                firstDate: DateTime(today.year - 150),
-                lastDate: today,
-                helpText: 'Fecha de nacimiento',
-              );
-              if (value != null && mounted) {
-                setState(
-                  () => controller('$prefix.fecha_nacimiento').text = value
-                      .toIso8601String()
-                      .substring(0, 10),
+  Widget birthDate(String prefix) {
+    labels['$prefix.fecha_nacimiento'] = 'Fecha de nacimiento';
+    return LabeledField(
+      'Fecha de nacimiento',
+      TextFormField(
+        controller: controller('$prefix.fecha_nacimiento'),
+        readOnly: true,
+        decoration: const InputDecoration(
+          hintText: 'Selecciona la fecha',
+          suffixIcon: Icon(Icons.calendar_month),
+        ),
+        onTap: busy
+            ? null
+            : () async {
+                final today = DateTime.now();
+                final value = await showDatePicker(
+                  context: context,
+                  initialDate:
+                      DateTime.tryParse(
+                        controller('$prefix.fecha_nacimiento').text,
+                      ) ??
+                      DateTime(today.year - 25),
+                  firstDate: DateTime(today.year - 150),
+                  lastDate: today,
+                  helpText: 'Fecha de nacimiento',
                 );
-              }
-            },
-      validator: (v) => (v ?? '').isEmpty ? 'Selecciona la fecha.' : null,
-    ),
-  );
+                if (value != null && mounted) {
+                  setState(
+                    () => controller('$prefix.fecha_nacimiento').text = value
+                        .toIso8601String()
+                        .substring(0, 10),
+                  );
+                }
+              },
+        validator: (v) => (v ?? '').isEmpty ? 'Selecciona la fecha.' : null,
+      ),
+    );
+  }
 
-  Widget check(String label, String key) => CheckboxListTile(
-    contentPadding: EdgeInsets.zero,
-    title: Text(label, style: const TextStyle(fontSize: 14)),
-    value: flags[key] ?? false,
-    controlAffinity: ListTileControlAffinity.leading,
-    onChanged: busy ? null : (v) => setState(() => flags[key] = v ?? false),
-  );
+  Widget check(String label, String key) {
+    labels[key] = label;
+    booleanFields.add(key);
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(label, style: const TextStyle(fontSize: 14)),
+      value: flags[key] ?? false,
+      controlAffinity: ListTileControlAffinity.leading,
+      onChanged: busy ? null : (v) => setState(() => flags[key] = v ?? false),
+    );
+  }
 
   Widget section(String title) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -347,39 +383,45 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   ];
 
   List<Widget> beneficiaryFields() => [
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: const Text('Usar beneficiario existente'),
-      value: existingBeneficiary,
-      onChanged: busy ? null : (v) => setState(() => existingBeneficiary = v),
-    ),
-    if (existingBeneficiary) ...[
-      if (beneficiary != null) Notice('${beneficiary!['nombre']}'),
-      OutlinedButton(
-        onPressed: busy ? null : () => findPerson(true),
-        child: const Text('Buscar beneficiario'),
+    if (step == 0) ...[
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Usar beneficiario existente'),
+        value: existingBeneficiary,
+        onChanged: busy ? null : (v) => setState(() => existingBeneficiary = v),
       ),
-    ] else ...[
-      input('Nombre(s)', 'b.nombres'),
-      input('Apellidos', 'b.apellidos'),
-      input('CURP (opcional)', 'b.curp', required: false, max: 18),
-      birthDate('b'),
-      select('Género', 'b.genero_id', 'generos'),
-      select(
-        'Estado de nacimiento',
-        'birth_entity',
-        'entidades',
-        changed: loadBirth,
-      ),
-      select(
-        'Municipio de nacimiento',
-        'b.municipio_nacimiento_id',
-        '',
-        options: birthMunicipalities,
-      ),
+      if (existingBeneficiary) ...[
+        if (beneficiary != null) Notice('${beneficiary!['nombre']}'),
+        OutlinedButton(
+          onPressed: busy ? null : () => findPerson(true),
+          child: const Text('Buscar beneficiario'),
+        ),
+      ] else ...[
+        input('Nombre(s)', 'b.nombres'),
+        input('Apellidos', 'b.apellidos'),
+        input('CURP (opcional)', 'b.curp', required: false, max: 18),
+        birthDate('b'),
+        select('Género', 'b.genero_id', 'generos'),
+        select(
+          'Estado de nacimiento',
+          'birth_entity',
+          'entidades',
+          changed: loadBirth,
+        ),
+        select(
+          'Municipio de nacimiento',
+          'b.municipio_nacimiento_id',
+          '',
+          options: birthMunicipalities,
+        ),
+      ],
+    ],
+    if (step == 1) ...[
       section('Domicilio'),
       ...address('b'),
       input('Años de residencia', 'b.tiempo_residencia', number: true, max: 3),
+    ],
+    if (step == 2) ...[
       section('Información social'),
       input('¿Con quién vive?', 'b.con_quien_vive', max: 50),
       input('Número de hijos', 'b.numero_hijos', number: true, max: 3),
@@ -403,81 +445,132 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   ];
 
   List<Widget> applicantFields() => [
-    const Notice(
-      'El solicitante es quien realiza el trámite. SSNL requiere sus datos aunque sea el propio beneficiario.',
-    ),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: const Text('Usar solicitante existente'),
-      value: existingApplicant,
-      onChanged: busy ? null : (v) => setState(() => existingApplicant = v),
-    ),
-    if (existingApplicant) ...[
-      if (applicant != null) Notice('${applicant!['nombre']}'),
-      OutlinedButton(
-        onPressed: busy ? null : () => findPerson(false),
-        child: const Text('Buscar solicitante'),
+    if (step == 3) ...[
+      const Notice(
+        'El solicitante es quien realiza el trámite. SSNL requiere sus datos aunque sea el propio beneficiario.',
       ),
-    ] else ...[
-      input('Nombre(s)', 's.nombres', max: 100),
-      input('Apellidos', 's.apellidos', max: 100),
-      select(
-        'Parentesco con el beneficiario',
-        's.parentesco_id',
-        'parentescos',
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Usar solicitante existente'),
+        value: existingApplicant,
+        onChanged: busy ? null : (v) => setState(() => existingApplicant = v),
       ),
-      input(
-        'Otro parentesco (si aplica)',
-        's.otro_parentesco',
-        max: 100,
-        required: false,
-      ),
-      birthDate('s'),
+      if (existingApplicant) ...[
+        if (applicant != null) Notice('${applicant!['nombre']}'),
+        OutlinedButton(
+          onPressed: busy ? null : () => findPerson(false),
+          child: const Text('Buscar solicitante'),
+        ),
+      ] else ...[
+        input('Nombre(s)', 's.nombres', max: 100),
+        input('Apellidos', 's.apellidos', max: 100),
+        select(
+          'Parentesco con el beneficiario',
+          's.parentesco_id',
+          'parentescos',
+        ),
+        input(
+          'Otro parentesco (si aplica)',
+          's.otro_parentesco',
+          max: 100,
+          required: false,
+        ),
+        birthDate('s'),
+      ],
+    ],
+    if (step == 4) ...[
       ...address('s'),
       input('Teléfono', 's.telefono', max: 15),
     ],
   ];
 
   List<Widget> requestFields() => [
+    if (step == 5) ...[
+      const Notice(
+        'La solicitud se guardará con estatus Inicio y la fecha de registro. Se conservará quién realizó el alta.',
+      ),
+      select('Tipo de apoyo', 'tipo_apoyo_id', 'apoyos'),
+      select('Origen de la solicitud', 'enviado_por_id', 'origenes'),
+      select(
+        'Dependencia remitente (opcional)',
+        'dependencia_id',
+        'dependencias',
+        required: false,
+      ),
+      select(
+        'Partido político remitente (opcional)',
+        'partido_id',
+        'partidos',
+        required: false,
+      ),
+      select(
+        'Municipio remitente (opcional)',
+        'municipio_remitente_id',
+        'municipios',
+        required: false,
+      ),
+      input('Detalles del envío (opcional)', 'detalles_envio', required: false),
+      select('Canal de recepción', 'canal_id', 'canales'),
+      select('Unidad tratante', 'unidad_tratante_id', 'unidades'),
+    ],
+    if (step == 6) ...[
+      input(
+        'Descripción de la solicitud',
+        'descripcion',
+        max: 5000,
+        multiline: true,
+      ),
+      input(
+        'Observaciones (opcional)',
+        'observaciones',
+        max: 5000,
+        multiline: true,
+        required: false,
+      ),
+    ],
+  ];
+
+  String reviewValue(String key) {
+    if (booleanFields.contains(key)) return flags[key] == true ? 'Sí' : 'No';
+    if (optionsByField.containsKey(key)) {
+      for (final row in optionsByField[key]!) {
+        if (row['id'] == values[key]) return '${row['nombre']}';
+      }
+      return 'Sin especificar';
+    }
+    final value = fields[key]?.text.trim() ?? '';
+    return value.isEmpty ? 'Sin especificar' : value;
+  }
+
+  Widget reviewCard(
+    String title,
+    String prefix,
+    Map<String, dynamic>? person,
+  ) => ExecutiveCard(
+    title: title,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (person != null)
+          Text('${person['nombre']} · Expediente #${person['id']}')
+        else
+          for (final entry in labels.entries)
+            if ((prefix.isEmpty
+                ? !entry.key.contains('.') && entry.key != 'birth_entity'
+                : entry.key.startsWith('$prefix.') ||
+                      prefix == 'b' && entry.key == 'birth_entity'))
+              LabeledField(entry.value, Text(reviewValue(entry.key))),
+      ],
+    ),
+  );
+
+  List<Widget> reviewFields() => [
     const Notice(
-      'La solicitud se guardará con estatus Inicio y la fecha de registro. Se conservará quién realizó el alta.',
+      'Revisa la información antes de registrar. Usa Paso anterior para corregir los datos.',
     ),
-    select('Tipo de apoyo', 'tipo_apoyo_id', 'apoyos'),
-    select('Origen de la solicitud', 'enviado_por_id', 'origenes'),
-    select(
-      'Dependencia remitente (opcional)',
-      'dependencia_id',
-      'dependencias',
-      required: false,
-    ),
-    select(
-      'Partido político remitente (opcional)',
-      'partido_id',
-      'partidos',
-      required: false,
-    ),
-    select(
-      'Municipio remitente (opcional)',
-      'municipio_remitente_id',
-      'municipios',
-      required: false,
-    ),
-    input('Detalles del envío (opcional)', 'detalles_envio', required: false),
-    select('Canal de recepción', 'canal_id', 'canales'),
-    select('Unidad tratante', 'unidad_tratante_id', 'unidades'),
-    input(
-      'Descripción de la solicitud',
-      'descripcion',
-      max: 5000,
-      multiline: true,
-    ),
-    input(
-      'Observaciones (opcional)',
-      'observaciones',
-      max: 5000,
-      multiline: true,
-      required: false,
-    ),
+    reviewCard('Beneficiario', 'b', existingBeneficiary ? beneficiary : null),
+    reviewCard('Solicitante', 's', existingApplicant ? applicant : null),
+    reviewCard('Solicitud', '', null),
   ];
 
   Map<String, dynamic> personData(String prefix) {
@@ -505,15 +598,12 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   Future<void> next() async {
     if (!forms[step].currentState!.validate()) return;
     if (step == 0 && existingBeneficiary && beneficiary == null ||
-        step == 1 && existingApplicant && applicant == null) {
+        step == 3 && existingApplicant && applicant == null) {
       setState(() => error = 'Selecciona un expediente para continuar.');
       return;
     }
-    if (step < 2) {
-      setState(() {
-        step++;
-        error = null;
-      });
+    if (step < 7) {
+      moveTo(visibleSteps[visibleSteps.indexOf(step) + 1]);
       return;
     }
     setState(() {
@@ -556,11 +646,13 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       children: [
         PageHeading('Nueva solicitud', onBack: busy ? () {} : widget.onBack),
         Text(
-          'Paso ${step + 1} de 3 · ${['Beneficiario', 'Solicitante', 'Solicitud'][step]}',
+          'Paso ${visibleSteps.indexOf(step) + 1} de ${visibleSteps.length} · ${stepNames[step]}',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        LinearProgressIndicator(value: (step + 1) / 3),
+        LinearProgressIndicator(
+          value: (visibleSteps.indexOf(step) + 1) / visibleSteps.length,
+        ),
         const SizedBox(height: 16),
         if (missingCatalogs)
           const Notice(
@@ -571,11 +663,13 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           key: forms[step],
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: step == 0
+            children: step < 3
                 ? beneficiaryFields()
-                : step == 1
+                : step < 5
                 ? applicantFields()
-                : requestFields(),
+                : step < 7
+                ? requestFields()
+                : reviewFields(),
           ),
         ),
         if (error != null) Notice(error!, error: true),
@@ -585,7 +679,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           child: Text(
             busy
                 ? 'Guardando…'
-                : step < 2
+                : step < 7
                 ? 'Continuar'
                 : 'Registrar solicitud',
           ),
@@ -594,10 +688,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           TextButton(
             onPressed: busy
                 ? null
-                : () => setState(() {
-                    step--;
-                    error = null;
-                  }),
+                : () => moveTo(visibleSteps[visibleSteps.indexOf(step) - 1]),
             child: const Text('Paso anterior'),
           ),
       ],

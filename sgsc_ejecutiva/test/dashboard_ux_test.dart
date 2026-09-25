@@ -66,11 +66,16 @@ final summary = {
 class Backend {
   final requests = <Uri>[];
   Completer<void>? gate;
+  bool failDashboard = false;
+  bool emptyDashboard = false;
   late final api = ExecutiveApi(
     client: MockClient((request) async {
       requests.add(request.url);
       final path = request.url.path;
       if (path == '/ejecutivo/dashboard' && gate != null) await gate!.future;
+      if (path == '/ejecutivo/dashboard' && failDashboard) {
+        return http.Response(jsonEncode({'detail': 'Error de consulta'}), 503);
+      }
       if (path.startsWith('/ejecutivo/exportar')) {
         return http.Response(
           jsonEncode({'detail': 'El servidor no pudo generar el archivo.'}),
@@ -87,7 +92,16 @@ class Backend {
           'items': [],
           'total': values == 0 ? 400 : 7 * values,
         },
-        '/ejecutivo/dashboard' => summary,
+        '/ejecutivo/dashboard' =>
+          emptyDashboard
+              ? {
+                  ...summary,
+                  'total': 0,
+                  'activas': 0,
+                  'resueltas': 0,
+                  'municipios': [],
+                }
+              : summary,
         '/ejecutivo/comparacion' => {
           'a': {'total': 3, 'activas': 2, 'resueltas': 1},
           'b': {'total': 5, 'activas': 3, 'resueltas': 2},
@@ -639,7 +653,7 @@ void main() {
       list[0] = {...list[0], 'clave_inegi': '19039'};
     });
 
-    Future<Offset> monterrey(WidgetTester tester) async {
+    Future<Offset> municipality(WidgetTester tester, String code) async {
       final json = jsonDecode(
         await tester.runAsync(
               () => rootBundle.loadString('assets/nl-municipios.json'),
@@ -647,7 +661,7 @@ void main() {
             '{}',
       ) as Map<String, dynamic>;
       final shape = (json['municipios'] as List).firstWhere(
-        (m) => m['cvegeo'] == '19039',
+        (m) => m['cvegeo'] == code,
       );
       final path = parseSvgPathData(shape['path'] as String);
       final center = path.getBounds().center;
@@ -655,13 +669,21 @@ void main() {
       final rect = tester.getRect(
         find.byKey(const ValueKey('municipality-map')),
       );
-      return rect.topLeft + center * (rect.width / (json['ancho'] as num));
+      final painter =
+          tester
+                  .widget<CustomPaint>(
+                    find.byKey(const ValueKey('municipality-map')),
+                  )
+                  .painter
+              as dynamic;
+      final view = painter.view as Rect;
+      return rect.topLeft + (center - view.topLeft) * (rect.width / view.width);
     }
 
     testWidgets('comes right after the trend and shows real counts', (
       tester,
     ) async {
-      await open(tester, account: nl);
+      final backend = await open(tester, account: nl);
       final trend = tester.getTopLeft(
         find.text('Solicitudes por mes de registro'),
       );
@@ -683,8 +705,10 @@ void main() {
       await tester.pumpAndSettle();
       final painted = find.byKey(const ValueKey('municipality-map'));
       final before = tester.getTopLeft(painted.first);
+      final fullView =
+          (tester.widget<CustomPaint>(painted).painter as dynamic).view as Rect;
       expect(find.text('Toca un municipio'), findsOneWidget);
-      await tester.tapAt(await monterrey(tester));
+      await tester.tapAt(await municipality(tester, '19039'));
       await tester.pumpAndSettle();
       expect(find.text('Monterrey'), findsWidgets);
       expect(find.textContaining('40 solicitudes'), findsOneWidget);
@@ -694,17 +718,118 @@ void main() {
         reason: 'the map must not shift under the finger',
       );
 
-      await tester.tap(find.byTooltip('Acercar'));
-      await tester.pumpAndSettle();
       expect(find.byTooltip('Ver todo el estado'), findsOneWidget);
-      await tester.tap(find.byTooltip('Ver todo el estado'));
+      final zoomView =
+          (tester.widget<CustomPaint>(painted).painter as dynamic).view as Rect;
+      expect(zoomView.width, lessThan(fullView.width));
+      for (final path in ['/ejecutivo/dashboard', '/ejecutivo/solicitudes']) {
+        expect(
+          backend.requests
+              .lastWhere((u) => u.path == path)
+              .queryParameters['municipio_id'],
+          '1',
+        );
+      }
+      await tester.tapAt(await municipality(tester, '19039'));
       await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Filtrar'));
-      await tester.pumpAndSettle();
-      expect(find.text('Municipio: Monterrey'), findsOneWidget);
-      expect(find.text('Quitar del filtro'), findsOneWidget);
+      expect(find.text('Quitar municipio'), findsNothing);
+      expect(
+        (tester.widget<CustomPaint>(painted).painter as dynamic).view,
+        fullView,
+      );
+      expect(
+        backend.requests
+            .lastWhere((u) => u.path == '/ejecutivo/dashboard')
+            .queryParameters
+            .containsKey('municipio_id'),
+        isFalse,
+      );
     });
+
+    testWidgets(
+      'map replaces municipality, preserves other filters and clears during loading',
+      (tester) async {
+        catalogs['municipios']![1] = {
+          ...catalogs['municipios']![1],
+          'clave_inegi': '19026',
+        };
+        final backend = await open(tester, account: nl);
+        await openFilters(tester);
+        await tick(tester, 'Tipo de apoyo', ['Medicamento']);
+        await tester.tap(applyButton());
+        await settle(tester);
+        await tester.scrollUntilVisible(
+          find.byType(MunicipalityMap),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.ensureVisible(find.byType(MunicipalityMap));
+        await tester.pumpAndSettle();
+        await tester.tapAt(await municipality(tester, '19039'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Ver todo el estado'));
+        await tester.pumpAndSettle();
+        await tester.tapAt(await municipality(tester, '19026'));
+        await tester.pumpAndSettle();
+        var query = backend.requests
+            .lastWhere((u) => u.path == '/ejecutivo/dashboard')
+            .queryParametersAll;
+        expect(query['municipio_id'], ['2']);
+        expect(query['tipo_apoyo_id'], ['1']);
+        backend.gate = Completer<void>();
+        await tester.tap(find.text('Quitar municipio'));
+        await tester.pump();
+        expect(find.text('Actualizando solicitudes...'), findsOneWidget);
+        query = backend.requests
+            .lastWhere((u) => u.path == '/ejecutivo/solicitudes')
+            .queryParametersAll;
+        expect(query.containsKey('municipio_id'), isFalse);
+        expect(query['tipo_apoyo_id'], ['1']);
+        expect(query['page'], ['0']);
+        backend.gate!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('Toca un municipio'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'map keeps selection on error, retries and displays filtered empty state',
+      (tester) async {
+        final backend = await open(tester, account: nl);
+        await tester.scrollUntilVisible(
+          find.byType(MunicipalityMap),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.ensureVisible(find.byType(MunicipalityMap));
+        await tester.pumpAndSettle();
+        backend.failDashboard = true;
+        await tester.tapAt(await municipality(tester, '19039'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('No se pudieron actualizar los datos.'),
+          findsOneWidget,
+        );
+        expect(
+          tester.widget<MunicipalityMap>(find.byType(MunicipalityMap)).active,
+          {'1'},
+        );
+        backend.failDashboard = false;
+        backend.emptyDashboard = true;
+        await tester.ensureVisible(find.byTooltip('Reintentar mapa'));
+        await tester.tap(find.byTooltip('Reintentar mapa'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byType(MunicipalityMap));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Sin solicitudes con los filtros actuales.'),
+          findsOneWidget,
+        );
+        expect(find.text('Quitar municipio'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('is not shown for other states', (tester) async {
       await open(tester, account: {...user, 'clave_inegi': '05'});

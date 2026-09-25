@@ -112,6 +112,9 @@ void main() {
       await choose('Origen de la solicitud', 'origenes');
       await choose('Canal de recepción', 'canales');
       await choose('Unidad tratante', 'unidades');
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
       final description = find.descendant(
         of: find.ancestor(
           of: find.text('Descripción de la solicitud'),
@@ -119,8 +122,28 @@ void main() {
         ),
         matching: find.byType(TextFormField),
       );
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Completa este campo.'), findsOneWidget);
+      expect(posted, isNull);
       await tester.ensureVisible(description);
       await tester.enterText(description, 'Solicitud de prueba');
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Solicitud de prueba'), findsOneWidget);
+      expect(posted, isNull);
+      await tester.ensureVisible(find.text('Paso anterior'));
+      await tester.tap(find.text('Paso anterior'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextFormField>(description).controller!.text,
+        'Solicitud de prueba',
+      );
+      await tester.ensureVisible(find.text('Continuar'));
+      await tester.tap(find.text('Continuar'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Registrar solicitud'));
       await tester.tap(find.text('Registrar solicitud'));
       await tester.pumpAndSettle();
