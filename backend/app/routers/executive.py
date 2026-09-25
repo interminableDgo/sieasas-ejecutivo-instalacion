@@ -115,7 +115,8 @@ def export(format:Literal['xlsx','pdf'],selected=Depends(svc.filters),user=Depen
     for key,value in selected.items():
         if key in labels:
             label,cat=labels[key]
-            value=next((r['nombre'] for r in cats[cat] if r['id']==value),str(value))
+            ids=value if isinstance(value,list) else [value]
+            value=', '.join(next((r['nombre'] for r in cats[cat] if r['id']==i),str(i)) for i in ids)
         else:
             label=key.replace('_',' ').capitalize()
         filter_parts.append(f'{label}: {value}')

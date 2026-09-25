@@ -9,12 +9,12 @@ import '../core/theme.dart';
 
 class DataBars extends StatelessWidget {
   final List<dynamic> rows;
-  final String? active;
+  final Set<String> active;
   final ValueChanged<String> onSelect;
   const DataBars({
     super.key,
     required this.rows,
-    this.active,
+    this.active = const {},
     required this.onSelect,
   });
   @override
@@ -39,9 +39,7 @@ class DataBars extends StatelessWidget {
                 onTap: r['id'] == null ? null : () => onSelect('${r['id']}'),
                 child: Container(
                   padding: const EdgeInsets.all(5),
-                  color: active != null && active == '${r['id']}'
-                      ? blueTint
-                      : null,
+                  color: active.contains('${r['id']}') ? blueTint : null,
                   child: Column(
                     children: [
                       Row(
@@ -108,13 +106,23 @@ class _TrendChartState extends State<TrendChart> {
     }
     return Column(
       children: [
-        const Row(
+        const Wrap(
+          spacing: 18,
           children: [
-            Icon(Icons.horizontal_rule, color: salud),
-            Text('Registradas', style: TextStyle(fontSize: 11)),
-            SizedBox(width: 18),
-            Icon(Icons.horizontal_rule, color: brand),
-            Text('Resueltas actualmente', style: TextStyle(fontSize: 11)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.horizontal_rule, color: salud),
+                Text('Registradas', style: TextStyle(fontSize: 11)),
+              ],
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.horizontal_rule, color: brand),
+                Text('Resueltas actualmente', style: TextStyle(fontSize: 11)),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -225,128 +233,331 @@ class _TrendPainter extends CustomPainter {
   bool shouldRepaint(covariant _TrendPainter old) => true;
 }
 
-class RegionMap extends StatefulWidget {
+/// Nuevo León by municipality, coloured by the requests of each one with the
+/// current filters. Tapping selects a municipality (orange) and shows its
+/// count; "Filtrar" applies it as a filter. "Acercar" zooms on the selection
+/// so the small metropolitan municipalities are easy to tap — a button
+/// instead of pinch/pan, which would fight with the page scroll on phones.
+class MunicipalityMap extends StatefulWidget {
+  /// Dashboard rows: {id, nombre, total}.
   final List<dynamic> rows;
-  final String? active;
-  final ValueChanged<String> onSelect;
-  const RegionMap({
+
+  /// Catalog rows: {id, nombre, clave_inegi}; links INEGI shapes to ids.
+  final List<dynamic> catalog;
+  final Set<String> active;
+  final ValueChanged<String> onFilter;
+  const MunicipalityMap({
     super.key,
     required this.rows,
-    this.active,
-    required this.onSelect,
+    required this.catalog,
+    required this.onFilter,
+    this.active = const {},
   });
   @override
-  State<RegionMap> createState() => _RegionMapState();
+  State<MunicipalityMap> createState() => _MunicipalityMapState();
 }
 
-class _RegionMapState extends State<RegionMap> {
-  late final Future<List<dynamic>> shapes = rootBundle
-      .loadString('assets/nl-map.json')
-      .then((s) => jsonDecode(s) as List<dynamic>);
+class _MapShape {
+  final String cvegeo, name;
+  final Path path;
+  _MapShape(this.cvegeo, this.name, this.path);
+}
+
+class _MapData {
+  final double width, height;
+  final String source;
+  final List<_MapShape> shapes;
+  _MapData(this.width, this.height, this.source, this.shapes);
+}
+
+class _MunicipalityMapState extends State<MunicipalityMap> {
+  static final Future<_MapData> _data = rootBundle
+      .loadString('assets/nl-municipios.json')
+      .then((raw) {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        return _MapData(
+          (json['ancho'] as num).toDouble(),
+          (json['alto'] as num).toDouble(),
+          '${json['fuente']}',
+          [
+            for (final m in json['municipios'] as List)
+              _MapShape(
+                '${m['cvegeo']}',
+                '${m['nombre']}',
+                parseSvgPathData('${m['path']}')
+                  ..fillType = PathFillType.evenOdd,
+              ),
+          ],
+        );
+      });
+  String? selected;
+  bool zoomed = false;
+
+  Map<String, String> get idByCvegeo => {
+    for (final r in widget.catalog) '${r['clave_inegi']}': '${r['id']}',
+  };
+  Map<String, num> get totalById => {
+    for (final r in widget.rows) '${r['id']}': r['total'] as num,
+  };
+
+  Rect viewBox(_MapData data) {
+    final full = Rect.fromLTWH(0, 0, data.width, data.height);
+    if (!zoomed || selected == null) return full;
+    final bounds = data.shapes
+        .firstWhere((s) => s.cvegeo == selected)
+        .path
+        .getBounds();
+    // A window with the map's aspect, ~1/3 of its size, centred on the pick.
+    final w = math.max(data.width / 3, bounds.width * 1.6);
+    final h = w * data.height / data.width;
+    final left = (bounds.center.dx - w / 2).clamp(0.0, data.width - w);
+    final top = (bounds.center.dy - h / 2).clamp(0.0, data.height - h);
+    return Rect.fromLTWH(left, top, w, h);
+  }
+
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      FutureBuilder<List<dynamic>>(
-        future: shapes,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox(height: 230);
-          return Center(
-            child: GestureDetector(
-              onTapUp: (event) {
-                final point = event.localPosition / (230 / 300);
-                for (final item in snapshot.data!) {
-                  if (parseSvgPathData(item['path']).contains(point)) {
-                    final found = widget.rows.where(
-                      (r) => r['nombre'] == item['region'] && r['id'] != null,
-                    );
-                    if (found.isNotEmpty) {
-                      widget.onSelect('${found.first['id']}');
-                    }
-                    break;
-                  }
-                }
-              },
-              child: SizedBox(
-                width: 230,
-                height: 383,
-                child: CustomPaint(
-                  painter: _MapPainter(
-                    snapshot.data!,
-                    widget.rows,
-                    widget.active,
+  Widget build(BuildContext context) => FutureBuilder<_MapData>(
+    future: _data,
+    builder: (context, snapshot) {
+      final data = snapshot.data;
+      if (data == null) return const SizedBox(height: 240);
+      final ids = idByCvegeo, totals = totalById;
+      num count(String cvegeo) => totals[ids[cvegeo]] ?? 0;
+      final max = data.shapes.fold<num>(
+        1,
+        (m, s) => math.max(m, count(s.cvegeo)),
+      );
+      final sum = totals.values.fold<num>(0, (a, b) => a + b);
+      final pick = selected == null
+          ? null
+          : data.shapes.firstWhere((s) => s.cvegeo == selected);
+      final pickId = pick == null ? null : ids[pick.cvegeo];
+      final activeCvegeo = {
+        for (final e in ids.entries)
+          if (widget.active.contains(e.value)) e.key,
+      };
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Above the map and with the same rows before and after a tap, so
+          // the answer is in view and the map never shifts under the finger.
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              pick?.name ?? 'Toca un municipio',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+          ),
+          Text(
+            pick == null
+                ? 'para ver cuántas solicitudes tiene.'
+                : '${count(pick.cvegeo)} ${count(pick.cvegeo) == 1 ? 'solicitud' : 'solicitudes'}'
+                      '${sum > 0 ? ' · ${(count(pick.cvegeo) / sum * 100).toStringAsFixed(1)} % del total' : ''}',
+            style: const TextStyle(fontSize: 12, color: muted),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 44,
+            child: pick == null
+                ? null
+                : Row(
+                    children: [
+                      if (pickId != null)
+                        Flexible(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                            ),
+                            onPressed: () => widget.onFilter(pickId),
+                            icon: Icon(
+                              widget.active.contains(pickId)
+                                  ? Icons.filter_alt_off_outlined
+                                  : Icons.filter_alt_outlined,
+                              size: 18,
+                            ),
+                            label: Text(
+                              widget.active.contains(pickId)
+                                  ? 'Quitar del filtro'
+                                  : 'Filtrar',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
+                        onPressed: () => setState(() => zoomed = !zoomed),
+                        icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, box) {
+              final height = math.min(
+                420.0,
+                box.maxWidth * data.height / data.width,
+              );
+              final width = height * data.width / data.height;
+              return Center(
+                child: TweenAnimationBuilder<Rect?>(
+                  tween: RectTween(end: viewBox(data)),
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, view, _) => Semantics(
+                    container: true,
+                    label: pick == null
+                        ? 'Mapa de Nuevo León por municipio. Toca un municipio para ver sus solicitudes.'
+                        : 'Mapa de Nuevo León. ${pick.name}: ${count(pick.cvegeo)} solicitudes.',
+                    // Described, but not exposed as one big button: on web
+                    // with accessibility on, a tap on a semantic button is
+                    // delivered at its centre, which would always pick the
+                    // central municipality. The bar list is the accessible
+                    // way to choose one.
+                    child: ExcludeSemantics(
+                      child: GestureDetector(
+                        onTapUp: (event) {
+                          final v = view;
+                          final point =
+                              v.topLeft +
+                              event.localPosition * (v.width / width);
+                          for (final shape in data.shapes) {
+                            if (shape.path.contains(point)) {
+                              setState(() => selected = shape.cvegeo);
+                              return;
+                            }
+                          }
+                        },
+                        child: ClipRect(
+                          child: CustomPaint(
+                            key: const ValueKey('municipality-map'),
+                            size: Size(width, height),
+                            painter: _MunicipalityPainter(
+                              data.shapes,
+                              view!,
+                              fill: (s) {
+                                final value = count(s.cvegeo);
+                                if (s.cvegeo == selected) return brand;
+                                return value == 0
+                                    ? border
+                                    : brand.withValues(
+                                        alpha: 0.15 + 0.55 * value / max,
+                                      );
+                              },
+                              outlined: {...activeCvegeo, ?selected},
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          const _MapLegend(),
+          const SizedBox(height: 8),
+          Text(
+            'Límites municipales: ${data.source}.',
+            style: const TextStyle(fontSize: 10, color: muted),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _MapLegend extends StatelessWidget {
+  const _MapLegend();
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 14,
+    runSpacing: 6,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Menos', style: TextStyle(fontSize: 11)),
+          const SizedBox(width: 6),
+          Container(
+            width: 72,
+            height: 8,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              gradient: LinearGradient(
+                colors: [
+                  brand.withValues(alpha: 0.15),
+                  brand.withValues(alpha: 0.7),
+                ],
               ),
             ),
-          );
-        },
-      ),
-      const SizedBox(height: 12),
-      if (widget.rows.isEmpty)
-        const Text(
-          'Sin solicitudes para distribuir por región.',
-          style: TextStyle(fontSize: 12, color: muted),
-        ),
-      ...widget.rows.map(
-        (r) => Material(
-          color: Colors.transparent,
-          child: ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            selected: widget.active != null && widget.active == '${r['id']}',
-            leading: const Icon(Icons.square, color: brand, size: 12),
-            title: Text('${r['nombre']}', style: const TextStyle(fontSize: 12)),
-            trailing: Text(
-              '${r['total']}',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            onTap: r['id'] == null ? null : () => widget.onSelect('${r['id']}'),
           ),
-        ),
+          const SizedBox(width: 6),
+          const Text('Más', style: TextStyle(fontSize: 11)),
+        ],
       ),
-      const Text(
-        'Mapa de referencia del diseño original. La clasificación visual es aproximada; los conteos corresponden al catálogo de la base de datos.',
-        style: TextStyle(fontSize: 10, color: muted),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: border,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text('Sin solicitudes', style: TextStyle(fontSize: 11)),
+        ],
       ),
     ],
   );
 }
 
-class _MapPainter extends CustomPainter {
-  final List<dynamic> shapes, rows;
-  final String? active;
-  _MapPainter(this.shapes, this.rows, this.active);
+class _MunicipalityPainter extends CustomPainter {
+  final List<_MapShape> shapes;
+  final Rect view;
+  final Color Function(_MapShape) fill;
+  final Set<String> outlined;
+  _MunicipalityPainter(
+    this.shapes,
+    this.view, {
+    required this.fill,
+    required this.outlined,
+  });
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 300);
-    final max = rows.fold<double>(
-      1,
-      (m, r) => math.max(m, (r['total'] as num).toDouble()),
-    );
+    final scale = size.width / view.width;
+    canvas
+      ..scale(scale)
+      ..translate(-view.left, -view.top);
     for (final shape in shapes) {
-      final matching = rows.where((r) => r['nombre'] == shape['region']);
-      final row = matching.isEmpty ? null : matching.first;
-      final value = row == null ? 0.0 : (row['total'] as num).toDouble();
-      final path = parseSvgPathData(shape['path']);
-      final selected =
-          active != null && row != null && '${row['id']}' == active;
+      canvas.drawPath(shape.path, Paint()..color = fill(shape));
       canvas.drawPath(
-        path,
+        shape.path,
         Paint()
-          ..color = value == 0
-              ? border
-              : brand.withValues(alpha: 0.2 + 0.8 * value / max),
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = selected ? ink : Colors.white
+          ..color = Colors.white
           ..style = PaintingStyle.stroke
-          ..strokeWidth = selected ? 1.2 : 0.6,
+          ..strokeWidth = 0.8 / scale,
+      );
+    }
+    for (final shape in shapes.where((s) => outlined.contains(s.cvegeo))) {
+      canvas.drawPath(
+        shape.path,
+        Paint()
+          ..color = ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6 / scale,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _MapPainter old) => true;
+  bool shouldRepaint(covariant _MunicipalityPainter old) => true;
 }

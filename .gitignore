@@ -26,3 +26,11 @@ sgsc_ejecutiva/.dart_tool/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Configuración local del entorno de desarrollo
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+SKILL.md
+SKILLS.md
+*ClaudeCode*.txt

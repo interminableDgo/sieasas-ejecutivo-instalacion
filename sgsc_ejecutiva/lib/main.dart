@@ -35,11 +35,32 @@ class _SgscAppState extends State<SgscApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       title: 'SGSC Ejecutiva',
       theme: executiveTheme(),
+      // Mobile-first: on a wide browser window (quick tests before running on
+      // iPhone) the whole navigator, including sheets, dialogs and menus,
+      // behaves like a phone screen. On a phone this changes nothing.
+      builder: (context, child) => LayoutBuilder(
+        builder: (context, box) {
+          final width = box.maxWidth.clamp(0.0, phoneMaxWidth);
+          return ColoredBox(
+            color: border,
+            child: Center(
+              child: SizedBox(
+                width: width,
+                child: MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(size: Size(width, box.maxHeight)),
+                  child: child!,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
       home: Scaffold(
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: phoneMaxWidth),
               child: user == null
                   ? LoginScreen(
                       api: api,

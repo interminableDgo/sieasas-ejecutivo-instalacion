@@ -161,8 +161,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Aún no hay solicitudes'), findsOneWidget);
     expect(find.text('Registrar primera solicitud'), findsOneWidget);
-    final export = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Excel'),
+    final export = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Exportar reporte'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
     );
     expect(export.onPressed, isNull);
     expect(tester.takeException(), isNull);
@@ -182,13 +185,18 @@ void main() {
     await prepare(tester);
     await tester.pumpWidget(wrap(dashboard(mockApi())));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Filtros '));
+    await tester.tap(find.text('Filtros'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+    await tester.tap(
+      find.bySemanticsLabel(RegExp('^Municipio: .*Elegir opciones')),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Monterrey').last);
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Monterrey'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Filtros 1'));
+    await tester.tap(find.text('Listo (1)'));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Ver 0 solicitudes'));
     await tester.pumpAndSettle();
     expect(find.text('Sin resultados'), findsOneWidget);
     await screenshot(tester, '04-sin-resultados');

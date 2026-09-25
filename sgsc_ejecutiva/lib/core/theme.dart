@@ -8,6 +8,9 @@ const border = Color(0xFFE3E3DE);
 const muted = Color(0xFF5B6B74);
 const blueTint = Color(0xFFE7F6FD);
 
+/// Widest layout the app uses; wider windows are treated as a phone.
+const phoneMaxWidth = 440.0;
+
 ThemeData executiveTheme() => ThemeData(
   useMaterial3: true,
   fontFamily: 'Mulish',
@@ -36,6 +39,26 @@ ThemeData executiveTheme() => ThemeData(
     ),
     bodyMedium: TextStyle(fontSize: 14, color: ink, height: 1.5),
     bodySmall: TextStyle(fontSize: 12, color: muted, height: 1.5),
+  ),
+  // Floating surfaces are white; the seed colour would tint them peach.
+  bottomSheetTheme: const BottomSheetThemeData(
+    backgroundColor: Colors.white,
+    modalBackgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+  ),
+  dialogTheme: const DialogThemeData(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+  ),
+  datePickerTheme: const DatePickerThemeData(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+  ),
+  menuTheme: const MenuThemeData(style: _whiteMenu),
+  dropdownMenuTheme: const DropdownMenuThemeData(menuStyle: _whiteMenu),
+  popupMenuTheme: const PopupMenuThemeData(
+    color: Colors.white,
+    surfaceTintColor: Colors.transparent,
   ),
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
@@ -74,4 +97,9 @@ ThemeData executiveTheme() => ThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
   ),
+);
+
+const _whiteMenu = MenuStyle(
+  backgroundColor: WidgetStatePropertyAll(Colors.white),
+  surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
 );

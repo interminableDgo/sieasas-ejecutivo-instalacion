@@ -1,14 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 
 import '../core/theme.dart';
 import '../services/executive_api.dart';
 import 'executive_widgets.dart';
+import 'filter_sheet.dart';
+
+/// What the person chose to compare, plus the last result and the query it
+/// answers. Owned by the dashboard so hiding the comparison (which disposes
+/// the widget) keeps the periods, and showing it again needs no request when
+/// nothing changed.
+class ComparisonSelection {
+  bool annual = false;
+  late DateTime a, b;
+  Map<String, dynamic>? result;
+  String? resultKey;
+  ComparisonSelection() {
+    final now = DateTime.now();
+    b = DateTime(now.year, now.month - 1);
+    a = DateTime(b.year - 1, b.month);
+  }
+}
 
 class PeriodComparison extends StatefulWidget {
   final ExecutiveApi api;
-  final Map<String, String> filters;
-  const PeriodComparison({super.key, required this.api, required this.filters});
+  final Filters filters;
+  final ComparisonSelection? selection;
+  const PeriodComparison({
+    super.key,
+    required this.api,
+    required this.filters,
+    this.selection,
+  });
   @override
   State<PeriodComparison> createState() => _PeriodComparisonState();
 }
@@ -28,26 +50,33 @@ class _PeriodComparisonState extends State<PeriodComparison> {
     'Noviembre',
     'Diciembre',
   ];
-  bool annual = false;
-  late DateTime a, b;
-  Map<String, dynamic>? result;
+  late final ComparisonSelection selection =
+      widget.selection ?? ComparisonSelection();
+  bool get annual => selection.annual;
+  set annual(bool value) => selection.annual = value;
+  DateTime get a => selection.a;
+  set a(DateTime value) => selection.a = value;
+  DateTime get b => selection.b;
+  set b(DateTime value) => selection.b = value;
+  Map<String, dynamic>? get result => selection.result;
+  set result(Map<String, dynamic>? value) => selection.result = value;
   String? error;
-  bool busy = true;
+  bool busy = false;
   int generation = 0;
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    b = DateTime(now.year, now.month - 1);
-    a = DateTime(b.year - 1, b.month);
-    compare();
+    if (result == null || selection.resultKey != queryKey) compare();
   }
 
   @override
   void didUpdateWidget(covariant PeriodComparison oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!mapEquals(oldWidget.filters, widget.filters)) compare();
+    if (filtersKey(oldWidget.filters) != filtersKey(widget.filters)) compare();
   }
+
+  String get queryKey =>
+      '${filtersKey(widget.filters)}|$annual|${iso(a)}|${iso(b)}';
 
   String iso(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -55,14 +84,14 @@ class _PeriodComparisonState extends State<PeriodComparison> {
       annual ? '${d.year}' : '${months[d.month - 1]} ${d.year}';
   Future<void> compare() async {
     final current = ++generation;
+    // Keep the previous result on screen while recomputing, so the card does
+    // not collapse and shift the page.
     setState(() {
       busy = true;
       error = null;
-      result = null;
     });
-    final query = Map<String, String>.from(widget.filters)
-      ..remove('fecha_inicio')
-      ..remove('fecha_fin');
+    final key = queryKey;
+    final Map<String, Object> query = {...widget.filters};
     for (final entry in {'a': a, 'b': b}.entries) {
       final d = entry.value;
       query['${entry.key}_inicio'] = iso(
@@ -74,35 +103,37 @@ class _PeriodComparisonState extends State<PeriodComparison> {
     }
     try {
       final response = await widget.api.get('/ejecutivo/comparacion', query);
-      if (mounted && current == generation) setState(() => result = response);
+      if (mounted && current == generation) {
+        setState(() {
+          result = response;
+          selection.resultKey = key;
+        });
+      }
     } catch (e) {
       if (mounted && current == generation) {
-        setState(() => error = e.toString());
+        setState(() {
+          error = e.toString();
+          result = null;
+        });
       }
     } finally {
       if (mounted && current == generation) setState(() => busy = false);
     }
   }
 
+  /// Switching Meses/Años only changes how the chosen periods are read: each
+  /// keeps its year and month, so going back restores the same months.
   void mode(bool value) {
     if (annual == value) return;
-    setState(() {
-      annual = value;
-      final now = DateTime.now();
-      b = value ? DateTime(now.year - 1) : DateTime(now.year, now.month - 1);
-      a = DateTime(b.year - 1, b.month);
-    });
+    setState(() => annual = value);
     compare();
   }
 
   Future<void> pick(bool reference) async {
     var selected = reference ? a : b;
-    final chosen = await showModalBottomSheet<DateTime>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheet) => StatefulBuilder(
+    final chosen = await showPhoneSheet<DateTime>(
+      context,
+      (sheet) => StatefulBuilder(
         builder: (sheet, update) => SafeArea(
           top: false,
           child: SingleChildScrollView(
@@ -127,8 +158,9 @@ class _PeriodComparisonState extends State<PeriodComparison> {
                         firstDate: DateTime(2000),
                         lastDate: DateTime(DateTime.now().year),
                         selectedDate: selected,
-                        onChanged: (d) =>
-                            update(() => selected = DateTime(d.year)),
+                        onChanged: (d) => update(
+                          () => selected = DateTime(d.year, selected.month),
+                        ),
                       ),
                     ),
                   if (!annual) ...[
@@ -375,7 +407,7 @@ class _PeriodComparisonState extends State<PeriodComparison> {
               onPressed: () {
                 setState(
                   () => a = annual
-                      ? DateTime(b.year - 1)
+                      ? DateTime(b.year - 1, a.month)
                       : DateTime(b.year, b.month - 1),
                 );
                 compare();
@@ -393,7 +425,7 @@ class _PeriodComparisonState extends State<PeriodComparison> {
           ],
         ),
         Text(
-          widget.filters.keys.any((k) => !k.startsWith('fecha_'))
+          widget.filters.isNotEmpty
               ? 'Con los filtros del panel · actualización automática'
               : 'Todos los registros de tu estado · actualización automática',
           style: const TextStyle(fontSize: 12, color: muted),
@@ -409,7 +441,15 @@ class _PeriodComparisonState extends State<PeriodComparison> {
               style: TextStyle(fontSize: 12),
             ),
           ),
-        if (busy)
+        if (busy && result != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: LinearProgressIndicator(
+              minHeight: 2,
+              semanticsLabel: 'Actualizando comparación',
+            ),
+          )
+        else if (busy)
           const Padding(
             padding: EdgeInsets.all(24),
             child: Center(

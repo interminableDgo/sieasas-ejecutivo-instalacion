@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
@@ -134,4 +135,107 @@ class PageHeading extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Filters, pickers and exports open as a white bottom sheet: the phone
+/// convention, reachable with the thumb and never wider or taller than the
+/// screen. Its content scrolls inside; the page behind does not move.
+Future<T?> showPhoneSheet<T>(
+  BuildContext context,
+  WidgetBuilder builder, {
+  double heightFactor = 0.9,
+}) => showModalBottomSheet<T>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  showDragHandle: true,
+  constraints: BoxConstraints(
+    maxHeight: MediaQuery.sizeOf(context).height * heightFactor,
+  ),
+  builder: builder,
+);
+
+/// Title row shared by sheets: title, optional action and a close button
+/// (drag handles are not obvious on desktop, Escape is not on touch).
+class SheetHeader extends StatelessWidget {
+  final String title;
+  final Widget? action;
+  const SheetHeader(this.title, {super.key, this.action});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 0, 8, 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
+        ?action,
+        IconButton(
+          tooltip: 'Cerrar',
+          onPressed: () => Navigator.maybePop(context),
+          icon: const Icon(Icons.close),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Action area pinned to the bottom of a sheet, always in view.
+class SheetFooter extends StatelessWidget {
+  final List<Widget> children;
+  const SheetFooter({super.key, required this.children});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: border)),
+    ),
+    // Clear of the iPhone home indicator.
+    child: SafeArea(
+      top: false,
+      left: false,
+      right: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    ),
+  );
+}
+
+bool isCupertino(BuildContext context) => switch (Theme.of(context).platform) {
+  TargetPlatform.iOS || TargetPlatform.macOS => true,
+  _ => false,
+};
+
+/// Native-looking confirmation on each platform: a Cupertino alert on iOS,
+/// a Material dialog on Android. Resolves to true only on [action].
+Future<bool> confirmAction(
+  BuildContext context, {
+  required String title,
+  required String body,
+  required String action,
+  bool destructive = false,
+}) async {
+  Widget button(BuildContext c, String label, bool value) => isCupertino(c)
+      ? CupertinoDialogAction(
+          isDefaultAction: !value,
+          isDestructiveAction: value && destructive,
+          onPressed: () => Navigator.pop(c, value),
+          child: Text(label),
+        )
+      : TextButton(
+          onPressed: () => Navigator.pop(c, value),
+          child: Text(label),
+        );
+  return await showAdaptiveDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog.adaptive(
+          title: Text(title),
+          content: Text(body),
+          actions: [button(c, 'Cancelar', false), button(c, action, true)],
+        ),
+      ) ==
+      true;
 }

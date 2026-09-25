@@ -65,7 +65,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/nl-logo.png
-    - assets/nl-map.json
+    - assets/nl-municipios.json
   fonts:
     - family: Mulish
       fonts:

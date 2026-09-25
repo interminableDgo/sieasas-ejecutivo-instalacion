@@ -46,8 +46,7 @@ void main() {
                   child: PeriodComparison(
                     api: api,
                     filters: const {
-                      'municipio_id': '3',
-                      'fecha_inicio': '2000-01-01',
+                      'municipio_id': ['3'],
                     },
                   ),
                 ),

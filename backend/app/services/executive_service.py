@@ -17,25 +17,47 @@ FILTER_COLUMNS = {'municipio_id':'m.id', 'tipo_apoyo_id':'sa.solapoyo_tipoapoyoi
  'grupo_vulnerable_id':'b.ben_misc_grupovulnerable_id', 'estatus_id':'sa.solapoyo_statusid'}
 
 
-def filters(municipio_id: int | None = Query(None, gt=0),
-    tipo_apoyo_id: int | None = Query(None, gt=0), dependencia_id: int | None = Query(None, gt=0),
-    grupo_vulnerable_id: int | None = Query(None, gt=0), estatus_id: int | None = Query(None, gt=0),
+MAX_VALUES_PER_FILTER = 100
+
+
+def filters(municipio_id: list[int] | None = Query(None),
+    tipo_apoyo_id: list[int] | None = Query(None), dependencia_id: list[int] | None = Query(None),
+    grupo_vulnerable_id: list[int] | None = Query(None), estatus_id: list[int] | None = Query(None),
     fecha_inicio: date | None = None, fecha_fin: date | None = None,
     region_id: int | None = Query(None, gt=0)):
-    if region_id is not None:
+    """Each catalog filter accepts repeated values (?estatus_id=1&estatus_id=5):
+    values of one filter are alternatives (OR), different filters combine (AND)."""
+    # Called directly (not through FastAPI) the defaults are Query markers.
+    if isinstance(region_id, int):
         raise HTTPException(422, 'SSNL no clasifica los municipios por región. Utiliza el filtro de municipio.')
-    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+    if isinstance(fecha_inicio, date) and isinstance(fecha_fin, date) and fecha_inicio > fecha_fin:
         raise HTTPException(422, 'La fecha inicial debe ser anterior a la final.')
-    return {k:v for k,v in locals().items() if v is not None}
+    selected = {}
+    for key, value in locals().items():
+        if key in FILTER_COLUMNS and isinstance(value, list) and value:
+            if len(value) > MAX_VALUES_PER_FILTER or any(v <= 0 for v in value):
+                raise HTTPException(422, 'Filtro inválido.')
+            unique = list(dict.fromkeys(value))
+            selected[key] = unique[0] if len(unique) == 1 else unique
+        elif key in ('fecha_inicio', 'fecha_fin') and isinstance(value, date):
+            selected[key] = value
+    return selected
 
 
 def where_clause(user, selected):
     clauses = ['m.entidad_id=:entidad_id']
     params = {'entidad_id': user['entidad_id']}
     for key, column in FILTER_COLUMNS.items():
-        if key in selected:
+        if key not in selected:
+            continue
+        value = selected[key]
+        if isinstance(value, (list, tuple)):
+            names = [f'{key}_{i}' for i in range(len(value))]
+            clauses.append(f"{column} IN ({','.join(':' + n for n in names)})")
+            params.update(zip(names, value))
+        else:
             clauses.append(f'{column}=:{key}')
-            params[key] = selected[key]
+            params[key] = value
     if selected.get('fecha_inicio'):
         clauses.append('sa.created>=:fecha_inicio')
         params['fecha_inicio'] = selected['fecha_inicio']

@@ -30,6 +30,24 @@ def test_scope_always_applied_and_parameterized():
     assert params=={'entidad_id':7,'municipio_id':12,'dependencia_id':3}
 
 
+def test_multiple_values_are_alternatives_within_a_filter():
+    where, params=where_clause({'entidad_id':7},{'municipio_id':[12,15],'estatus_id':1})
+    assert 'm.id IN (:municipio_id_0,:municipio_id_1)' in where
+    assert 'sa.solapoyo_statusid=:estatus_id' in where
+    assert 'm.entidad_id=:entidad_id' in where
+    assert params=={'entidad_id':7,'municipio_id_0':12,'municipio_id_1':15,'estatus_id':1}
+
+
+def test_filters_accept_repeated_params_and_reject_invalid():
+    from app.services.executive_service import filters
+    assert filters(municipio_id=[3,3],estatus_id=[1,5])=={'municipio_id':3,'estatus_id':[1,5]}
+    assert filters()=={}
+    with pytest.raises(Exception):
+        filters(municipio_id=[0])
+    with pytest.raises(Exception):
+        filters(tipo_apoyo_id=list(range(1,102)))
+
+
 def test_blank_request_rejected():
     with pytest.raises(ValueError):
         NewRequest(nombres=' ',apellidos='A',municipio_id=1,tipo_apoyo_id=1,dependencia_id=1,descripcion='x',idempotencia=uuid.uuid4())

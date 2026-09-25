@@ -24,7 +24,8 @@ class ExecutiveApi {
   Future<http.Response> request(
     String path, {
     Map<String, dynamic>? body,
-    Map<String, String> query = const {},
+    // Values are a String or an Iterable<String> (repeated ?key=a&key=b).
+    Map<String, Object> query = const {},
   }) async {
     final uri = Uri.parse('$baseUrl$path')
         .replace(queryParameters: query.isEmpty ? null : query);
@@ -62,7 +63,7 @@ class ExecutiveApi {
 
   Future<Map<String, dynamic>> get(
     String path, [
-    Map<String, String> query = const {},
+    Map<String, Object> query = const {},
   ]) async =>
       jsonDecode(utf8.decode((await request(path, query: query)).bodyBytes))
           as Map<String, dynamic>;
@@ -72,7 +73,7 @@ class ExecutiveApi {
   ) async =>
       jsonDecode(utf8.decode((await request(path, body: body)).bodyBytes))
           as Map<String, dynamic>;
-  Future<Uint8List> export(String format, Map<String, String> filters) async =>
+  Future<Uint8List> export(String format, Map<String, Object> filters) async =>
       (await request('/ejecutivo/exportar/$format', query: filters)).bodyBytes;
   void dispose() => client.close();
 }
