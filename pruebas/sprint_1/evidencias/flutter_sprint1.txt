@@ -1,0 +1,4 @@
+00:00 +0: loading C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/sprint1_test.dart
+00:00 +0: HU1 recovery validates email and displays generic response
+00:01 +1: HU4 category filters list and detail returns to same context
+00:02 +2: All tests passed!

@@ -127,6 +127,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Completa este campo.'), findsOneWidget);
       expect(posted, isNull);
+      await screenshot(tester, 'HU5-descripcion-obligatoria');
       await tester.ensureVisible(description);
       await tester.enterText(description, 'Solicitud de prueba');
       await tester.ensureVisible(find.text('Continuar'));
@@ -145,12 +146,15 @@ void main() {
       await tester.tap(find.text('Continuar'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Registrar solicitud'));
+      await screenshot(tester, 'HU5-confirmacion-solicitud');
       await tester.tap(find.text('Registrar solicitud'));
       await tester.pumpAndSettle();
       expect(saved, 'Solicitud #9');
       expect(posted!['beneficiario_id'], 21);
       expect(posted!['solicitante_id'], 22);
       expect(posted!['canal_id'], 1);
+      expect(posted!['descripcion'], 'Solicitud de prueba');
+      expect(posted!['idempotencia'], isNotEmpty);
       expect(posted!.containsKey('prioridad_id'), false);
       expect(tester.takeException(), isNull);
     },

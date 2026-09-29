@@ -1,0 +1,3 @@
+00:00 +0: loading C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/sprint1_test.dart
+00:00 +0: HU3 historical trend renders and selects a single month
+00:00 +1: All tests passed!

@@ -82,12 +82,24 @@ def groups(db, user, selected):
     return result
 
 
-def month_series(rows, today=None):
+def month_series(rows, today=None, *, start_date=None, end_date=None):
     today = today or date.today()
-    start = today.year * 12 + today.month - 1 - 11
+
+    def month_number(value):
+        return value.year * 12 + value.month - 1
+
+    end = month_number(today)
+    start = end - 11
+    if start_date is not None or end_date is not None:
+        # SQL has already applied the exact dates; only fill missing months here.
+        data_months = [month_number(date.fromisoformat(r['mes'] + '-01')) for r in rows]
+        end = month_number(end_date) if end_date else max(
+            [end, *data_months, *([month_number(start_date)] if start_date else [])]
+        )
+        start = month_number(start_date) if start_date else min(data_months, default=end - 11)
     indexed = {r['mes']: r for r in rows}
     result=[]
-    for number in range(start, start+12):
+    for number in range(start, end+1):
         year, month = divmod(number, 12)
         key=f'{year:04d}-{month+1:02d}'
         result.append({'mes':key, 'recibidas':0, 'resueltas':0, **indexed.get(key,{})})
@@ -102,7 +114,9 @@ def dashboard(db, user, selected):
     series=query_rows(db, f'''SELECT DATE_FORMAT(sa.created,'%Y-%m') AS mes,
       COUNT(*) AS recibidas, COALESCE(SUM({RESOLVED}),0) AS resueltas
       {JOINS} {where} GROUP BY mes ORDER BY mes''', params)
-    return {**totals, **groups(db,user,selected), 'tendencia': month_series(series), 'datos_demo': 0}
+    return {**totals, **groups(db,user,selected), 'tendencia': month_series(
+        series, start_date=selected.get('fecha_inicio'), end_date=selected.get('fecha_fin')
+    ), 'datos_demo': 0}
 
 
 def compare_periods(db, user, selected, a_inicio, a_fin, b_inicio, b_fin):

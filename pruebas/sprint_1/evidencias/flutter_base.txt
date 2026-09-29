@@ -1,0 +1,52 @@
+00:00 +0: loading C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart
+00:00 +0: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: selecting a bar keeps the scroll position and the content
+00:04 +1: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/period_comparison_test.dart: Mobile comparison updates automatically and selects months in a sheet
+00:06 +2: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/ssnl_registration_test.dart: SSNL wizard selects existing people and submits original request fields
+00:08 +3: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/ssnl_registration_test.dart: SSNL wizard selects existing people and submits original request fields
+00:09 +4: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/ssnl_registration_test.dart: SSNL wizard selects existing people and submits original request fields
+00:09 +5: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/ssnl_registration_test.dart: SSNL wizard selects existing people and submits original request fields
+00:11 +6: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/ssnl_registration_test.dart: SSNL wizard selects existing people and submits original request fields
+00:11 +7: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: "Todos" clears the specific selections of a filter
+00:11 +8: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/widget_test.dart: Missing required SSNL catalogs disable continuing
+00:11 +9: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: a single selection can be removed inside the sheet
+00:12 +10: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: a single selection can be removed inside the sheet
+00:12 +11: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: "Limpiar todo" asks before clearing
+00:13 +12: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: closing with pending changes asks before discarding
+00:13 +13: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: Escape closes the option list
+00:14 +14: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: applied chips wrap and "Ver todos" reveals the rest
+00:14 +15: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: removing a filter can be undone
+00:15 +16: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: bars accept several values and keep active rows visible
+00:15 +17: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: hiding the comparison keeps periods and needs no request
+00:16 +18: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: export: summary of applied filters, format, failures in place
+00:17 +19: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 375.0x667.0 (variant: TargetPlatform.android)
+00:18 +20: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 375.0x667.0 (variant: TargetPlatform.iOS)
+00:18 +21: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 375.0x667.0 (variant: TargetPlatform.fuchsia)
+00:19 +22: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 390.0x844.0 (variant: TargetPlatform.android)
+00:20 +23: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 390.0x844.0 (variant: TargetPlatform.iOS)
+00:20 +24: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 390.0x844.0 (variant: TargetPlatform.fuchsia)
+00:20 +25: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 393.0x852.0 (variant: TargetPlatform.android)
+00:20 +26: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 393.0x852.0 (variant: TargetPlatform.iOS)
+00:21 +27: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 393.0x852.0 (variant: TargetPlatform.fuchsia)
+00:21 +28: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x640.0 (variant: TargetPlatform.android)
+00:21 +29: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x640.0 (variant: TargetPlatform.iOS)
+00:21 +30: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x640.0 (variant: TargetPlatform.fuchsia)
+00:22 +31: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x800.0 (variant: TargetPlatform.android)
+00:22 +32: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x800.0 (variant: TargetPlatform.iOS)
+00:22 +33: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x800.0 (variant: TargetPlatform.fuchsia)
+00:22 +34: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 412.0x915.0 (variant: TargetPlatform.android)
+00:22 +35: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 412.0x915.0 (variant: TargetPlatform.iOS)
+00:23 +36: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 412.0x915.0 (variant: TargetPlatform.fuchsia)
+00:23 +37: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: a wide browser window still behaves like a phone
+00:23 +38: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: switching Meses/Años keeps the chosen periods
+00:24 +39: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: Android back returns from a sub-view to the panel
+00:24 +40: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: larger system text (130%) does not break sheets (variant: TargetPlatform.android)
+00:24 +41: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: larger system text (130%) does not break sheets (variant: TargetPlatform.iOS)
+00:24 +42: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: larger system text (130%) does not break sheets (variant: TargetPlatform.fuchsia)
+00:25 +43: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: checkboxes use the brand orange on both platforms (variant: TargetPlatform.android)
+00:25 +44: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: checkboxes use the brand orange on both platforms (variant: TargetPlatform.iOS)
+00:25 +45: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: checkboxes use the brand orange on both platforms (variant: TargetPlatform.fuchsia)
+00:25 +46: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map comes right after the trend and shows real counts
+00:26 +47: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map map replaces municipality, preserves other filters and clears during loading
+00:26 +48: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map map keeps selection on error, retries and displays filtered empty state
+00:26 +49: C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map is not shown for other states
+00:27 +50: All tests passed!

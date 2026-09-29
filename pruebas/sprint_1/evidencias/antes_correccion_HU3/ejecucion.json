@@ -1,0 +1,36 @@
+[
+  {
+    "prueba": "backend_aislado",
+    "inicio_utc": "2026-09-28T22:17:42.780203+00:00",
+    "codigo_salida": 1,
+    "comando": [
+      "C:\\Users\\aldop\\SIESAS\\SGSC\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-v",
+      "--junitxml=C:\\Users\\aldop\\SIESAS\\SGSC\\pruebas\\sprint_1\\evidencias\\backend_aislado.xml"
+    ]
+  },
+  {
+    "prueba": "flutter_completo",
+    "inicio_utc": "2026-09-28T22:17:45.980633+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "test",
+      "--no-pub",
+      "--reporter",
+      "expanded"
+    ]
+  },
+  {
+    "prueba": "flutter_analyze",
+    "inicio_utc": "2026-09-28T22:18:20.613816+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "analyze",
+      "--no-pub"
+    ]
+  }
+]
