@@ -177,6 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// One line per active filter, e.g. "Municipio: Apodaca, Linares".
   List<String> filterSummary() => [
+    'Periodo de registro: ${periodSummary(filters)}',
     for (final def in filterDefinitions)
       if (filters[def[1]]?.isNotEmpty ?? false)
         '${def[0]}: ${filters[def[1]]!.map((id) => catalogName(catalogs, def[2], id)).join(', ')}',
@@ -220,6 +221,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String filterLabel(String key, String id) {
+    if (key == 'fecha_inicio') return 'Desde: $id';
+    if (key == 'fecha_fin') return 'Hasta: $id';
     for (final def in filterDefinitions) {
       if (def[1] == key) {
         return '${def[0]}: ${catalogName(catalogs, def[2], id)}';
@@ -357,6 +360,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget filterBar(BuildContext context) {
     final refreshing = loading && summary != null;
     final active = [
+      for (final key in ['fecha_inicio', 'fecha_fin'])
+        for (final id in filters[key] ?? const <String>[]) (key: key, id: id),
       for (final def in filterDefinitions)
         for (final id in filters[def[1]] ?? const <String>[])
           (key: def[1], id: id),
@@ -844,6 +849,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                               horizontal: 5,
                                             ),
                                             child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Expanded(
                                                   child: Text(
@@ -853,11 +860,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                     ),
                                                   ),
                                                 ),
-                                                Text(
-                                                  '${r['total']}  ·  ${hasData ? ((r['total'] as num) / (summary!['total'] as num) * 100).toStringAsFixed(1) : '0'}%',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w800,
+                                                const SizedBox(width: 12),
+                                                SizedBox(
+                                                  width: 100,
+                                                  child: Text(
+                                                    '${r['total']}  ·  ${hasData ? ((r['total'] as num) / (summary!['total'] as num) * 100).toStringAsFixed(1) : '0'}%',
+                                                    textAlign: TextAlign.right,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
                                                   ),
                                                 ),
                                               ],

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sgsc_ejecutiva/core/theme.dart';
+import 'package:sgsc_ejecutiva/core/curp_validator.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
 import 'package:sgsc_ejecutiva/screens/solicitudes/nueva_solicitud_screen.dart';
 import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
@@ -12,6 +13,86 @@ import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
 import 'widget_test.dart' show prepare, wrap, screenshot;
 
 void main() {
+  test('CURP validates structure, actual dates and checksum', () {
+    expect(validateCurp(''), isNull);
+    expect(validateCurp('GODE561231HDFRRN00'), isNull);
+    expect(validateCurp('gode561231hdfrrn00'), isNull);
+    expect(validateCurp('G1'), contains('iniciales'));
+    expect(validateCurp('GODE'), contains('18 caracteres'));
+    expect(validateCurp('GODE560231'), contains('no existe'));
+    expect(validateCurp('GODE561231X'), contains('sexo'));
+    expect(validateCurp('GODE561231HXX'), contains('entidad'));
+    expect(validateCurp('GODE561231HDFA'), contains('consonantes'));
+    expect(validateCurp('GODE561231HDFRRN01'), contains('verificador'));
+    expect(
+      validateCurp('GODE990101HDFRRNA0', today: DateTime(2026)),
+      contains('futura'),
+    );
+    expect(validateCurp('GODE000229HDFRRN00'), contains('no existe'));
+  });
+
+  testWidgets('CURP errors update while typing without submitting', (
+    tester,
+  ) async {
+    await prepare(tester);
+    final api = ExecutiveApi(
+      client: MockClient((_) async => http.Response('{}', 200)),
+    );
+    addTearDown(api.dispose);
+    await tester.pumpWidget(
+      wrap(
+        MaterialApp(
+          theme: executiveTheme(),
+          home: Scaffold(
+            body: NewRequestScreen(
+              api: api,
+              catalogs: const {
+                'generos': [
+                  {'id': 1, 'nombre': 'Hombre'},
+                ],
+                'entidades': [
+                  {'id': 1, 'nombre': 'Nuevo León'},
+                ],
+              },
+              entity: 'Nuevo León',
+              onBack: () {},
+              onSaved: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final curp = find.descendant(
+      of: find.ancestor(
+        of: find.text('CURP (opcional)'),
+        matching: find.byType(LabeledField),
+      ),
+      matching: find.byType(TextFormField),
+    );
+    await tester.ensureVisible(curp);
+    await tester.enterText(curp, 'GODE');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('18 caracteres (llevas 4)'), findsOneWidget);
+    await tester.enterText(curp, 'GODE561231X');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('El sexo en la CURP'), findsOneWidget);
+    expect(find.textContaining('18 caracteres (llevas'), findsNothing);
+    await tester.enterText(curp, 'GODE561231HDFRRN01');
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('El dígito verificador de la CURP'),
+      findsOneWidget,
+    );
+    await tester.enterText(curp, 'GODE561231HDFRRN00');
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('El dígito verificador de la CURP'),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'SSNL wizard selects existing people and submits original request fields',
     (tester) async {

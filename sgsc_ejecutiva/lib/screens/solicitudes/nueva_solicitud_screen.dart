@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/curp_validator.dart';
 import '../../services/executive_api.dart';
 import '../../widgets/executive_widgets.dart';
 
@@ -103,11 +104,21 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       TextFormField(
         controller: controller(key),
         enabled: !busy,
+        autovalidateMode: key == 'b.curp'
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled,
+        textCapitalization: key == 'b.curp'
+            ? TextCapitalization.characters
+            : TextCapitalization.none,
         keyboardType: number ? TextInputType.number : TextInputType.text,
         minLines: multiline ? 3 : 1,
         maxLines: multiline ? 6 : 1,
         maxLength: max,
-        decoration: InputDecoration(helperText: help, helperMaxLines: 3),
+        decoration: InputDecoration(
+          helperText: help,
+          helperMaxLines: 3,
+          errorMaxLines: 3,
+        ),
         validator: (v) {
           final value = (v ?? '').trim();
           if (required && value.isEmpty) return 'Completa este campo.';
@@ -121,11 +132,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
               !RegExp(r'^\d{5}$').hasMatch(value)) {
             return 'Ingresa cinco dígitos.';
           }
-          if (key == 'b.curp' &&
-              value.isNotEmpty &&
-              !RegExp(r'^[A-Za-z0-9]{18}$').hasMatch(value)) {
-            return 'La CURP debe tener 18 caracteres.';
-          }
+          if (key == 'b.curp') return validateCurp(value);
           return null;
         },
       ),
@@ -200,6 +207,8 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
                   firstDate: DateTime(today.year - 150),
                   lastDate: today,
                   helpText: 'Fecha de nacimiento',
+                  errorInvalidText: 'Fecha incorrecta',
+                  errorFormatText: 'Fecha incorrecta',
                 );
                 if (value != null && mounted) {
                   setState(

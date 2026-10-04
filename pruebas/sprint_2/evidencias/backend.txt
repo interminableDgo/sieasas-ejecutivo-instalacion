@@ -1,0 +1,84 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\aldop\SIESAS\SGSC\backend\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\aldop\SIESAS\SGSC\backend
+plugins: anyio-4.15.1
+collecting ... collected 64 items
+
+tests/test_comparison.py::test_comparison_zero_baseline_and_same_scope PASSED [  1%]
+tests/test_comparison.py::test_variation[10-5--50.0] PASSED              [  3%]
+tests/test_comparison.py::test_variation[5-10-100.0] PASSED              [  4%]
+tests/test_comparison.py::test_variation[0-0-0] PASSED                   [  6%]
+tests/test_comparison.py::test_variation[3-3-0] PASSED                   [  7%]
+tests/test_comparison.py::test_invalid_period PASSED                     [  9%]
+tests/test_email.py::test_email_embeds_logo_and_has_accessible_text PASSED [ 10%]
+tests/test_email.py::test_html_escapes_dynamic_url PASSED                [ 12%]
+tests/test_executive.py::test_months_zero_fill_and_year_boundary PASSED  [ 14%]
+tests/test_executive.py::test_scope_always_applied_and_parameterized PASSED [ 15%]
+tests/test_executive.py::test_multiple_values_are_alternatives_within_a_filter PASSED [ 17%]
+tests/test_executive.py::test_filters_accept_repeated_params_and_reject_invalid PASSED [ 18%]
+tests/test_executive.py::test_blank_request_rejected PASSED              [ 20%]
+tests/test_executive.py::test_comparison_api_auth_validation_and_empty_scope SKIPPED [ 21%]
+tests/test_executive.py::test_empty_data_scope_registration_exports_and_logout SKIPPED [ 23%]
+tests/test_executive.py::test_reset_single_use_expiry_revocation SKIPPED [ 25%]
+tests/test_executive.py::test_2fa_and_replay SKIPPED (Set RUN_DB_TES...) [ 26%]
+tests/test_executive.py::test_missing_mail_and_inactive_user SKIPPED     [ 28%]
+tests/test_export.py::test_allowlist_numeric_excel_and_no_individual_rows PASSED [ 29%]
+tests/test_export.py::test_pdf_metadata_definitions_and_privacy PASSED   [ 31%]
+tests/test_export.py::test_formula_and_markup_are_literal PASSED         [ 32%]
+tests/test_export.py::test_empty_report_no_fake_chart_or_division PASSED [ 34%]
+tests/test_export.py::test_long_labels_all_categories_and_months_are_retained PASSED [ 35%]
+tests/test_export.py::test_open_periods[selected0-Todo el historial] PASSED [ 37%]
+tests/test_export.py::test_open_periods[selected1-Sin l\xedmite final] PASSED [ 39%]
+tests/test_export.py::test_open_periods[selected2-Sin l\xedmite inicial] PASSED [ 40%]
+tests/test_export.py::test_full_history_scope_and_final_day[True] PASSED [ 42%]
+tests/test_export.py::test_full_history_scope_and_final_day[False] PASSED [ 43%]
+tests/test_export.py::test_api_filters_format_scope_and_no_row_limit[pdf] PASSED [ 45%]
+tests/test_export.py::test_api_filters_format_scope_and_no_row_limit[xlsx] PASSED [ 46%]
+tests/test_export.py::test_api_validation[/ejecutivo/exportar/csv] PASSED [ 48%]
+tests/test_export.py::test_api_validation[/ejecutivo/exportar/pdf?fecha_inicio=2024-03-01&fecha_fin=2024-02-01] PASSED [ 50%]
+tests/test_export.py::test_api_validation[/ejecutivo/exportar/pdf?municipio_id=0] PASSED [ 51%]
+tests/test_export.py::test_api_unauthenticated_and_database_failure PASSED [ 53%]
+tests/test_export.py::test_many_filter_labels_are_readable PASSED        [ 54%]
+tests/test_sprint1.py::test_hu1_password_policy_matches_registration[14-False] PASSED [ 56%]
+tests/test_sprint1.py::test_hu1_password_policy_matches_registration[15-True] PASSED [ 57%]
+tests/test_sprint1.py::test_hu1_password_policy_matches_registration[128-True] PASSED [ 59%]
+tests/test_sprint1.py::test_hu1_password_policy_matches_registration[129-False] PASSED [ 60%]
+tests/test_sprint1.py::test_hu1_forgot_generic_response_and_delivery_scheduled PASSED [ 62%]
+tests/test_sprint1.py::test_hu1_reset_invalid_credential_does_not_write PASSED [ 64%]
+tests/test_sprint1.py::test_hu1_reset_hashes_password_and_requests_session_revocation PASSED [ 65%]
+tests/test_sprint1.py::test_hu5_required_request_fields[beneficiario_id] PASSED [ 67%]
+tests/test_sprint1.py::test_hu5_required_request_fields[solicitante_id] PASSED [ 68%]
+tests/test_sprint1.py::test_hu5_required_request_fields[descripcion] PASSED [ 70%]
+tests/test_sprint1.py::test_hu5_required_request_fields[canal_id] PASSED [ 71%]
+tests/test_sprint1.py::test_hu5_retry_returns_original_without_writing PASSED [ 73%]
+tests/test_sprint1.py::test_hu5_registration_sets_initial_status_and_author PASSED [ 75%]
+tests/test_sprint1.py::test_hu4_hu5_unauthenticated_access_denied[/ejecutivo/solicitudes-post] PASSED [ 76%]
+tests/test_sprint1.py::test_hu4_hu5_unauthenticated_access_denied[/ejecutivo/dashboard-get] PASSED [ 78%]
+tests/test_sprint1.py::test_hu4_hu5_unauthenticated_access_denied[/ejecutivo/solicitudes/9-get] PASSED [ 79%]
+tests/test_sprint1.py::test_hu4_detail_query_keeps_entity_scope PASSED   [ 81%]
+tests/test_sprint1.py::test_hu3_dashboard_and_list_receive_same_filters PASSED [ 82%]
+tests/test_sprint1.py::test_hu3_inclusive_end_date_and_invalid_period PASSED [ 84%]
+tests/test_sprint1.py::test_hu3_historical_period_keeps_trend_data PASSED [ 85%]
+tests/test_sprint1.py::test_hu3_trend_period_bounds_and_zero_fill[start0-end0-months0] PASSED [ 87%]
+tests/test_sprint1.py::test_hu3_trend_period_bounds_and_zero_fill[start1-end1-months1] PASSED [ 89%]
+tests/test_sprint1.py::test_hu3_trend_period_bounds_and_zero_fill[None-end2-months2] PASSED [ 90%]
+tests/test_sprint1.py::test_hu3_trend_period_bounds_and_zero_fill[start3-None-months3] PASSED [ 92%]
+tests/test_sprint1.py::test_hu3_empty_filtered_period[start0-end0-2020-01-2020-02-2] PASSED [ 93%]
+tests/test_sprint1.py::test_hu3_empty_filtered_period[None-end1-2019-03-2020-02-12] PASSED [ 95%]
+tests/test_sprint1.py::test_hu3_empty_filtered_period[start2-None-2027-01-2027-01-1] PASSED [ 96%]
+tests/test_ssnl.py::test_yii_bcrypt_and_current_argon2_compatibility PASSED [ 98%]
+tests/test_ssnl.py::test_future_birth_is_rejected PASSED                 [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\aldop\SIESAS\SGSC\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv\Lib\site-packages\starlette\testclient.py:53
+  C:\Users\aldop\SIESAS\SGSC\backend\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: C:\Users\aldop\SIESAS\SGSC\pruebas\sprint_2\evidencias\backend.xml -
+================== 59 passed, 5 skipped, 2 warnings in 5.29s ==================

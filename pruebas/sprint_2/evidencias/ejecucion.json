@@ -1,0 +1,48 @@
+[
+  {
+    "prueba": "backend",
+    "inicio_utc": "2026-10-03T05:11:34.930621+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:\\Users\\aldop\\SIESAS\\SGSC\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-v",
+      "--junitxml=C:\\Users\\aldop\\SIESAS\\SGSC\\pruebas\\sprint_2\\evidencias\\backend.xml"
+    ]
+  },
+  {
+    "prueba": "flutter",
+    "inicio_utc": "2026-10-03T05:11:40.191710+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "test",
+      "--no-pub",
+      "--reporter",
+      "expanded"
+    ]
+  },
+  {
+    "prueba": "analyze",
+    "inicio_utc": "2026-10-03T05:12:16.672380+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "analyze",
+      "--no-pub"
+    ]
+  },
+  {
+    "prueba": "web",
+    "inicio_utc": "2026-10-03T05:12:27.322321+00:00",
+    "codigo_salida": 0,
+    "comando": [
+      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "build",
+      "web",
+      "--no-pub",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:8000"
+    ]
+  }
+]

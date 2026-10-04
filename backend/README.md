@@ -34,7 +34,7 @@ Datos: GET /ejecutivo/catalogos, /ejecutivo/dashboard; GET y POST /ejecutivo/sol
 
 Datos y perfil requieren Authorization: Bearer. Cada consulta verifica cuenta activa, rol Ejecutivo en `auth_assignment` y entidad asignada. Los routers antiguos permanecen como referencia pero no se publican porque no aplicaban este control.
 
-Filtros compartidos: municipio_id, tipo_apoyo_id, dependencia_id, grupo_vulnerable_id, estatus_id, fecha_inicio, fecha_fin. Lista: page desde cero, 10 filas por página. Exportación: hasta 10,000 solicitudes, con filtros incluidos. Excel trata valores como texto para evitar fórmulas inyectadas.
+Filtros compartidos: municipio_id, tipo_apoyo_id, dependencia_id, grupo_vulnerable_id, estatus_id, fecha_inicio, fecha_fin. Lista: page desde cero, 10 filas por página. Exportación HU6: PDF y Excel con indicadores, distribuciones y tendencia de todo el periodo filtrado; no incluye nombres ni filas individuales. Reutiliza filtros y ámbito estatal, sin el antiguo límite de 10,000 filas. Excel conserva cantidades numéricas y trata las etiquetas de catálogo como texto para evitar fórmulas inyectadas. Fechas, filtros, generación UTC y definiciones se incluyen en ambos formatos.
 
 ## Pruebas
 

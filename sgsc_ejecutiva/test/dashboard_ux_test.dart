@@ -478,7 +478,10 @@ void main() {
     await tester.tap(find.text('Exportar reporte'));
     await settle(tester);
     expect(find.text('•  Tipo de apoyo: Traslado, Estudio'), findsOneWidget);
-    expect(find.textContaining('Periodo'), findsNothing);
+    expect(
+      find.textContaining('Periodo de registro: Todo el historial'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Fechas'), findsNothing);
     expect(find.text('Descargar Excel'), findsOneWidget);
     await tester.tap(find.text('PDF'));

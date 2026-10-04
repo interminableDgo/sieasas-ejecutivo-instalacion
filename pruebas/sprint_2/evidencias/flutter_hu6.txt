@@ -1,0 +1,6 @@
+00:00 +0: loading C:/Users/aldop/SIESAS/SGSC/sgsc_ejecutiva/test/export_test.dart
+00:00 +0: HU6 dates reach dashboard list and export and survive retry
+00:02 +1: HU6 export busy and success at Size(360.0, 640.0)
+00:03 +2: HU6 export busy and success at Size(1440.0, 900.0)
+00:03 +3: HU6 open periods
+00:03 +4: All tests passed!

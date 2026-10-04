@@ -68,9 +68,14 @@ class _ExportSheetState extends State<ExportSheet> {
                 children: [
                   Text(
                     widget.total == 1
-                        ? 'Se exportará 1 solicitud.'
-                        : 'Se exportarán ${widget.total} solicitudes.',
+                        ? 'Resumen agregado de 1 solicitud.'
+                        : 'Resumen agregado de ${widget.total} solicitudes.',
                     style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Incluye indicadores, gráficas y definiciones. Sin nombres ni registros individuales.',
+                    style: TextStyle(fontSize: 12, color: muted),
                   ),
                   const SizedBox(height: 6),
                   if (widget.appliedFilters.isEmpty)

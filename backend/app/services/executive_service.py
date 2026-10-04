@@ -106,7 +106,7 @@ def month_series(rows, today=None, *, start_date=None, end_date=None):
     return result
 
 
-def dashboard(db, user, selected):
+def dashboard(db, user, selected, *, full_history=False):
     where, params = where_clause(user, selected)
     totals = query_rows(db, f'''SELECT COUNT(*) AS total, COALESCE(SUM({RESOLVED}),0) AS resueltas,
       COALESCE(SUM({ACTIVE}),0) AS activas {JOINS} {where}''', params)[0]
@@ -114,8 +114,12 @@ def dashboard(db, user, selected):
     series=query_rows(db, f'''SELECT DATE_FORMAT(sa.created,'%Y-%m') AS mes,
       COUNT(*) AS recibidas, COALESCE(SUM({RESOLVED}),0) AS resueltas
       {JOINS} {where} GROUP BY mes ORDER BY mes''', params)
+    start, end = selected.get('fecha_inicio'), selected.get('fecha_fin')
+    if full_history and series:
+        start = start or date.fromisoformat(series[0]['mes'] + '-01')
+        end = end or date.fromisoformat(series[-1]['mes'] + '-01')
     return {**totals, **groups(db,user,selected), 'tendencia': month_series(
-        series, start_date=selected.get('fecha_inicio'), end_date=selected.get('fecha_fin')
+        series, start_date=start, end_date=end
     ), 'datos_demo': 0}
 
 

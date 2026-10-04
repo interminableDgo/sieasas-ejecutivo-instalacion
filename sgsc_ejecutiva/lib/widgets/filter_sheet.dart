@@ -18,6 +18,13 @@ const filterDefinitions = [
   ['Estatus', 'estatus_id', 'estatus'],
 ];
 
+String periodSummary(Filters filters) {
+  final start = filters['fecha_inicio']?.firstOrNull;
+  final end = filters['fecha_fin']?.firstOrNull;
+  if (start == null && end == null) return 'Todo el historial';
+  return '${start ?? 'Sin límite inicial'} al ${end ?? 'Sin límite final'}';
+}
+
 Filters copyFilters(Filters filters) => {
   for (final e in filters.entries)
     if (e.value.isNotEmpty) e.key: [...e.value],
@@ -234,6 +241,29 @@ class _FilterSheetState extends State<FilterSheet> {
     return matches == 1 ? 'Ver 1 solicitud' : 'Ver $matches solicitudes';
   }
 
+  Future<void> choosePeriod() async {
+    final start = DateTime.tryParse(draft['fecha_inicio']?.firstOrNull ?? '');
+    final end = DateTime.tryParse(draft['fecha_fin']?.firstOrNull ?? '');
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100, 12, 31),
+      initialDateRange: start != null && end != null
+          ? DateTimeRange(start: start, end: end)
+          : null,
+      helpText: 'Periodo de registro',
+      saveText: 'Aplicar periodo',
+      confirmText: 'Aplicar periodo',
+      cancelText: 'Cancelar',
+    );
+    if (range == null || !mounted) return;
+    setState(() {
+      draft['fecha_inicio'] = [range.start.toIso8601String().substring(0, 10)];
+      draft['fecha_fin'] = [range.end.toIso8601String().substring(0, 10)];
+    });
+    recount();
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !dirty,
@@ -259,6 +289,26 @@ class _FilterSheetState extends State<FilterSheet> {
                   ),
                 ),
                 ...filterDefinitions.map(field),
+                LabeledField(
+                  'Periodo de registro',
+                  OutlinedButton.icon(
+                    onPressed: choosePeriod,
+                    icon: const Icon(Icons.date_range_outlined),
+                    label: Text(periodSummary(draft)),
+                  ),
+                ),
+                if (draft.containsKey('fecha_inicio') ||
+                    draft.containsKey('fecha_fin'))
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        draft.remove('fecha_inicio');
+                        draft.remove('fecha_fin');
+                      });
+                      recount();
+                    },
+                    child: const Text('Quitar periodo'),
+                  ),
               ],
             ),
           ),
