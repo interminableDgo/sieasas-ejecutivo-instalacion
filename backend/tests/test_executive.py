@@ -154,7 +154,8 @@ def test_empty_data_scope_registration_exports_and_logout(live):
         if fmt=='xlsx':
             book=load_workbook(io.BytesIO(report.content))
             assert 'Solicitudes' not in book.sheetnames
-            assert dict((r[0].value, r[1].value) for r in book['Resumen'])['Solicitudes']==before+1
+            label=next(c for row in book['Resumen'] for c in row if c.value=='Solicitudes')
+            assert book['Resumen'].cell(label.row+1,label.column).value==before+1
     # An account assigned to another entity cannot see or register NL requests.
     other=db.execute(text("SELECT id FROM INEGI_Cat_Entidades WHERE cve_ent='01'")).scalar_one()
     db.execute(text('UPDATE ejecutivo_acceso SET entidad_id=:e WHERE usuario_id=:u'),{'e':other,'u':uid})

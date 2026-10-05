@@ -38,6 +38,14 @@ Filtros compartidos: municipio_id, tipo_apoyo_id, dependencia_id, grupo_vulnerab
 
 ## Pruebas
 
+La descarga Excel usa `app/services/executive_xlsx.py`: seis hojas con resumen,
+tendencia azul/naranja, rankings de hasta diez categorías y tablas completas.
+Los colores aprobados son `#16A5D8` (registradas) y `#FF8200` (resueltas y barras).
+La fecha se presenta en `America/Mexico_City`; instalar los requisitos actualizados
+incluye `tzdata`, necesario en Windows. Reiniciar el backend sin `--reload` después
+de actualizar el generador. Esta revisión visual corresponde al Excel; el PDF
+conserva su generador existente.
+
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 $env:RUN_DB_TESTS='1'

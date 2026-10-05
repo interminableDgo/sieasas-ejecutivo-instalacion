@@ -3,6 +3,8 @@ import io
 import os
 import sys
 import subprocess
+import zipfile
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 
 import pytest
@@ -31,6 +33,19 @@ def report_for(summary, selected=None):
                         datetime(2026, 10, 3, 1, 0, tzinfo=timezone.utc))
 
 
+def cells(book):
+    return [c for sheet in book for row in sheet for c in row if c.value is not None]
+
+
+def indicator(book, label):
+    c = next(c for row in book['Resumen'] for c in row if c.value == label)
+    return book['Resumen'].cell(c.row + 1, c.column).value
+
+
+def category_row(book, sheet, label):
+    return next(c.row for row in book[sheet] for c in row if c.value == label)
+
+
 def pdf_text(content, tmp_path):
     python = os.getenv('PDF_TEST_PYTHON', sys.executable)
     if python == sys.executable:
@@ -49,12 +64,12 @@ def test_allowlist_numeric_excel_and_no_individual_rows(summary):
     assert 'Solicitud #987654' not in repr(report)
     book = load_workbook(io.BytesIO(render_xlsx(report)))
     assert book.sheetnames == ['Resumen', 'Tendencia', *[title for _, title in DIMENSIONS]]
-    values = {row[0].value: row[1].value for row in book['Resumen'] if isinstance(row[1].value, (int, float))}
-    assert values['Solicitudes'] == 20
-    assert values['Otros estatus'] == 2
-    assert values['Porcentaje resuelto'] == .35
-    assert book['Tipos de apoyo']['B4'].data_type == 'n'
-    assert book['Tipos de apoyo']['C4'].value == 1
+    assert indicator(book, 'Solicitudes') == 20
+    assert indicator(book, 'Otros estatus') == 2
+    assert indicator(book, 'Porcentaje resuelto') == .35
+    row = category_row(book, 'Tipos de apoyo', 'Categoría de prueba')
+    assert book['Tipos de apoyo'].cell(row, 14).data_type == 'n'
+    assert book['Tipos de apoyo'].cell(row, 16).value == 1
     assert len(book['Tendencia']._charts) == 1
     assert len(book['Municipios']._charts) == 1
     assert not any('PERSONA_NO_EXPORTAR' in str(c.value) or 'Solicitud #' in str(c.value)
@@ -74,8 +89,8 @@ def test_formula_and_markup_are_literal(summary, tmp_path):
     summary['municipios'][0]['nombre'] = '=HYPERLINK("x") <script> & prueba'
     report = report_for(summary)
     book = load_workbook(io.BytesIO(render_xlsx(report)))
-    assert book['Municipios']['A4'].data_type == 's'
-    assert book['Municipios']['A4'].value.startswith('=HYPERLINK')
+    labels = [c for c in cells(book) if str(c.value).startswith('=HYPERLINK')]
+    assert labels and all(c.data_type == 's' for c in labels)
     assert '<script>' in pdf_text(render_pdf(report), tmp_path)
 
 
@@ -95,9 +110,10 @@ def test_long_labels_all_categories_and_months_are_retained(summary, tmp_path):
     summary['tendencia'] = [{'mes': f'{2023 + i // 12}-{i % 12 + 1:02}', 'recibidas': 5, 'resueltas': 2} for i in range(24)]
     report = report_for(summary)
     book = load_workbook(io.BytesIO(render_xlsx(report)))
-    assert book['Municipios'].max_row == 63
-    assert len(book['Municipios']._charts) == 5
-    assert len(book['Tendencia']._charts) == 2
+    for row in summary['municipios']:
+        assert row['nombre'] in [c.value for c in cells(book)]
+    assert len(book['Municipios']._charts) == 1
+    assert len(book['Tendencia']._charts) == 1
     text = pdf_text(render_pdf(report), tmp_path)
     assert 'Categoría 059' in text and '2023-01' in text and '2024-12' in text
 
@@ -166,7 +182,7 @@ def test_api_filters_format_scope_and_no_row_limit(client, summary, format):
                      {'municipio_id': [3, 4], 'estatus_id': 1, 'fecha_inicio': date(2024, 2, 1), 'fecha_fin': date(2024, 2, 29)}, {'full_history': True})]
     if format == 'xlsx':
         book = load_workbook(io.BytesIO(response.content))
-        assert book['Resumen']['B5'].value == 'Municipio A, Municipio B'
+        assert any('Municipio A, Municipio B' in str(c.value) for c in cells(book))
 
 
 @pytest.mark.parametrize('path', ['/ejecutivo/exportar/csv', '/ejecutivo/exportar/pdf?fecha_inicio=2024-03-01&fecha_fin=2024-02-01', '/ejecutivo/exportar/pdf?municipio_id=0'])
@@ -194,3 +210,56 @@ def test_many_filter_labels_are_readable(summary, tmp_path):
     assert all((row.height or 0) <= 409 for row in book['Resumen'].row_dimensions.values())
     assert 'prueba 100' in ' '.join(str(cell.value) for row in book['Resumen'] for cell in row)
     assert 'prueba 100' in pdf_text(render_pdf(report), tmp_path)
+
+
+def test_download_chart_colors_rankings_and_timezone(summary):
+    summary['municipios'] = [{'nombre': f'Municipio {i}', 'total': 1} for i in range(12)]
+    payload = render_xlsx(report_for(summary))
+    book = load_workbook(io.BytesIO(payload))
+    assert any('02/10/2026, 19:00' in str(c.value) for c in cells(book))
+    assert any('50.0%' in str(c.value) for c in cells(book))  # 10 / 20, not 10 / 10.
+    assert any('Empates:' in str(c.value) for c in cells(book))
+    for sheet in book:
+        assert sheet.print_area and sheet.print_title_rows
+    ns = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+          'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        charts = [ET.fromstring(archive.read(n)) for n in archive.namelist() if n.startswith('xl/charts/chart') and n.endswith('.xml')]
+    line = next(c for c in charts if c.find('.//c:lineChart', ns) is not None)
+    assert line.find('.//c:legend/c:legendPos', ns).attrib['val'] == 't'
+    assert line.find('.//c:legend/c:overlay', ns).attrib['val'] == '0'
+    assert [n.attrib['val'] for n in line.findall('.//c:ser/c:spPr/a:ln/a:solidFill/a:srgbClr', ns)] == ['16A5D8', 'FF8200']
+    assert line.findall('.//c:ser/c:spPr/a:ln/a:prstDash', ns)[1].attrib['val'] == 'dash'
+    assert all(c.find('.//c:valAx/c:scaling/c:min', ns).attrib['val'] == '0' for c in charts)
+    series = book['Municipios']._charts[0].series[0]
+    ref = series.val.numRef.f
+    from openpyxl.utils.cell import range_boundaries
+    left, first, right, last = range_boundaries(ref.split('!')[1])
+    assert last-first+1 == 10
+    counts = [book['Municipios'].cell(row, left).value for row in range(first, last+1)]
+    assert counts == sorted(counts)  # Bottom-to-top source order for horizontal bars.
+
+
+def test_excel_chart_bounds_leave_space_before_following_content(summary):
+    summary['municipios'] = [{'nombre': f'Municipio {i}', 'total': i+1} for i in range(12)]
+    book = load_workbook(io.BytesIO(render_xlsx(report_for(summary))))
+    for sheet in book:
+        for chart in sheet._charts:
+            anchor = chart.anchor
+            assert anchor._from.col == 1 and anchor.to.col == 17
+            assert all(sheet.row_dimensions[r].height == 22
+                       for r in range(anchor._from.row+1, anchor.to.row+2))
+            below = next(c.row for row in sheet for c in row
+                         if c.value == ('Definiciones y alcance' if sheet.title == 'Resumen'
+                                        else 'Mes de registro' if sheet.title == 'Tendencia' else 'Categoría'))
+            assert below >= anchor.to.row + 3
+            assert chart.x_axis.delete is False and chart.y_axis.delete is False
+            if chart.tagname == 'barChart':
+                assert chart.dLbls.showVal is True
+                assert chart.dLbls.showSerName is False
+                assert chart.dLbls.showCatName is False
+                assert chart.dLbls.showLegendKey is False
+    for label in ['Solicitudes', 'Activas', 'Resueltas', 'Otros estatus', 'Porcentaje resuelto']:
+        c = next(c for row in book['Resumen'] for c in row if c.value == label)
+        assert c.alignment.horizontal == 'center'
+        assert book['Resumen'].cell(c.row+1, c.column).alignment.horizontal == 'center'

@@ -12,3 +12,4 @@ reportlab
 pytest
 httpx
 bcrypt
+tzdata
