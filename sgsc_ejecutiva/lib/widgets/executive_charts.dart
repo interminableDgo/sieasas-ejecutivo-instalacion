@@ -81,6 +81,417 @@ class DataBars extends StatelessWidget {
   }
 }
 
+class CategoryPieChart extends StatefulWidget {
+  final List<dynamic> rows;
+  final num total;
+  final Set<String> active;
+  final ValueChanged<String> onSelect;
+  const CategoryPieChart({
+    super.key,
+    required this.rows,
+    required this.total,
+    required this.onSelect,
+    this.active = const {},
+  });
+
+  @override
+  State<CategoryPieChart> createState() => _CategoryPieChartState();
+}
+
+class _CategoryPieChartState extends State<CategoryPieChart> {
+  bool showAll = false;
+
+  static const colors = [
+    salud,
+    brand,
+    Color(0xFF4E7D67),
+    Color(0xFF8064A2),
+    Color(0xFFD76770),
+    Color(0xFF87949B),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = widget.rows;
+    final total = widget.total;
+    if (rows.isEmpty || total == 0) {
+      return const Text(
+        'Sin datos para mostrar.',
+        style: TextStyle(color: muted),
+      );
+    }
+    final top = rows.take(5).toList();
+    final otherTotal = rows
+        .skip(5)
+        .fold<num>(0, (sum, row) => sum + (row['total'] as num));
+    final values = <num>[
+      ...top.map((row) => row['total'] as num),
+      if (otherTotal > 0) otherTotal,
+    ];
+    final names = <String>[
+      ...top.map((row) => '${row['nombre']}'),
+      if (otherTotal > 0) 'Otros',
+    ];
+    return Column(
+      children: [
+        SizedBox(
+          height: 190,
+          width: 190,
+          child: CustomPaint(
+            painter: _CategoryPiePainter(values, colors),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$total',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Text(
+                    'solicitudes',
+                    style: TextStyle(fontSize: 11, color: muted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(values.length, (i) {
+          final row = i < top.length ? top[i] : null;
+          final selected =
+              row != null && widget.active.contains('${row['id']}');
+          final percent = total == 0 ? 0 : values[i] / total * 100;
+          return InkWell(
+            onTap: row == null || row['id'] == null
+                ? null
+                : () => widget.onSelect('${row['id']}'),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: colors[i],
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      names[i],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${values[i]} · ${percent.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (rows.length > 5) ...[
+          if (showAll) ...[
+            const Divider(height: 20),
+            ...rows.skip(5).map((row) {
+              final selected = widget.active.contains('${row['id']}');
+              final percent = (row['total'] as num) / total * 100;
+              return InkWell(
+                onTap: row['id'] == null
+                    ? null
+                    : () => widget.onSelect('${row['id']}'),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 7,
+                    horizontal: 4,
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Text(
+                          '${row['nombre']}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${row['total']} · ${percent.toStringAsFixed(1)}%",
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => showAll = !showAll),
+              icon: Icon(
+                showAll ? Icons.expand_less : Icons.expand_more,
+                size: 18,
+              ),
+              label: Text(showAll ? 'Ver menos' : 'Ver todos (${rows.length})'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CategoryPiePainter extends CustomPainter {
+  final List<num> values;
+  final List<Color> colors;
+  const _CategoryPiePainter(this.values, this.colors);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sum = values.fold<num>(0, (total, value) => total + value);
+    if (sum == 0) return;
+    final rect = Offset.zero & size;
+    var start = -math.pi / 2;
+    for (var i = 0; i < values.length; i++) {
+      final sweep = values[i] / sum * math.pi * 2;
+      canvas.drawArc(rect, start, sweep, true, Paint()..color = colors[i]);
+      start += sweep;
+    }
+    canvas.drawCircle(
+      size.center(Offset.zero),
+      size.width * 0.29,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryPiePainter old) =>
+      !listEquals(values, old.values) || !listEquals(colors, old.colors);
+}
+
+/// Side-by-side period comparison for independent indicators. A grouped bar
+/// chart makes the two periods directly comparable without implying that the
+/// indicators are steps in a continuous series.
+class PeriodComparisonChart extends StatelessWidget {
+  final Map<String, dynamic> earlier, later;
+  final Map<String, dynamic> variations;
+  final String earlierLabel, laterLabel;
+  const PeriodComparisonChart({
+    super.key,
+    required this.earlier,
+    required this.later,
+    required this.variations,
+    required this.earlierLabel,
+    required this.laterLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const indicators = [
+      ('Solicitudes registradas', 'total'),
+      ('Activas', 'activas'),
+      ('Resueltas', 'resueltas'),
+    ];
+    final maxValue = indicators.fold<num>(0, (maximum, item) {
+      final key = item.$2;
+      return math.max(
+        maximum,
+        math.max(earlier[key] as num, later[key] as num),
+      );
+    });
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Cada par de barras compara el mismo indicador entre periodos.',
+          style: TextStyle(fontSize: 11, color: muted),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'Las barras comparan los conteos; el cambio porcentual va junto a cada indicador.',
+          style: TextStyle(fontSize: 11, color: muted),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 14,
+          runSpacing: 6,
+          children: [
+            _ChartLegend(color: muted, label: earlierLabel),
+            _ChartLegend(color: salud, label: laterLabel),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            maxValue == 0
+                ? 'Los dos periodos registran 0.'
+                : 'Escala común desde 0: $maxValue',
+            style: const TextStyle(fontSize: 10, color: muted),
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (final (label, key) in indicators)
+          _PeriodIndicatorBars(
+            label: label,
+            earlier: earlier[key] as num,
+            later: later[key] as num,
+            variation: variations[key] as Map<String, dynamic>,
+            maximum: maxValue,
+          ),
+      ],
+    );
+  }
+}
+
+class _PeriodIndicatorBars extends StatelessWidget {
+  final String label;
+  final num earlier, later, maximum;
+  final Map<String, dynamic> variation;
+  const _PeriodIndicatorBars({
+    required this.label,
+    required this.earlier,
+    required this.later,
+    required this.variation,
+    required this.maximum,
+  });
+
+  String get changeLabel {
+    final difference = variation['diferencia'] as num;
+    if (difference == 0) return 'Sin cambio';
+    final sign = difference > 0 ? '+' : '−';
+    final percentage = variation['porcentaje'] as num?;
+    final percentLabel = percentage == null
+        ? '% sin referencia'
+        : '$sign${percentage.abs().toStringAsFixed(1)}%';
+    return 'Δ $sign${difference.abs()} · $percentLabel';
+  }
+
+  Widget bar(num value, Color color) => Padding(
+    padding: const EdgeInsets.only(top: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: maximum == 0 ? 0 : (value / maximum).toDouble(),
+              minHeight: 8,
+              color: color,
+              backgroundColor: paper,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 28,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: label == 'Solicitudes registradas' ? blueTint : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  changeLabel,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: muted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          bar(earlier, muted),
+          bar(later, salud),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ChartLegend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _ChartLegend({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(fontSize: 10)),
+    ],
+  );
+}
+
 class TrendChart extends StatefulWidget {
   final List<dynamic> points;
   const TrendChart({super.key, required this.points});
@@ -242,6 +653,7 @@ class MunicipalityMap extends StatefulWidget {
   /// Catalog rows: {id, nombre, clave_inegi}; links INEGI shapes to ids.
   final List<dynamic> catalog;
   final Set<String> active;
+  final num? activeCount, resolvedCount;
   final ValueChanged<String?> onFilter;
   final bool loading;
   final String? error;
@@ -252,6 +664,8 @@ class MunicipalityMap extends StatefulWidget {
     required this.catalog,
     required this.onFilter,
     this.active = const {},
+    this.activeCount,
+    this.resolvedCount,
     this.loading = false,
     this.error,
     this.onRetry,
@@ -389,7 +803,7 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
           Semantics(
             liveRegion: true,
             child: SizedBox(
-              height: 36,
+              height: 48,
               child: Text(
                 widget.loading
                     ? 'Actualizando solicitudes...'
@@ -399,7 +813,8 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                     ? 'Toca para filtrar y acercar.'
                     : count(pick.cvegeo) == 0
                     ? 'Sin solicitudes con los filtros actuales.'
-                    : '${count(pick.cvegeo)} solicitudes; toca de nuevo para quitar',
+                    : '${count(pick.cvegeo)} solicitudes; toca de nuevo para quitar'
+                          '${widget.activeCount == null ? '' : '\n${widget.activeCount} activas (incluye pendientes) · ${widget.resolvedCount} resueltas'}',
                 maxLines: 2,
                 style: const TextStyle(fontSize: 12, color: muted),
               ),

@@ -94,6 +94,157 @@ class Notice extends StatelessWidget {
   );
 }
 
+/// Compact status glyph for the request table. The SSNL schema has no closure
+/// timestamp, so completed requests deliberately show no invented duration.
+class StatusDaysIcon extends StatelessWidget {
+  final String status;
+  final Object? registeredAt;
+
+  const StatusDaysIcon({
+    super.key,
+    required this.status,
+    required this.registeredAt,
+  });
+
+  String get normalizedStatus => status.trim().toLowerCase();
+  bool get resolved => normalizedStatus.startsWith('resuelto');
+  bool get closed =>
+      resolved ||
+      normalizedStatus.contains('cerrado') ||
+      normalizedStatus.contains('cancelado') ||
+      normalizedStatus == 'no es competencia';
+  bool get pending =>
+      normalizedStatus.contains('inicio') ||
+      normalizedStatus.contains('pendiente');
+
+  int? get daysSinceRegistration {
+    final parsed = DateTime.tryParse('$registeredAt');
+    if (parsed == null) return null;
+    final today = DateUtils.dateOnly(DateTime.now());
+    final elapsed = today
+        .difference(DateUtils.dateOnly(parsed.toLocal()))
+        .inDays;
+    return elapsed < 0 ? 0 : elapsed;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final days = daysSinceRegistration;
+    const blue = Color(0xFF12A5E5);
+    const yellow = Color(0xFFF4B400);
+    const green = Color(0xFF27834A);
+    const red = Color(0xFFD32F2F);
+    final marker = days?.toString() ?? '?';
+    final description = closed
+        ? resolved
+              ? days == null
+                    ? '$status · días desde el registro no disponibles; la base no guarda la fecha de cierre para calcular cuánto tardó en resolverse'
+                    : '$status · $days días desde el registro hasta hoy; no es el tiempo que tardó en resolverse, porque la base no guarda la fecha de cierre'
+              : '$status · cerrada; duración no disponible porque falta la fecha de cierre'
+        : days == null
+        ? '$status · días desde el registro no disponibles'
+        : '$status · $days días desde el registro';
+    return Tooltip(
+      message: description,
+      child: Semantics(
+        label: description,
+        child: SizedBox.square(
+          dimension: 36,
+          child: Center(
+            child: resolved
+                ? Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: green,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          marker,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : closed
+                ? const Icon(Icons.cancel_rounded, color: red, size: 30)
+                : Stack(
+                    alignment: Alignment.center,
+                    children: pending
+                        ? [
+                            CustomPaint(
+                              size: const Size(36, 36),
+                              painter: _DaysTrianglePainter(yellow),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 9),
+                              child: SizedBox(
+                                width: 28,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    marker,
+                                    style: const TextStyle(
+                                      color: ink,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]
+                        : [
+                            const Icon(Icons.circle, color: blue, size: 30),
+                            SizedBox(
+                              width: 26,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  marker,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DaysTrianglePainter extends CustomPainter {
+  final Color color;
+  const _DaysTrianglePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final triangle = Path()
+      ..moveTo(size.width / 2, 2)
+      ..lineTo(size.width - 1, size.height - 2)
+      ..lineTo(1, size.height - 2)
+      ..close();
+    canvas.drawPath(triangle, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DaysTrianglePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
 class LabeledField extends StatelessWidget {
   final String label;
   final Widget child;

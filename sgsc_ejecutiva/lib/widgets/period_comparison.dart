@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../services/executive_api.dart';
 import 'executive_widgets.dart';
+import 'executive_charts.dart';
 import 'filter_sheet.dart';
 
 /// What the person chose to compare, plus the last result and the query it
@@ -307,76 +308,6 @@ class _PeriodComparisonState extends State<PeriodComparison> {
       ),
     ),
   );
-  Widget metric(String key, String title) {
-    final av = result!['a'][key] as num, bv = result!['b'][key] as num;
-    final delta = result!['variacion'][key];
-    final diff = delta['diferencia'] as num;
-    final pct = delta['porcentaje'] as num?;
-    final maxValue = (av > bv ? av : bv).toDouble();
-    String change = diff == 0
-        ? 'Sin cambio'
-        : '${diff.abs()} ${diff > 0 ? 'más' : 'menos'}';
-    if (pct != null && diff != 0) change += ' (${pct.abs()} %)';
-    if (pct == null) change += ' · referencia en cero';
-    Widget bar(DateTime date, num value, Color color) => Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(label(date), style: const TextStyle(fontSize: 12)),
-              ),
-              Text(
-                '$value',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: maxValue == 0 ? 0 : value / maxValue,
-              minHeight: 6,
-              color: color,
-              backgroundColor: paper,
-            ),
-          ),
-        ],
-      ),
-    );
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: key == 'total' ? blueTint : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          ),
-          Text(
-            '$bv',
-            style: TextStyle(
-              fontSize: key == 'total' ? 32 : 24,
-              fontWeight: FontWeight.w800,
-              color: ink,
-            ),
-          ),
-          Text(change, style: const TextStyle(fontSize: 13, color: ink)),
-          bar(b, bv, salud),
-          bar(a, av, muted),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) => ExecutiveCard(
     title: 'Comparar periodos',
@@ -480,9 +411,21 @@ class _PeriodComparisonState extends State<PeriodComparison> {
                 'Sin solicitudes en ambos periodos. Prueba otras fechas o ajusta los filtros.',
               ),
             ),
-          metric('total', 'Solicitudes registradas'),
-          metric('activas', 'Activas actualmente'),
-          metric('resueltas', 'Resueltas actualmente'),
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text(
+              'Comparación de indicadores',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 8),
+          PeriodComparisonChart(
+            earlier: result!['a'] as Map<String, dynamic>,
+            later: result!['b'] as Map<String, dynamic>,
+            variations: result!['variacion'] as Map<String, dynamic>,
+            earlierLabel: label(a),
+            laterLabel: label(b),
+          ),
         ],
       ],
     ),

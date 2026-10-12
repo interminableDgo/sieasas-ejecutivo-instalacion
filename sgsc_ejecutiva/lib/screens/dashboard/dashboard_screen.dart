@@ -499,12 +499,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Chip(
-                  label: Text('${detail!['estatus']}'),
-                  backgroundColor: blueTint,
-                  side: BorderSide.none,
-                ),
-                const SizedBox(height: 10),
                 Text(
                   '${detail!['nombres']} ${detail!['apellidos']}',
                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -706,7 +700,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ExecutiveCard(
                             title: 'Solicitudes registradas',
-                            source: 'Cantidad de solicitudes del estado asignado que cumplen los filtros. No representa personas únicas ni apoyos entregados.',
+                            source: 'Cantidad de solicitudes del estado asignado que cumplen los filtros. No representa personas únicas ni apoyos entregados. Activas incluye todos los estatus que no son Resuelto, Resuelto con observación, Cerrado / Cancelado o No es competencia. Pendientes puede ser una parte de las activas.',
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -724,7 +718,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
-                                  '${summary!['activas']} activas · ${summary!['resueltas']} resueltas',
+                                  '${summary!['activas']} activas (incluye pendientes) · ${summary!['resueltas']} resueltas',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: muted,
@@ -790,6 +784,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 rows: group('municipios'),
                                 catalog: catalogs?['municipios'] as List? ?? [],
                                 active: {...?filters['municipio_id']},
+                                activeCount:
+                                    (filters['municipio_id']?.length ?? 0) == 1
+                                    ? summary!['activas'] as num
+                                    : null,
+                                resolvedCount:
+                                    (filters['municipio_id']?.length ?? 0) == 1
+                                    ? summary!['resueltas'] as num
+                                    : null,
                                 onFilter: selectMapMunicipality,
                                 loading: loading,
                                 error: error,
@@ -802,85 +804,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             'municipio_id',
                             'Solicitudes agrupadas por municipio. Toca una barra para aplicar el filtro.',
                           ),
-                          bars(
-                            'Tipos de apoyo más solicitados',
-                            'apoyos',
-                            'tipo_apoyo_id',
-                            'Solicitudes agrupadas por el tipo de apoyo registrado. Toca una barra para aplicar el filtro.',
-                          ),
-                          bars(
-                            'Solicitudes por grupo vulnerable',
-                            'grupos',
-                            'grupo_vulnerable_id',
-                            'Solicitudes agrupadas por el grupo del beneficiario. Un beneficiario puede tener varias solicitudes. Toca una barra para aplicar el filtro.',
+                          ExecutiveCard(
+                            title: 'Tipos de apoyo más solicitados',
+                            source: 'Participación de los cinco tipos más frecuentes y el resto agrupado como Otros. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
+                            child: CategoryPieChart(
+                              rows: group('apoyos'),
+                              total: summary!['total'] as num,
+                              active: {...?filters['tipo_apoyo_id']},
+                              onSelect: (id) =>
+                                  toggleFilter('tipo_apoyo_id', id),
+                            ),
                           ),
                           ExecutiveCard(
-                            title: 'Dependencias remitentes',
-                            source: 'Porcentaje de las solicitudes filtradas que fue remitido por cada dependencia. Toca una fila para aplicar el filtro.',
-                            child: group('dependencias').isEmpty
-                                ? const Text(
-                                    'Sin datos por dependencia.',
-                                    style: TextStyle(color: muted),
-                                  )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ...visibleRows(
-                                        'dependencias',
-                                        'dependencia_id',
-                                      ).map(
-                                        (r) => InkWell(
-                                          onTap: r['id'] == null
-                                              ? null
-                                              : () => toggleFilter(
-                                                  'dependencia_id',
-                                                  '${r['id']}',
-                                                ),
-                                          child: Container(
-                                            color:
-                                                (filters['dependencia_id'] ??
-                                                        const [])
-                                                    .contains('${r['id']}')
-                                                ? blueTint
-                                                : null,
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 10,
-                                              horizontal: 5,
-                                            ),
-                                            child: Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    '${r['nombre']}',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                SizedBox(
-                                                  width: 100,
-                                                  child: Text(
-                                                    '${r['total']}  ·  ${hasData ? ((r['total'] as num) / (summary!['total'] as num) * 100).toStringAsFixed(1) : '0'}%',
-                                                    textAlign: TextAlign.right,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      moreToggle('dependencias'),
-                                    ],
-                                  ),
+                            title: 'Solicitudes por grupo vulnerable',
+                            source: 'Distribución de solicitudes por grupo vulnerable. Los porcentajes se calculan sobre las solicitudes clasificadas en el catálogo, incluida la categoría Sin información. Un mismo beneficiario puede generar varias solicitudes. Toca una categoría para aplicar el filtro.',
+                            child: CategoryPieChart(
+                              rows: group('grupos'),
+                              total: group('grupos').fold<num>(
+                                0,
+                                (sum, row) => sum + (row['total'] as num),
+                              ),
+                              active: {...?filters['grupo_vulnerable_id']},
+                              onSelect: (id) =>
+                                  toggleFilter('grupo_vulnerable_id', id),
+                            ),
                           ),
                           ExecutiveCard(
                             title: 'Detalle de solicitudes',
@@ -907,42 +854,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             color: ink,
                                             fontSize: 11,
                                           ),
-                                          columns:
-                                              [
-                                                    'Solicitud',
-                                                    'Municipio',
-                                                    'Tipo de apoyo',
-                                                    'Remitente',
-                                                    'Estatus',
-                                                  ]
-                                                  .map(
-                                                    (h) => DataColumn(
-                                                      label: Text(h),
-                                                    ),
-                                                  )
-                                                  .toList(),
+                                          columns: [
+                                            const DataColumn(
+                                              label: SizedBox(
+                                                width: 30,
+                                                child: Center(
+                                                  child: Text(
+                                                    'Estado',
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            for (final h in [
+                                              'Solicitud',
+                                              'Municipio',
+                                              'Tipo de apoyo',
+                                              'Remitente',
+                                            ])
+                                              DataColumn(label: Text(h)),
+                                          ],
                                           rows: rows
                                               .map(
                                                 (r) => DataRow(
-                                                  cells:
-                                                      [
-                                                            'folio',
-                                                            'municipio',
-                                                            'tipo_apoyo',
-                                                            'dependencia',
-                                                            'estatus',
-                                                          ]
-                                                          .map(
-                                                            (k) => DataCell(
-                                                              Text('${r[k]}'),
-                                                              onTap: () =>
-                                                                  openDetail(
-                                                                    r['solicitud_id']
-                                                                        as int,
-                                                                  ),
-                                                            ),
-                                                          )
-                                                          .toList(),
+                                                  cells: [
+                                                    DataCell(
+                                                      Center(
+                                                        child: StatusDaysIcon(
+                                                          status:
+                                                              '${r['estatus']}',
+                                                          registeredAt:
+                                                              r['fecha_registro'],
+                                                        ),
+                                                      ),
+                                                      onTap: () => openDetail(
+                                                        r['solicitud_id']
+                                                            as int,
+                                                      ),
+                                                    ),
+                                                    for (final k in [
+                                                      'folio',
+                                                      'municipio',
+                                                      'tipo_apoyo',
+                                                      'dependencia',
+                                                    ])
+                                                      DataCell(
+                                                        Text('${r[k]}'),
+                                                        onTap: () => openDetail(
+                                                          r['solicitud_id']
+                                                              as int,
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
                                               )
                                               .toList(),
