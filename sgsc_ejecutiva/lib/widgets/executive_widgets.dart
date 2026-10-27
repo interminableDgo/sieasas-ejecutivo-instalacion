@@ -266,6 +266,120 @@ class LabeledField extends StatelessWidget {
   );
 }
 
+/// Wizard position: a large step number, the section and title, and one
+/// segment per step (completed, current, pending). Ink on orange keeps the
+/// number legible (≈ 6.8:1); color is never the only cue, since completed
+/// segments also show a check.
+class StepProgress extends StatelessWidget {
+  final int current, total;
+  final String section, title;
+  const StepProgress({
+    super.key,
+    required this.current,
+    required this.total,
+    required this.section,
+    required this.title,
+  });
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    label: 'Paso $current de $total: $section, $title',
+    child: ExcludeSemantics(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 18),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        decoration: BoxDecoration(
+          color: blueTint,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: salud.withValues(alpha: .35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: brand,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$current',
+                    style: const TextStyle(
+                      color: ink,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PASO $current DE $total · ${section.toUpperCase()}',
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: ink,
+                          fontSize: 20,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                for (var i = 1; i <= total; i++) ...[
+                  if (i > 1) const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 18,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: i < current
+                            ? salud
+                            : i == current
+                            ? brand
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: i <= current ? Colors.transparent : border,
+                        ),
+                      ),
+                      child: i < current
+                          ? const Icon(Icons.check, size: 13, color: ink)
+                          : null,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class PageHeading extends StatelessWidget {
   final String title;
   final VoidCallback onBack;

@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.main import app
@@ -109,15 +110,25 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert initial.status_code==200,initial.text
     before=initial.json()['total']
     cats=client.get('/ejecutivo/catalogos',headers=headers).json()
-    mid=cats['municipios'][0]['id']
+    mid,other_mid=cats['municipios'][0]['id'],cats['municipios'][1]['id']
+    home=db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'Colonia temporal','64999')"),{'m':mid}).lastrowid
+    away=db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'Colonia temporal','65999')"),{'m':other_mid}).lastrowid
+    db.commit()
+    # La misma colonia con otra escritura (mayúsculas o acentos) no puede repetirse en el catálogo.
+    with pytest.raises(IntegrityError):
+        db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'COLONIA TEMPORÁL','64999')"),{'m':mid})
+    db.rollback()
+    colonies=client.get('/ejecutivo/colonias',params={'municipio_id':mid},headers=headers).json()['items']
+    assert {'id':home,'nombre':'Colonia temporal','codigo_postal':'64999'} in colonies
     data={'beneficiario':{'nombres':'Beneficiario temporal','apellidos':'Prueba',
       'fecha_nacimiento':'1990-01-01','genero_id':cats['generos'][0]['id'],
-      'municipio_nacimiento_id':mid,'municipio_id':mid,'calle':'Temporal','numero':'1','colonia_id':1,
-      'codigo_postal':'64000','tiempo_residencia':1,'con_quien_vive':'Familia','numero_hijos':0,
+      'municipio_nacimiento_id':mid,'municipio_id':mid,'calle':'Temporal','numero':'1','colonia_id':home,
+      'tiempo_residencia':1,'con_quien_vive_id':cats['con_quien_vive'][0]['id'],'numero_hijos':0,
+      'estudia':True,'area_estudio_id':cats['areas_estudio'][0]['id'],'ocupacion_id':cats['ocupaciones'][0]['id'],
       'seguridad_social_id':cats['seguridad_social'][0]['id'],'grupo_vulnerable_id':cats['grupos'][0]['id']},
       'solicitante':{'nombres':'Solicitante temporal','apellidos':'Prueba',
       'parentesco_id':cats['parentescos'][0]['id'],'fecha_nacimiento':'1990-01-01',
-      'municipio_id':mid,'calle':'Temporal','numero':'1','colonia':'Temporal','codigo_postal':'64000','telefono':'8112345678'},
+      'mismo_domicilio':True,'telefono':'8112345678'},
       'tipo_apoyo_id':cats['apoyos'][0]['id'],'dependencia_id':cats['dependencias'][0]['id'],
       'enviado_por_id':cats['origenes'][0]['id'],'canal_id':cats['canales'][0]['id'],
       'unidad_tratante_id':cats['unidades'][0]['id'],'descripcion':'Prueba aislada, se revierte',
@@ -126,6 +137,16 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert created.status_code==201,created.text
     assert client.post('/ejecutivo/solicitudes',json=data,headers=headers).json()==created.json()
     sid=created.json()['solicitud_id']
+    stored=db.execute(text('''SELECT b.ben_dom_colonia,b.ben_dom_colonia_id,b.ben_dom_cp,b.ben_estsocioeco_conquienvive,
+      s.sol_calle,s.sol_colonia,s.sol_colonia_id,s.sol_codigopostal,s.sol_municipioid
+      FROM Tbl_SolicitudesApoyo sa JOIN Tbl_Beneficiarios b ON b.ben_id=sa.solapoyo_beneficiarioid
+      JOIN Tbl_Solicitantes s ON s.sol_id=sa.solapoyo_solicitanteid WHERE sa.solapoyo_id=:sid'''),{'sid':sid}).mappings().one()
+    assert (stored['ben_dom_colonia'],stored['ben_dom_colonia_id'],stored['ben_dom_cp'])==('Colonia temporal',home,'64999')
+    assert stored['ben_estsocioeco_conquienvive']==cats['con_quien_vive'][0]['nombre']
+    assert (stored['sol_calle'],stored['sol_colonia_id'],stored['sol_codigopostal'],stored['sol_municipioid'])==('Temporal',home,'64999',mid)
+    wrong=client.post('/ejecutivo/solicitudes',json={**data,'beneficiario':{**data['beneficiario'],'colonia_id':away},
+      'idempotencia':str(uuid.uuid4())},headers=headers)
+    assert wrong.status_code==422 and 'colonia' in wrong.text
     summary=client.get('/ejecutivo/dashboard',headers=headers).json()
     assert summary['total']==before+1
     assert sum(r['total'] for r in summary['municipios'])==summary['total']

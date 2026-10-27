@@ -9,13 +9,48 @@ from app.database import engine
 from app.security import hasher
 
 
+COLONY_COLUMNS={'Tbl_Beneficiarios':'ben_dom_colonia_id','Tbl_Solicitantes':'sol_colonia_id'}
+
+
+def run_sql(db,name):
+    sql=(Path(__file__).parent/'migrations'/name).read_text(encoding='utf-8')
+    sql='\n'.join(line for line in sql.splitlines() if not line.lstrip().startswith('--'))
+    for statement in sql.split(';'):
+        if statement.strip():
+            db.execute(text(statement))
+
+
 def migrate():
-    sql=(Path(__file__).parent/'migrations/002_ssnl_ejecutivo.sql').read_text(encoding='utf-8')
     with engine.begin() as db:
-        for statement in sql.split(';'):
-            if statement.strip():
-                db.execute(text(statement))
+        run_sql(db,'002_ssnl_ejecutivo.sql')
+        run_sql(db,'003_catalogos_solicitud.sql')
+        # MySQL 8 no admite ADD COLUMN IF NOT EXISTS; se comprueba antes para que la migración sea repetible.
+        for table,column in COLONY_COLUMNS.items():
+            exists=db.execute(text('''SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:t AND COLUMN_NAME=:c'''),{'t':table,'c':column}).scalar()
+            if not exists:
+                db.execute(text(f'ALTER TABLE `{table}` ADD COLUMN `{column}` INT NULL, '
+                                f'ADD CONSTRAINT `fk_{column}` FOREIGN KEY (`{column}`) REFERENCES Cat_Colonias(id)'))
     print('Migración aditiva aplicada.')
+
+
+def load_colonies(args):
+    """Carga el catálogo de SEPOMEX (CPdescarga.txt, separado por «|») sin duplicar colonias."""
+    lines=Path(args.archivo).read_text(encoding=args.codificacion).splitlines()
+    header=next(i for i,line in enumerate(lines) if line.startswith('d_codigo|'))
+    columns=lines[header].split('|')
+    added=skipped=0
+    with engine.begin() as db:
+        municipalities={row.cvegeo:row.id for row in db.execute(text('SELECT id,cvegeo FROM INEGI_Cat_Municipios'))}
+        for line in lines[header+1:]:
+            row=dict(zip(columns,line.split('|')))
+            if args.estado and row.get('c_estado')!=args.estado: continue
+            mid=municipalities.get(row.get('c_estado','')+row.get('c_mnpio',''))
+            if not mid or not row.get('d_asenta'): skipped+=1; continue
+            added+=db.execute(text('''INSERT IGNORE INTO Cat_Colonias (municipio_id,nombre,codigo_postal,tipo_asentamiento,created,updated)
+              VALUES (:m,:n,:cp,:t,UNIX_TIMESTAMP(),UNIX_TIMESTAMP())'''),
+              {'m':mid,'n':row['d_asenta'].strip()[:70],'cp':row['d_codigo'],'t':row.get('d_tipo_asenta')}).rowcount
+    print(f'Colonias nuevas: {added}. Omitidas por municipio desconocido: {skipped}. Las repetidas no se duplican.')
 
 
 def seed():
@@ -74,8 +109,13 @@ if __name__=='__main__':
     account.add_argument('--entidad',default='19',help='Clave INEGI del estado autorizado')
     second_factor=sub.add_parser('setup-2fa')
     second_factor.add_argument('--correo',required=True)
+    colonies=sub.add_parser('cargar-colonias',help='Importa el catálogo de códigos postales de SEPOMEX')
+    colonies.add_argument('archivo')
+    colonies.add_argument('--estado',default='19',help='Clave INEGI del estado; vacío para todos')
+    colonies.add_argument('--codificacion',default='latin-1')
     args=parser.parse_args()
     if args.command=='migrate': migrate()
+    elif args.command=='cargar-colonias': load_colonies(args)
     elif args.command=='seed-wireframe': seed()
     elif args.command=='setup-2fa': setup_2fa(args)
     else: provision(args)

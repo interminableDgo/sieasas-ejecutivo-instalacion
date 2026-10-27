@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/curp_validator.dart';
+import '../../core/theme.dart';
 import '../../services/executive_api.dart';
 import '../../widgets/executive_widgets.dart';
 
@@ -32,7 +33,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     'Solicitante · Domicilio y contacto',
     'Solicitud · Apoyo y recepción',
     'Solicitud · Descripción',
-    'Revisar y registrar',
+    'Revisión · Revisar y registrar',
   ];
   final forms = List.generate(stepNames.length, (_) => GlobalKey<FormState>());
   final labels = <String, String>{};
@@ -43,6 +44,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   final flags = <String, bool>{};
   final idempotency = const Uuid().v4();
   List<dynamic> birthMunicipalities = [];
+  // Colonias del municipio elegido, por domicilio ('b' beneficiario, 's' solicitante).
+  final colonies = <String, List<dynamic>>{'b': [], 's': []};
+  final colonyLoads = <String, int>{'b': 0, 's': 0};
   Map<String, dynamic>? beneficiary, applicant;
   bool existingBeneficiary = false, existingApplicant = false, busy = false;
   int step = 0, birthLoad = 0;
@@ -70,7 +74,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     final keys = switch (step) {
       0 => existingBeneficiary ? <String>[] : ['generos', 'entidades'],
       1 || 4 => ['municipios'],
-      2 => ['seguridad_social', 'grupos'],
+      2 => ['con_quien_vive', 'seguridad_social', 'grupos'],
       3 => existingApplicant ? <String>[] : ['parentescos'],
       5 => ['apoyos', 'origenes', 'canales', 'unidades'],
       _ => <String>[],
@@ -263,6 +267,65 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     }
   }
 
+  Future<void> loadColonies(String prefix, int? municipality) async {
+    final version = colonyLoads[prefix]! + 1;
+    colonyLoads[prefix] = version;
+    setState(() {
+      colonies[prefix] = [];
+      values['$prefix.colonia_id'] = null;
+      error = null;
+    });
+    if (municipality == null) return;
+    try {
+      final result = await widget.api.get('/ejecutivo/colonias', {
+        'municipio_id': '$municipality',
+      });
+      if (mounted && version == colonyLoads[prefix]) {
+        setState(
+          () => colonies[prefix] = [
+            for (final r in result['items'] as List)
+              {
+                'id': r['id'],
+                'nombre': '${r['nombre']} · CP ${r['codigo_postal']}',
+                'codigo_postal': r['codigo_postal'],
+              },
+          ],
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = e.toString());
+    }
+  }
+
+  String? postalCode(String prefix) {
+    for (final r in colonies[prefix]!) {
+      if (r['id'] == values['$prefix.colonia_id']) return '${r['codigo_postal']}';
+    }
+    return null;
+  }
+
+  bool get sameAddress => flags['s.mismo_domicilio'] == true;
+
+  /// Fields that are neither sent nor reviewed in the current situation:
+  /// with the same address the server copies the beneficiary's location.
+  bool skip(String key) =>
+      sameAddress &&
+          const {
+            's.calle',
+            's.numero',
+            's.colonia_id',
+            's.municipio_id',
+          }.contains(key) ||
+      key == 's.otro_parentesco' && !otherRelation ||
+      key == 'b.area_estudio_id' && flags['b.estudia'] != true;
+
+  bool get otherRelation {
+    for (final r in widget.catalogs['parentescos'] as List? ?? []) {
+      if (r['id'] == values['s.parentesco_id']) return r['nombre'] == 'Otro';
+    }
+    return false;
+  }
+
   Future<void> findPerson(bool isBeneficiary) async {
     final search = TextEditingController();
     List<dynamic> rows = [];
@@ -365,31 +428,48 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     }
   }
 
-  List<Widget> address(String prefix) => [
-    select(
-      'Municipio de domicilio · ${widget.entity}',
-      '$prefix.municipio_id',
-      'municipios',
-    ),
-    input('Calle', '$prefix.calle'),
-    input(
-      'Número exterior / interior',
-      '$prefix.numero',
-      max: prefix == 'b' ? 15 : 20,
-    ),
-    if (prefix == 'b')
+  /// Municipio → colonia del catálogo; el código postal se deriva de la colonia
+  /// para que la ubicación no pueda capturarse con datos contradictorios.
+  List<Widget> address(String prefix) {
+    final municipality = values['$prefix.municipio_id'];
+    final cp = postalCode(prefix);
+    return [
+      select(
+        'Municipio de domicilio · ${widget.entity}',
+        '$prefix.municipio_id',
+        'municipios',
+        changed: (v) => loadColonies(prefix, v),
+      ),
+      select(
+        'Colonia',
+        '$prefix.colonia_id',
+        '',
+        options: colonies[prefix],
+      ),
+      if (municipality != null && colonies[prefix]!.isEmpty)
+        const Notice(
+          'No hay colonias registradas para este municipio. La administración debe cargar el catálogo de colonias.',
+          error: true,
+        ),
+      LabeledField(
+        'Código postal',
+        Text(
+          cp ?? 'Se asigna al elegir la colonia',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: cp == null ? FontWeight.normal : FontWeight.w700,
+            color: cp == null ? muted : ink,
+          ),
+        ),
+      ),
+      input('Calle', '$prefix.calle'),
       input(
-        'Clave de colonia del expediente',
-        'b.colonia_id',
-        number: true,
-        max: 10,
-        minimum: 1,
-        help: 'SSNL guarda una clave numérica. Usa la clave registrada en el expediente; no el nombre de la colonia.',
-      )
-    else
-      input('Colonia', 's.colonia'),
-    input('Código postal', '$prefix.codigo_postal', number: true, max: 5),
-  ];
+        'Número exterior / interior',
+        '$prefix.numero',
+        max: prefix == 'b' ? 15 : 20,
+      ),
+    ];
+  }
 
   List<Widget> beneficiaryFields() => [
     if (step == 0) ...[
@@ -432,16 +512,22 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     ],
     if (step == 2) ...[
       section('Información social'),
-      input('¿Con quién vive?', 'b.con_quien_vive', max: 50),
+      select('¿Con quién vive?', 'b.con_quien_vive_id', 'con_quien_vive'),
       input('Número de hijos', 'b.numero_hijos', number: true, max: 3),
       check('Algún hijo tiene seguridad social', 'b.hijo_seguridad_social'),
       check('Estudia actualmente', 'b.estudia'),
       if (flags['b.estudia'] == true)
-        input('Área de estudio (opcional)', 'b.area_estudio', required: false),
-      input('Profesión (opcional)', 'b.profesion', required: false),
-      input(
+        select('Área de estudio', 'b.area_estudio_id', 'areas_estudio'),
+      select(
+        'Ocupación (opcional)',
+        'b.ocupacion_id',
+        'ocupaciones',
+        required: false,
+      ),
+      select(
         'Fuente de ingresos (opcional)',
-        'b.fuente_ingresos',
+        'b.fuente_ingresos_id',
+        'fuentes_ingreso',
         required: false,
       ),
       select('Seguridad social', 'b.seguridad_social_id', 'seguridad_social'),
@@ -478,17 +564,24 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           's.parentesco_id',
           'parentescos',
         ),
-        input(
-          'Otro parentesco (si aplica)',
-          's.otro_parentesco',
-          max: 100,
-          required: false,
-        ),
+        if (otherRelation)
+          input('Especifica el parentesco', 's.otro_parentesco', max: 100),
         birthDate('s'),
       ],
     ],
     if (step == 4) ...[
-      ...address('s'),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Vive en el mismo domicilio que el beneficiario'),
+        subtitle: const Text(
+          'Se usa el domicilio ya registrado y no se vuelve a capturar.',
+        ),
+        value: sameAddress,
+        onChanged: busy
+            ? null
+            : (v) => setState(() => flags['s.mismo_domicilio'] = v),
+      ),
+      if (!sameAddress) ...address('s'),
       input('Teléfono', 's.telefono', max: 15),
     ],
   ];
@@ -564,11 +657,14 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           Text('${person['nombre']} · Expediente #${person['id']}')
         else
           for (final entry in labels.entries)
-            if ((prefix.isEmpty
-                ? !entry.key.contains('.') && entry.key != 'birth_entity'
-                : entry.key.startsWith('$prefix.') ||
-                      prefix == 'b' && entry.key == 'birth_entity'))
+            if (!skip(entry.key) &&
+                (prefix.isEmpty
+                    ? !entry.key.contains('.') && entry.key != 'birth_entity'
+                    : entry.key.startsWith('$prefix.') ||
+                          prefix == 'b' && entry.key == 'birth_entity'))
               LabeledField(entry.value, Text(reviewValue(entry.key))),
+        if (person == null && prefix == 's' && sameAddress)
+          const LabeledField('Domicilio', Text('El mismo del beneficiario')),
       ],
     ),
   );
@@ -584,8 +680,10 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
 
   Map<String, dynamic> personData(String prefix) {
     final result = <String, dynamic>{};
-    const numeric = {'colonia_id', 'tiempo_residencia', 'numero_hijos'};
-    for (final e in fields.entries.where((e) => e.key.startsWith('$prefix.'))) {
+    const numeric = {'tiempo_residencia', 'numero_hijos'};
+    for (final e in fields.entries.where(
+      (e) => e.key.startsWith('$prefix.') && !skip(e.key),
+    )) {
       final key = e.key.substring(2), value = e.value.text.trim();
       result[key] = value.isEmpty
           ? null
@@ -595,7 +693,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
           ? value.toUpperCase()
           : value;
     }
-    for (final e in values.entries.where((e) => e.key.startsWith('$prefix.'))) {
+    for (final e in values.entries.where(
+      (e) => e.key.startsWith('$prefix.') && !skip(e.key),
+    )) {
       result[e.key.substring(2)] = e.value;
     }
     for (final e in flags.entries.where((e) => e.key.startsWith('$prefix.'))) {
@@ -654,15 +754,12 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PageHeading('Nueva solicitud', onBack: busy ? () {} : widget.onBack),
-        Text(
-          'Paso ${visibleSteps.indexOf(step) + 1} de ${visibleSteps.length} · ${stepNames[step]}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        StepProgress(
+          current: visibleSteps.indexOf(step) + 1,
+          total: visibleSteps.length,
+          section: stepNames[step].split(' · ').first,
+          title: stepNames[step].split(' · ').last,
         ),
-        const SizedBox(height: 12),
-        LinearProgressIndicator(
-          value: (visibleSteps.indexOf(step) + 1) / visibleSteps.length,
-        ),
-        const SizedBox(height: 16),
         if (missingCatalogs)
           const Notice(
             'Faltan opciones obligatorias en los catálogos. La administración debe completarlas para continuar.',

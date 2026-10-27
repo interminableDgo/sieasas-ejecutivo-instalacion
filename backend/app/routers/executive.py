@@ -16,7 +16,9 @@ router=APIRouter(prefix='/ejecutivo',tags=['Ejecutivo'])
 CATALOGS = {'apoyos':'Cat_TipoApoyo','dependencias':'Cat_Dependencias','grupos':'Cat_GruposVulnerables',
  'estatus':'Cat_StatusAtencion','canales':'Cat_CanalesRecepcion','origenes':'Cat_EnviadoPor',
  'unidades':'Cat_UnidadesTratantes','parentescos':'Cat_Parentescos','generos':'Cat_Generos',
- 'seguridad_social':'Cat_SeguridadSocial','partidos':'Cat_PartidosPoliticos'}
+ 'seguridad_social':'Cat_SeguridadSocial','partidos':'Cat_PartidosPoliticos',
+ 'con_quien_vive':'Cat_ConQuienVive','ocupaciones':'Cat_Ocupaciones','fuentes_ingreso':'Cat_FuentesIngreso',
+ 'areas_estudio':'Cat_AreasEstudio'}
 
 @router.get('/catalogos')
 def catalogs(user=Depends(current_user),db:Session=Depends(get_db)):
@@ -30,6 +32,15 @@ def catalogs(user=Depends(current_user),db:Session=Depends(get_db)):
 @router.get('/municipios-nacimiento')
 def birth_municipalities(entidad_id:int=Query(gt=0),user=Depends(current_user),db:Session=Depends(get_db)):
     return {'items':svc.query_rows(db,'SELECT id,nom_mun AS nombre FROM INEGI_Cat_Municipios WHERE entidad_id=:eid ORDER BY nom_mun',{'eid':entidad_id})}
+
+
+@router.get('/colonias')
+def colonies(municipio_id:int=Query(gt=0),user=Depends(current_user),db:Session=Depends(get_db)):
+    # Solo municipios del estado autorizado; el código postal sale del catálogo, no de la captura.
+    return {'items':svc.query_rows(db,'''SELECT c.id,c.nombre,c.codigo_postal FROM Cat_Colonias c
+      JOIN INEGI_Cat_Municipios m ON m.id=c.municipio_id
+      WHERE c.municipio_id=:mid AND m.entidad_id=:eid AND c.is_active=1 ORDER BY c.nombre,c.codigo_postal''',
+      {'mid':municipio_id,'eid':user['entidad_id']})}
 
 
 @router.get('/personas')

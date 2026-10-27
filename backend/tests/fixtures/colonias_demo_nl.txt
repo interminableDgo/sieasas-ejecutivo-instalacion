@@ -1,0 +1,19 @@
+Archivo de demostración con el formato de CPdescarga.txt de SEPOMEX. No sustituye al catálogo oficial.
+d_codigo|d_asenta|d_tipo_asenta|D_mnpio|d_estado|d_ciudad|d_CP|c_estado|c_oficina|c_CP|c_tipo_asenta|c_mnpio|id_asenta_cpcons|d_zona|c_cve_ciudad
+64000|Centro|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0001|Urbano|01
+64000|CENTRO|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0001|Urbano|01
+64060|Obispado|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0002|Urbano|01
+64460|Mitras Centro|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0003|Urbano|01
+64610|Cumbres Primer Sector|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0004|Urbano|01
+64700|Tecnológico|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0005|Urbano|01
+64720|Independencia|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0006|Urbano|01
+64860|Contry|Colonia|Monterrey|Nuevo León|Monterrey|64001|19|64001||09|039|0007|Urbano|01
+66220|Del Valle|Colonia|San Pedro Garza García|Nuevo León|San Pedro Garza García|66201|19|66201||09|019|0001|Urbano|02
+66220|Fuentes del Valle|Colonia|San Pedro Garza García|Nuevo León|San Pedro Garza García|66201|19|66201||09|019|0002|Urbano|02
+67100|Centro|Colonia|Guadalupe|Nuevo León|Guadalupe|67101|19|67101||09|026|0001|Urbano|03
+67130|Linda Vista|Colonia|Guadalupe|Nuevo León|Guadalupe|67101|19|67101||09|026|0002|Urbano|03
+66400|Centro|Colonia|San Nicolás de los Garza|Nuevo León|San Nicolás de los Garza|66401|19|66401||09|046|0001|Urbano|04
+66450|Anáhuac|Colonia|San Nicolás de los Garza|Nuevo León|San Nicolás de los Garza|66401|19|66401||09|046|0002|Urbano|04
+66600|Centro|Colonia|Apodaca|Nuevo León|Apodaca|66601|19|66601||09|006|0001|Urbano|05
+66050|Centro|Colonia|General Escobedo|Nuevo León|General Escobedo|66051|19|66051||09|021|0001|Urbano|06
+66350|Centro|Colonia|Santa Catarina|Nuevo León|Santa Catarina|66351|19|66351||09|048|0001|Urbano|07
