@@ -37,6 +37,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String screen = 'dashboard';
   String? error, message;
   bool loading = true, exporting = false;
+  String supportView = 'Dona', groupView = 'Dona';
+  static const chartCodes = {
+    'Dona': 'donut',
+    'Barras': 'bars',
+    'Apilada': 'stacked',
+    'Treemap': 'treemap',
+  };
   bool showComparison = false;
   int page = 0, total = 0, generation = 0;
   final Set<String> expanded = {};
@@ -235,7 +242,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<String?> export(String format) async {
     setState(() => exporting = true);
     try {
-      final bytes = await widget.api.export(format, {...filters});
+      final bytes = await widget.api.export(format, {
+        ...filters,
+        'chart_apoyos': chartCodes[supportView]!,
+        'chart_grupos': chartCodes[groupView]!,
+      });
       final file = XFile.fromData(
         bytes,
         name: 'SIESAS-ejecutivo.$format',
@@ -805,9 +816,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             'Solicitudes agrupadas por municipio. Toca una barra para aplicar el filtro.',
                           ),
                           ExecutiveCard(
-                            title: 'Tipos de apoyo más solicitados',
-                            source: 'Participación de los cinco tipos más frecuentes y el resto agrupado como Otros. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
+                            title: 'Apoyos solicitados',
+                            source: 'Se grafican los cinco tipos más frecuentes; las demás categorías se indican por separado. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
                             child: CategoryPieChart(
+                              selectedView: supportView,
+                              onViewChanged: (value) =>
+                                  setState(() => supportView = value),
                               rows: group('apoyos'),
                               total: summary!['total'] as num,
                               active: {...?filters['tipo_apoyo_id']},
@@ -816,9 +830,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           ExecutiveCard(
-                            title: 'Solicitudes por grupo vulnerable',
+                            title: 'Clasificación por grupo vulnerable',
                             source: 'Distribución de solicitudes por grupo vulnerable. Los porcentajes se calculan sobre las solicitudes clasificadas en el catálogo, incluida la categoría Sin información. Un mismo beneficiario puede generar varias solicitudes. Toca una categoría para aplicar el filtro.',
                             child: CategoryPieChart(
+                              selectedView: groupView,
+                              onViewChanged: (value) =>
+                                  setState(() => groupView = value),
                               rows: group('grupos'),
                               total: group('grupos').fold<num>(
                                 0,

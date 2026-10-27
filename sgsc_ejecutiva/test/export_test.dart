@@ -46,6 +46,24 @@ void main() {
       expect(uri.queryParameters['fecha_inicio'], '2024-02-01');
       expect(uri.queryParameters['fecha_fin'], '2024-02-29');
     }
+    final requestCount = backend.requests.length;
+    await tester.scrollUntilVisible(
+      find.text('Apoyos solicitados'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Barras').first);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Barras').first);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Clasificación por grupo vulnerable'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Treemap').last);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Treemap').last);
+    await tester.pumpAndSettle();
+    expect(backend.requests.length, requestCount);
     await tester.tap(find.text('Exportar reporte'));
     await tester.pumpAndSettle();
     expect(find.textContaining('2024-02-01 al 2024-02-29'), findsOneWidget);
@@ -64,6 +82,8 @@ void main() {
       );
       expect(uri.queryParameters['fecha_inicio'], '2024-02-01');
       expect(uri.queryParameters['fecha_fin'], '2024-02-29');
+      expect(uri.queryParameters['chart_apoyos'], 'bars');
+      expect(uri.queryParameters['chart_grupos'], 'treemap');
       expect(
         find.textContaining('El servidor no pudo generar el archivo.'),
         findsOneWidget,

@@ -82,12 +82,16 @@ class DataBars extends StatelessWidget {
 }
 
 class CategoryPieChart extends StatefulWidget {
+  final String? selectedView;
+  final ValueChanged<String>? onViewChanged;
   final List<dynamic> rows;
   final num total;
   final Set<String> active;
   final ValueChanged<String> onSelect;
   const CategoryPieChart({
     super.key,
+    this.selectedView,
+    this.onViewChanged,
     required this.rows,
     required this.total,
     required this.onSelect,
@@ -100,6 +104,7 @@ class CategoryPieChart extends StatefulWidget {
 
 class _CategoryPieChartState extends State<CategoryPieChart> {
   bool showAll = false;
+  String view = 'Dona';
 
   static const colors = [
     salud,
@@ -124,41 +129,109 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
     final otherTotal = rows
         .skip(5)
         .fold<num>(0, (sum, row) => sum + (row['total'] as num));
-    final values = <num>[
-      ...top.map((row) => row['total'] as num),
-      if (otherTotal > 0) otherTotal,
-    ];
-    final names = <String>[
-      ...top.map((row) => '${row['nombre']}'),
-      if (otherTotal > 0) 'Otros',
-    ];
+    final values = <num>[...top.map((row) => row['total'] as num)];
+    final names = <String>[...top.map((row) => '${row['nombre']}')];
+    final sum = values.fold<num>(0, (sum, value) => sum + value);
+    final canStack =
+        sum + otherTotal == total && values.every((value) => value >= 0);
+    final chosen = widget.selectedView ?? view;
+    final currentView = chosen == 'Apilada' && !canStack ? 'Dona' : chosen;
+    final maximum = values.fold<num>(1, math.max);
     return Column(
       children: [
-        SizedBox(
-          height: 190,
-          width: 190,
-          child: CustomPaint(
-            painter: _CategoryPiePainter(values, colors),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$total',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final option in ['Dona', 'Barras', 'Apilada', 'Treemap'])
+                ChoiceChip(
+                  label: Text(option == 'Apilada' ? 'Composición' : option),
+                  selected: currentView == option,
+                  onSelected: option == 'Apilada' && !canStack
+                      ? null
+                      : (_) {
+                          setState(() => view = option);
+                          widget.onViewChanged?.call(option);
+                        },
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (currentView == 'Dona')
+          SizedBox(
+            height: 190,
+            width: 190,
+            child: CustomPaint(
+              painter: _CategoryPiePainter(values, colors),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$sum',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'solicitudes',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
-                ],
+                    Text(
+                      otherTotal > 0 ? 'mostradas' : 'solicitudes',
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
+        if (currentView != 'Dona')
+          Text(
+            otherTotal > 0
+                ? '$sum solicitudes mostradas'
+                : '$total solicitudes',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+        if (currentView == 'Barras')
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Escala común: 0 a $maximum solicitudes',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+          ),
+        if (currentView == 'Treemap') ...[
+          const SizedBox(height: 12),
+          ExcludeSemantics(
+            child: SizedBox(
+              height: 190,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _CategoryTreemapPainter(values, colors),
+              ),
+            ),
+          ),
+        ],
+        if (currentView == 'Apilada') ...[
+          const SizedBox(height: 12),
+          ExcludeSemantics(
+            child: SizedBox(
+              height: 28,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _CategoryStackPainter(values, colors),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            otherTotal > 0
+                ? 'Composición de las categorías mostradas'
+                : 'Composición del total · 100%',
+            style: TextStyle(fontSize: 11, color: muted),
+          ),
+        ],
         const SizedBox(height: 12),
         ...List.generate(values.length, (i) {
           final row = i < top.length ? top[i] : null;
@@ -172,43 +245,68 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: colors[i],
-                      shape: BoxShape.circle,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: colors[i],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          names[i],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${values[i]} · ${percent.toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      names[i],
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: selected
-                            ? FontWeight.w800
-                            : FontWeight.normal,
+                  if (currentView == 'Barras') ...[
+                    const SizedBox(height: 6),
+                    ExcludeSemantics(
+                      child: LinearProgressIndicator(
+                        value: (values[i] / maximum).clamp(0.0, 1.0),
+                        minHeight: 10,
+                        color: colors[i],
+                        backgroundColor: paper,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${values[i]} · ${percent.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
           );
         }),
+        if (otherTotal > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Fuera de la gráfica: $otherTotal solicitudes en ${rows.length - 5} categorías. '
+              'Total: $total. Porcentajes sobre el total; áreas sobre las $sum mostradas.',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+          ),
         if (rows.length > 5) ...[
           if (showAll) ...[
             const Divider(height: 20),
@@ -272,6 +370,94 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
   }
 }
 
+/// Uses exactly the same ordered values and palette as the donut and legend.
+class _CategoryTreemapPainter extends CustomPainter {
+  final List<num> values;
+  final List<Color> colors;
+  const _CategoryTreemapPainter(this.values, this.colors);
+  @override
+  void paint(Canvas canvas, Size size) {
+    void draw(int start, int end, Rect rect) {
+      final sum = values.sublist(start, end).fold<num>(0, (a, b) => a + b);
+      if (sum <= 0) return;
+      if (end - start == 1) {
+        canvas.drawRect(rect, Paint()..color = colors[start]);
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+        final label = TextPainter(
+          text: TextSpan(
+            text: '${values[start]}',
+            style: TextStyle(
+              fontFamily: 'Mulish',
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: colors[start].computeLuminance() > 0.179
+                  ? Colors.black
+                  : Colors.white,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (rect.width >= label.width + 4 && rect.height >= label.height + 4) {
+          label.paint(
+            canvas,
+            rect.center - Offset(label.width / 2, label.height / 2),
+          );
+        }
+        return;
+      }
+      final mid = (start + end) ~/ 2;
+      final fraction =
+          values.sublist(start, mid).fold<num>(0, (a, b) => a + b) / sum;
+      if (rect.width >= rect.height) {
+        final cut = rect.left + rect.width * fraction;
+        draw(start, mid, Rect.fromLTRB(rect.left, rect.top, cut, rect.bottom));
+        draw(mid, end, Rect.fromLTRB(cut, rect.top, rect.right, rect.bottom));
+      } else {
+        final cut = rect.top + rect.height * fraction;
+        draw(start, mid, Rect.fromLTRB(rect.left, rect.top, rect.right, cut));
+        draw(mid, end, Rect.fromLTRB(rect.left, cut, rect.right, rect.bottom));
+      }
+    }
+
+    draw(0, values.length, Offset.zero & size);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryTreemapPainter old) =>
+      !listEquals(values, old.values) || !listEquals(colors, old.colors);
+}
+
+class _CategoryStackPainter extends CustomPainter {
+  final List<num> values;
+  final List<Color> colors;
+  const _CategoryStackPainter(this.values, this.colors);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sum = values.fold<num>(0, (sum, value) => sum + value);
+    if (sum <= 0) return;
+    double left = 0;
+    for (var i = 0; i < values.length; i++) {
+      final width = size.width * values[i] / sum;
+      canvas.drawRect(
+        Rect.fromLTWH(left, 0, width, size.height),
+        Paint()..color = colors[i],
+      );
+      left += width;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryStackPainter old) =>
+      !listEquals(values, old.values) || !listEquals(colors, old.colors);
+}
+
 class _CategoryPiePainter extends CustomPainter {
   final List<num> values;
   final List<Color> colors;
@@ -281,18 +467,30 @@ class _CategoryPiePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final sum = values.fold<num>(0, (total, value) => total + value);
     if (sum == 0) return;
-    final rect = Offset.zero & size;
+    final center = size.center(Offset.zero);
+    final outer = Rect.fromCircle(
+      center: center,
+      radius: size.shortestSide / 2 - 10,
+    );
+    final inner = Rect.fromCircle(
+      center: center,
+      radius: size.shortestSide * .29,
+    );
+    final largest = values.indexOf(values.reduce((a, b) => a > b ? a : b));
     var start = -math.pi / 2;
     for (var i = 0; i < values.length; i++) {
       final sweep = values[i] / sum * math.pi * 2;
-      canvas.drawArc(rect, start, sweep, true, Paint()..color = colors[i]);
+      final mid = start + sweep / 2;
+      final offset = i == largest && values.where((v) => v > 0).length > 1
+          ? Offset(math.cos(mid), math.sin(mid)) * 8
+          : Offset.zero;
+      final path = Path()
+        ..arcTo(outer.shift(offset), start, sweep, true)
+        ..arcTo(inner.shift(offset), start + sweep, -sweep, false)
+        ..close();
+      canvas.drawPath(path, Paint()..color = colors[i]);
       start += sweep;
     }
-    canvas.drawCircle(
-      size.center(Offset.zero),
-      size.width * 0.29,
-      Paint()..color = Colors.white,
-    );
   }
 
   @override

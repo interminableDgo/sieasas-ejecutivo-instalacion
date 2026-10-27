@@ -76,6 +76,50 @@ def test_allowlist_numeric_excel_and_no_individual_rows(summary):
                    for sheet in book for row in sheet for c in row)
 
 
+@pytest.mark.parametrize('mode', ['donut', 'bars', 'stacked'])
+def test_selected_chart_types_keep_data_and_palette(summary, tmp_path, mode):
+    from openpyxl.chart import BarChart, DoughnutChart
+    from app.services.executive_chart_style import PALETTE
+    summary['apoyos'] = [{'nombre': f'Categoría {i}', 'total': n}
+                         for i, n in enumerate([6, 4, 3, 2, 2, 2, 1])]
+    report = report_for(summary)
+    report['chart_types'] = {'apoyos': mode, 'grupos': 'bars'}
+    book = load_workbook(io.BytesIO(render_xlsx(report)))
+    chart = book['Tipos de apoyo']._charts[0]
+    assert isinstance(chart, DoughnutChart if mode == 'donut' else BarChart)
+    assert isinstance(book['Grupos vulnerables']._charts[0], BarChart)
+    if mode == 'stacked':
+        assert chart.grouping == 'percentStacked' and chart.overlap == 100
+        assert len(chart.series) == 5
+        assert [s.graphicalProperties.solidFill.srgbClr for s in chart.series] == list(PALETTE[:5])
+    else:
+        assert [p.graphicalProperties.solidFill.srgbClr for p in chart.series[0].data_points] == list(PALETTE[:5])
+    text = pdf_text(render_pdf(report), tmp_path)
+    assert 'Fuera de la gráfica: 3' in text and '30.0%' in text and '15.0%' in text
+    if mode == 'stacked':
+        assert 'Composición de las categorías mostradas' in text
+    assert indicator(book, 'Solicitudes') == 20
+
+
+def test_chart_parameters_are_not_query_filters(client, monkeypatch):
+    client, calls = client
+    captured = []
+    monkeypatch.setattr(executive, 'render_xlsx', lambda report: captured.append(report) or b'PK')
+    response = client.get('/ejecutivo/exportar/xlsx?chart_apoyos=bars&chart_grupos=stacked&municipio_id=3')
+    assert response.status_code == 200
+    assert captured[0]['chart_types'] == {'apoyos': 'bars', 'grupos': 'stacked'}
+    assert calls[0][1] == {'municipio_id': 3}
+    assert client.get('/ejecutivo/exportar/pdf?chart_apoyos=points').status_code == 422
+
+
+def test_incompatible_stack_matches_dashboard_fallback(summary):
+    from app.services.executive_chart_style import category_chart_type
+    report = report_for(summary)
+    report['chart_types'] = {'apoyos': 'stacked'}
+    report['total'] = 21
+    assert category_chart_type(report, 'apoyos') == 'donut'
+
+
 def test_pdf_metadata_definitions_and_privacy(summary, tmp_path):
     report = report_for(summary, {'fecha_inicio': date(2024, 2, 1), 'fecha_fin': date(2024, 2, 29)})
     text = pdf_text(render_pdf(report), tmp_path)
@@ -228,9 +272,10 @@ def test_download_chart_colors_rankings_and_timezone(summary):
     line = next(c for c in charts if c.find('.//c:lineChart', ns) is not None)
     assert line.find('.//c:legend/c:legendPos', ns).attrib['val'] == 't'
     assert line.find('.//c:legend/c:overlay', ns).attrib['val'] == '0'
-    assert [n.attrib['val'] for n in line.findall('.//c:ser/c:spPr/a:ln/a:solidFill/a:srgbClr', ns)] == ['16A5D8', 'FF8200']
-    assert line.findall('.//c:ser/c:spPr/a:ln/a:prstDash', ns)[1].attrib['val'] == 'dash'
-    assert all(c.find('.//c:valAx/c:scaling/c:min', ns).attrib['val'] == '0' for c in charts)
+    assert [n.attrib['val'] for n in line.findall('.//c:ser/c:spPr/a:ln/a:solidFill/a:srgbClr', ns)] == ['12A5E5', 'FF8300']
+    assert all(n.attrib['val'] == 'solid' for n in line.findall('.//c:ser/c:spPr/a:ln/a:prstDash', ns))
+    assert all(n.attrib['val'] == 'circle' for n in line.findall('.//c:ser/c:marker/c:symbol', ns))
+    assert all(axis.attrib['val'] == '0' for c in charts for axis in c.findall('.//c:valAx/c:scaling/c:min', ns))
     series = book['Municipios']._charts[0].series[0]
     ref = series.val.numRef.f
     from openpyxl.utils.cell import range_boundaries
@@ -253,7 +298,8 @@ def test_excel_chart_bounds_leave_space_before_following_content(summary):
                          if c.value == ('Definiciones y alcance' if sheet.title == 'Resumen'
                                         else 'Mes de registro' if sheet.title == 'Tendencia' else 'Categoría'))
             assert below >= anchor.to.row + 3
-            assert chart.x_axis.delete is False and chart.y_axis.delete is False
+            if chart.tagname != 'doughnutChart':
+                assert chart.x_axis.delete is False and chart.y_axis.delete is False
             if chart.tagname == 'barChart':
                 assert chart.dLbls.showVal is True
                 assert chart.dLbls.showSerName is False
@@ -263,3 +309,33 @@ def test_excel_chart_bounds_leave_space_before_following_content(summary):
         c = next(c for row in book['Resumen'] for c in row if c.value == label)
         assert c.alignment.horizontal == 'center'
         assert book['Resumen'].cell(c.row+1, c.column).alignment.horizontal == 'center'
+
+
+def test_donuts_preserve_dashboard_grouping_colors_and_classified_base(summary, tmp_path):
+    rows = [{'nombre': f'Grupo {i}', 'total': count}
+            for i, count in enumerate([6, 5, 4, 3, 2, 1, 1])]
+    summary['grupos'] = rows
+    summary['apoyos'] = rows
+    book = load_workbook(io.BytesIO(render_xlsx(report_for(summary))))
+    chart = book['Grupos vulnerables']._charts[0]
+    assert chart.tagname == 'doughnutChart' and chart.holeSize == 58
+    assert [p.graphicalProperties.solidFill.srgbClr for p in chart.series[0].data_points] == [
+        '12A5E5', 'FF8300', '4E7D67', '8064A2', 'D76770']
+    assert not any(str(c.value).startswith('Otros ·') for c in cells(book))
+    assert chart.series[0].data_points[0].explosion == 8
+    row = category_row(book, 'Grupos vulnerables', 'Grupo 0')
+    assert book['Grupos vulnerables'].cell(row, 16).value == pytest.approx(6/22)
+    assert all(any(c.value == item['nombre'] for c in cells(book)) for item in rows)
+    text = pdf_text(render_pdf(report_for(summary)), tmp_path)
+    assert 'Fuera de la gráfica: 2' in text and 'Base: 22 solicitudes' in text
+
+
+def test_treemap_export(summary, tmp_path):
+    from app.services.executive_chart_style import treemap_rects
+    rects = treemap_rects([6, 3, 1], width=100, height=100)
+    assert [round(w*h) for _, _, _, w, h in rects] == [6000, 3000, 1000]
+    report = report_for(summary)
+    report['chart_types'] = {'apoyos': 'treemap', 'grupos': 'treemap'}
+    book = load_workbook(io.BytesIO(render_xlsx(report)))
+    assert len(book['Tipos de apoyo']._images) == 1
+    assert 'Categoría de prueba' in pdf_text(render_pdf(report), tmp_path)

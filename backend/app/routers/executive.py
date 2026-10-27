@@ -88,10 +88,13 @@ def create_request(data:NewRequest,user=Depends(current_user),db:Session=Depends
 
 
 @router.get('/exportar/{format}')
-def export(format:Literal['xlsx','pdf'],selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db)):
+def export(format:Literal['xlsx','pdf'],selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db),
+    chart_apoyos:Literal['donut','bars','stacked','treemap']='donut',
+    chart_grupos:Literal['donut','bars','stacked','treemap']='donut'):
     # Only aggregate queries: no request rows or personal fields enter the renderer.
     summary = svc.dashboard(db, user, selected, full_history=True)
     report = build_report(summary, user, selected, catalogs(user, db))
+    report['chart_types'] = {'apoyos': chart_apoyos, 'grupos': chart_grupos}
     content = render_xlsx(report) if format == 'xlsx' else render_pdf(report)
     mime = ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             if format == 'xlsx' else 'application/pdf')
