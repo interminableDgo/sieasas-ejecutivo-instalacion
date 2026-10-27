@@ -171,6 +171,25 @@ void main() {
     expect(tester.takeException(), isNull);
     await screenshot(tester, '02-panel-vacio');
   });
+  testWidgets('Eye button inside the field shows and hides the password', (
+    tester,
+  ) async {
+    await prepare(tester);
+    await tester.pumpWidget(wrap(SgscApp(api: mockApi())));
+    await tester.pumpAndSettle();
+    EditableText field() =>
+        tester.widget<EditableText>(find.byType(EditableText).at(1));
+    expect(find.text('Mostrar contraseña'), findsNothing);
+    expect(field().obscureText, true);
+    await tester.tap(find.byTooltip('Mostrar contraseña'));
+    await tester.pumpAndSettle();
+    expect(field().obscureText, false);
+    expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
+    await tester.tap(find.byTooltip('Ocultar contraseña'));
+    await tester.pumpAndSettle();
+    expect(field().obscureText, true);
+    await screenshot(tester, '01-acceso-ojo');
+  });
   testWidgets('Connection failure does not masquerade as empty results', (
     tester,
   ) async {

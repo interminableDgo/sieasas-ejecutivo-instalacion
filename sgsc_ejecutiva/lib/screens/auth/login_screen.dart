@@ -187,6 +187,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Eye toggle inside the field; the tooltip gives screen readers the action.
+  Widget eye() => IconButton(
+    tooltip: show ? 'Ocultar contraseña' : 'Mostrar contraseña',
+    icon: Icon(show ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+    onPressed: () => setState(() => show = !show),
+  );
+
   @override
   Widget build(BuildContext context) {
     final newPassword = mode == 'register' || mode == 'reset';
@@ -276,6 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: password,
                           obscureText: !show,
+                          decoration: InputDecoration(suffixIcon: eye()),
                           autocorrect: false,
                           enableSuggestions: false,
                           autofillHints: [
@@ -298,14 +306,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       if (newPassword) passwordRequirements(),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        dense: true,
-                        title: const Text('Mostrar contraseña'),
-                        value: show,
-                        onChanged: (v) => setState(() => show = v!),
-                      ),
                     ],
                     if (newPassword) ...[
                       LabeledField(
@@ -313,6 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextFormField(
                           controller: confirmation,
                           obscureText: !show,
+                          decoration: InputDecoration(suffixIcon: eye()),
                           validator: (v) => v == password.text
                               ? null
                               : 'Las contraseñas no coinciden.',
