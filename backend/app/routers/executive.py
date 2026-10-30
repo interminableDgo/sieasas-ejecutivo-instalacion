@@ -46,18 +46,22 @@ def colonies(municipio_id:int=Query(gt=0),user=Depends(current_user),db:Session=
 @router.get('/personas')
 def people(tipo:Literal['beneficiario','solicitante'],q:str=Query('',max_length=150),
     user=Depends(current_user),db:Session=Depends(get_db)):
+    # Every word must appear in the name, in any order ("martinez maria");
+    # the collation ignores accents and capitals.
     if tipo=='beneficiario':
-        sql="""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre
+        found,params=svc.matches([svc.BENEFICIARY],svc.search_terms(q),'p')
+        sql=f"""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre
           FROM Tbl_Beneficiarios b JOIN INEGI_Cat_Municipios m ON m.id=b.ben_dom_municipio AND m.entidad_id=b.ben_dom_entidad
           WHERE b.is_active=1 AND b.ben_dom_entidad=:eid
-          AND (CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname) LIKE :q OR b.ben_gen_curp=:exact)
+          AND ((TRUE{found}) OR b.ben_gen_curp=:exact)
           ORDER BY b.ben_gen_name,b.ben_id LIMIT 30"""
     else:
-        sql="""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre
+        found,params=svc.matches([svc.APPLICANT],svc.search_terms(q),'p')
+        sql=f"""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre
           FROM Tbl_Solicitantes s JOIN INEGI_Cat_Municipios m ON m.id=s.sol_municipioid AND m.entidad_id=s.sol_estadoid
           WHERE s.is_active=1 AND s.sol_estadoid=:eid
-          AND CONCAT(s.sol_nombres,' ',s.sol_apellidos) LIKE :q ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
-    return {'items':svc.query_rows(db,sql,{'eid':user['entidad_id'],'q':'%'+q.strip()+'%','exact':q.strip()})}
+          AND (TRUE{found}) ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
+    return {'items':svc.query_rows(db,sql,{**params,'eid':user['entidad_id'],'exact':q.strip()})}
 
 
 @router.get('/dashboard')

@@ -187,6 +187,10 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert {'texto':'29/02/2024','tipo':'Fecha de registro'} in dates
     found=client.get('/ejecutivo/personas',params={'tipo':'beneficiario','q':'Beneficiario temporal'},headers=headers)
     assert found.status_code==200 and found.json()['items']
+    # Palabras en cualquier orden, sin importar acentos ni mayúsculas.
+    for tipo,q in [('beneficiario','PRUEBA temporál beneficiario'),('solicitante','prueba SOLICITANTE')]:
+        names=[p['nombre'] for p in client.get('/ejecutivo/personas',params={'tipo':tipo,'q':q},headers=headers).json()['items']]
+        assert any(n.startswith(tipo.capitalize()+' temporal Prueba') for n in names),(q,names)
     assert client.get('/ejecutivo/dashboard?region_id=1',headers=headers).status_code==422
     filtered=client.get('/ejecutivo/dashboard?municipio_id=2147483647',headers=headers).json()
     assert filtered['total']==0
