@@ -308,6 +308,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Solicitudes por municipio'),
       300,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

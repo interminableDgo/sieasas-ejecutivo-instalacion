@@ -1,4 +1,5 @@
 """Queries against the original SSNL tables; API aliases are presentation only."""
+import re
 from datetime import date
 from fastapi import HTTPException, Query
 from sqlalchemy import text
@@ -146,9 +147,74 @@ ROW_SELECT = '''SELECT sa.solapoyo_id AS solicitud_id, CONCAT('Solicitud #',sa.s
  es.descripcion AS estatus, COALESCE(g.descripcion,'Sin información') AS grupo_vulnerable'''
 
 
-def list_rows(db,user,selected,limit=10,offset=0):
+# The table also shows who is involved, so a search by name has visible results.
+PEOPLE_SELECT = ''', CONCAT_WS(' ',b.ben_gen_name,b.ben_gen_lastname) AS beneficiario,
+ CONCAT_WS(' ',s.sol_nombres,s.sol_apellidos) AS solicitante'''
+PEOPLE_JOIN = ' LEFT JOIN Tbl_Solicitantes s ON s.sol_id=sa.solapoyo_solicitanteid'
+BENEFICIARY = "CONCAT_WS(' ',b.ben_gen_name,b.ben_gen_lastname)"
+APPLICANT = "CONCAT_WS(' ',s.sol_nombres,s.sol_apellidos)"
+# 05/10/2026, 5/10/2026 and 2026-10-05 all find the same registration date.
+DATES = ["DATE_FORMAT(sa.created,'%d/%m/%Y')", "DATE_FORMAT(sa.created,'%e/%c/%Y')",
+ "DATE_FORMAT(sa.created,'%Y-%m-%d')"]
+MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+ 'septiembre','octubre','noviembre','diciembre']
+MAX_SEARCH_TERMS = 6
+
+
+def looks_like_date(term):
+    """Only date-shaped words search the date, so a number such as 026 does
+    not match every request registered in 2026."""
+    return bool(re.fullmatch(r'[\d/-]+', term)) and ('/' in term or '-' in term or len(term) == 4)
+
+
+def search_terms(q):
+    return (q or '').split()[:MAX_SEARCH_TERMS]
+
+
+def matches(columns, terms, prefix, *, months=False):
+    """Every word must appear in one of the columns. Names use the
+    utf8mb4_unicode_ci collation, so accents and capitals do not matter."""
+    clauses, params = [], {}
+    for i, term in enumerate(terms):
+        name = f'{prefix}{i}'
+        like = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        params[name] = f'%{like}%'
+        options = [f'{column} LIKE :{name}' for column in columns
+                   if column not in DATES or looks_like_date(term)]
+        if months and len(term) >= 3:
+            plain = term.lower().translate(str.maketrans('áéíóú', 'aeiou'))
+            for number, month in enumerate(MONTHS, 1):
+                if month.startswith(plain):
+                    options.append(f'MONTH(sa.created)={number}')
+        clauses.append('(' + (' OR '.join(options) or 'FALSE') + ')')
+    return ''.join(' AND ' + c for c in clauses), params
+
+
+def list_rows(db,user,selected,limit=10,offset=0,q=None):
     where, params=where_clause(user,selected)
-    total=db.execute(text('SELECT COUNT(*) '+JOINS+where),params).scalar_one()
-    rows=query_rows(db, ROW_SELECT+JOINS+where+' ORDER BY sa.created DESC, sa.solapoyo_id DESC LIMIT :limit OFFSET :offset',
+    search, extra=matches([BENEFICIARY, APPLICANT, *DATES], search_terms(q), 'q', months=True)
+    where, params=where+search, {**params, **extra}
+    total=db.execute(text('SELECT COUNT(*) '+JOINS+PEOPLE_JOIN+where),params).scalar_one()
+    rows=query_rows(db, ROW_SELECT+PEOPLE_SELECT+JOINS+PEOPLE_JOIN+where
+      +' ORDER BY sa.created DESC, sa.solapoyo_id DESC LIMIT :limit OFFSET :offset',
       {**params,'limit':limit,'offset':offset})
     return {'total':total, 'items':rows}
+
+
+def suggestions(db,user,selected,q,limit=8):
+    """Distinct beneficiaries, applicants and dates that match what was typed,
+    within the same state and filters as the table."""
+    terms = search_terms(q)
+    if not terms:
+        return []
+    where, params = where_clause(user, selected)
+    # A share per kind, so many beneficiaries do not hide the applicants.
+    per_kind = max(1, limit // 2)
+    parts = []
+    for kind, column, columns in [('Beneficiario', BENEFICIARY, [BENEFICIARY]),
+        ('Solicitante', APPLICANT, [APPLICANT]), ('Fecha de registro', DATES[0], DATES)]:
+        found, extra = matches(columns, terms, f'{kind[0].lower()}')
+        params.update(extra)
+        parts.append(f"(SELECT DISTINCT {column} AS texto, '{kind}' AS tipo {JOINS}{PEOPLE_JOIN}{where}{found}"
+          f' AND {column} IS NOT NULL ORDER BY texto LIMIT {per_kind})')
+    return query_rows(db, ' UNION '.join(parts) + ' ORDER BY tipo, texto LIMIT :limit', {**params, 'limit': limit})

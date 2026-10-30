@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.main import app
 from app.database import engine, get_db
 from app.security import hasher, issue_token, now
-from app.services.executive_service import month_series, where_clause
+from app.services.executive_service import DATES, looks_like_date, matches, month_series, where_clause
 from app.routers.executive import NewRequest
 
 
@@ -47,6 +47,17 @@ def test_filters_accept_repeated_params_and_reject_invalid():
         filters(municipio_id=[0])
     with pytest.raises(Exception):
         filters(tipo_apoyo_id=list(range(1,102)))
+
+
+def test_search_words_are_parameterized_and_dates_need_a_date_shape():
+    sql,params=matches(['name'],['50%_off'],'q')
+    assert params=={'q0':'%50\\%\\_off%'} and '50' not in sql
+    assert looks_like_date('29/02/2024') and looks_like_date('2024-02') and looks_like_date('2024')
+    assert not looks_like_date('026') and not looks_like_date('maria')
+    sql,_=matches(['name',*DATES],['026'],'q')
+    assert 'DATE_FORMAT' not in sql
+    sql,_=matches(['name'],['oct'],'q',months=True)
+    assert 'MONTH(sa.created)=10' in sql
 
 
 def test_blank_request_rejected():
@@ -157,6 +168,23 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert comparison['a']['total']==1 and comparison['a']['resueltas']==1 and comparison['a']['activas']==0
     assert comparison['b']['total']==0
     assert comparison['variacion']['total']['porcentaje']==-100.0
+    # Búsqueda de la tabla: sin importar acentos ni mayúsculas, por persona o por fecha de registro.
+    def search(q,**extra):
+        result=client.get('/ejecutivo/solicitudes',params={'q':q,'municipio_id':mid,**extra},headers=headers)
+        assert result.status_code==200,result.text
+        return [r['solicitud_id'] for r in result.json()['items']]
+    assert sid in search('BENEFICIARIO TEMPORÁL prúeba')
+    assert sid in search('solicitante temporal')
+    assert sid in search('29/02/2024') and sid in search('2024-02-29') and sid in search('febrero 2024')
+    assert sid not in search('Beneficiario temporal 2023')
+    row=client.get('/ejecutivo/solicitudes',params={'q':'temporal','municipio_id':mid},headers=headers).json()['items'][0]
+    assert (row['beneficiario'],row['solicitante'])==('Beneficiario temporal Prueba','Solicitante temporal Prueba')
+    hints=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'TEMPORÁL','municipio_id':mid},headers=headers)
+    assert hints.status_code==200,hints.text
+    assert {'texto':'Beneficiario temporal Prueba','tipo':'Beneficiario'} in hints.json()['items']
+    assert {'texto':'Solicitante temporal Prueba','tipo':'Solicitante'} in hints.json()['items']
+    dates=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'29/02','municipio_id':mid},headers=headers).json()['items']
+    assert {'texto':'29/02/2024','tipo':'Fecha de registro'} in dates
     found=client.get('/ejecutivo/personas',params={'tipo':'beneficiario','q':'Beneficiario temporal'},headers=headers)
     assert found.status_code==200 and found.json()['items']
     assert client.get('/ejecutivo/dashboard?region_id=1',headers=headers).status_code==422

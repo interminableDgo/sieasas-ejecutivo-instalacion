@@ -72,8 +72,16 @@ def comparison(a_inicio:date, a_fin:date, b_inicio:date, b_fin:date,
 
 
 @router.get('/solicitudes')
-def requests(selected=Depends(svc.filters),page:int=Query(0,ge=0),user=Depends(current_user),db:Session=Depends(get_db)):
-    return svc.list_rows(db,user,selected,10,page*10)
+def requests(selected=Depends(svc.filters),page:int=Query(0,ge=0),q:str|None=Query(None,max_length=80),
+    user=Depends(current_user),db:Session=Depends(get_db)):
+    return svc.list_rows(db,user,selected,10,page*10,q)
+
+
+# Declared before /solicitudes/{sid} so "sugerencias" is not read as an id.
+@router.get('/solicitudes/sugerencias')
+def request_suggestions(q:str=Query(...,min_length=1,max_length=80),selected=Depends(svc.filters),
+    user=Depends(current_user),db:Session=Depends(get_db)):
+    return {'items': svc.suggestions(db,user,selected,q)}
 
 
 @router.get('/solicitudes/{sid}')

@@ -10,6 +10,7 @@ import '../../widgets/executive_charts.dart';
 import '../../widgets/export_sheet.dart';
 import '../../widgets/filter_sheet.dart';
 import '../../widgets/period_comparison.dart';
+import '../../widgets/request_search.dart';
 import '../solicitudes/nueva_solicitud_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -45,7 +46,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'Treemap': 'treemap',
   };
   bool showComparison = false;
-  int page = 0, total = 0, generation = 0;
+  int page = 0, total = 0, generation = 0, rowsGeneration = 0;
+
+  /// Text of the table search; it narrows only the table, not the charts.
+  String search = '';
+  bool loadingRows = false;
   final Set<String> expanded = {};
   static const topRows = 5;
   @override
@@ -89,6 +94,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> load() async {
     final current = ++generation;
+    // A search typed while this loads must not be replaced by older rows.
+    final currentRows = ++rowsGeneration;
     setState(() {
       loading = true;
       error = null;
@@ -97,14 +104,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final Map<String, Object> query = {...filters};
       final results = await Future.wait([
         widget.api.get('/ejecutivo/dashboard', query),
-        widget.api.get('/ejecutivo/solicitudes', {...query, 'page': '$page'}),
+        widget.api.get('/ejecutivo/solicitudes', rowsQuery()),
         if (catalogs == null) widget.api.get('/ejecutivo/catalogos'),
       ]);
       if (!mounted || current != generation) return;
       setState(() {
         summary = results[0];
-        rows = results[1]['items'] as List;
-        total = results[1]['total'] as int;
+        if (currentRows == rowsGeneration) {
+          rows = results[1]['items'] as List;
+          total = results[1]['total'] as int;
+          loadingRows = false;
+        }
         if (results.length > 2) catalogs = results[2];
       });
     } catch (e) {
@@ -117,6 +127,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } finally {
       if (mounted && current == generation) setState(() => loading = false);
     }
+  }
+
+  Map<String, Object> rowsQuery() => {
+    ...filters,
+    'page': '$page',
+    if (search.isNotEmpty) 'q': search,
+  };
+
+  /// Reloads only the table (search and pages) so the charts stay put.
+  Future<void> loadRows() async {
+    final current = ++rowsGeneration;
+    setState(() => loadingRows = true);
+    try {
+      final result = await widget.api.get(
+        '/ejecutivo/solicitudes',
+        rowsQuery(),
+      );
+      if (!mounted || current != rowsGeneration) return;
+      setState(() {
+        rows = result['items'] as List;
+        total = result['total'] as int;
+      });
+    } catch (e) {
+      if (!mounted || current != rowsGeneration) return;
+      if (e is ApiException && e.status == 401) {
+        widget.onLogout();
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo consultar la tabla. Intenta de nuevo.'),
+        ),
+      );
+    } finally {
+      if (mounted && current == rowsGeneration) {
+        setState(() => loadingRows = false);
+      }
+    }
+  }
+
+  void searchRows(String text) {
+    search = text;
+    page = 0;
+    loadRows();
+  }
+
+  static String shortDate(Object? value) {
+    final date = DateTime.tryParse('$value');
+    if (date == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year}';
   }
 
   void applyFilters(Filters next, {String? undo}) {
@@ -312,6 +373,151 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<dynamic> group(String key) => summary?[key] as List? ?? [];
+
+  /// Requests of the current filters, searchable by beneficiary, applicant
+  /// or registration date.
+  Widget requestsTable() {
+    const cellStyle = TextStyle(fontFamily: 'Mulish', color: ink, fontSize: 11);
+    final pages = (total / 10).ceil();
+    return ExecutiveCard(
+      key: const ValueKey('requests-table-card'),
+      title: 'Detalle de solicitudes',
+      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante y fecha de registro, sin importar acentos ni mayúsculas, y sólo afecta a esta tabla.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RequestSearchField(
+            api: widget.api,
+            initial: search,
+            scope: () => {...filters},
+            onSearch: searchRows,
+          ),
+          SizedBox(
+            height: 4,
+            child: loadingRows ? const LinearProgressIndicator() : null,
+          ),
+          const SizedBox(height: 8),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    search.isEmpty
+                        ? 'No hay solicitudes para mostrar.'
+                        : 'No hay solicitudes que coincidan con «$search».',
+                    style: const TextStyle(color: muted),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            if (search.isNotEmpty)
+              Text(
+                '$total ${total == 1 ? 'resultado' : 'resultados'} para «$search»',
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 20,
+                dataRowMaxHeight: 64,
+                headingTextStyle: cellStyle.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+                dataTextStyle: cellStyle,
+                columns: [
+                  const DataColumn(
+                    label: SizedBox(
+                      width: 30,
+                      child: Center(
+                        child: Text('Estado', textAlign: TextAlign.center),
+                      ),
+                    ),
+                  ),
+                  for (final h in [
+                    'Solicitud',
+                    'Fecha de registro',
+                    'Beneficiario',
+                    'Solicitante',
+                    'Municipio',
+                    'Tipo de apoyo',
+                    'Remitente',
+                  ])
+                    DataColumn(label: Text(h)),
+                ],
+                rows: [
+                  for (final r in rows)
+                    DataRow(
+                      cells: [
+                        DataCell(
+                          Center(
+                            child: StatusDaysIcon(
+                              status: '${r['estatus']}',
+                              registeredAt: r['fecha_registro'],
+                            ),
+                          ),
+                          onTap: () => openDetail(r['solicitud_id'] as int),
+                        ),
+                        for (final value in [
+                          r['folio'],
+                          shortDate(r['fecha_registro']),
+                          r['beneficiario'] ?? '',
+                          r['solicitante'] ?? '',
+                          r['municipio'],
+                          r['tipo_apoyo'],
+                          r['dependencia'],
+                        ])
+                          DataCell(
+                            Text('$value'),
+                            onTap: () => openDetail(r['solicitud_id'] as int),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Toca una solicitud para consultar el detalle.',
+              style: TextStyle(fontSize: 11, color: muted),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  tooltip: 'Anterior',
+                  onPressed: page == 0 || loadingRows
+                      ? null
+                      : () {
+                          page--;
+                          loadRows();
+                        },
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  '${page + 1} / $pages',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                IconButton(
+                  tooltip: 'Siguiente',
+                  onPressed: (page + 1) * 10 >= total || loadingRows
+                      ? null
+                      : () {
+                          page++;
+                          loadRows();
+                        },
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget heading(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
     child: Text(
@@ -742,6 +948,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ],
                             ),
                           ),
+                          // Nothing to search when no request meets the filters.
+                          if (hasData) requestsTable(),
                           if (!hasData)
                             ExecutiveCard(
                               title: filters.isEmpty
@@ -853,135 +1061,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               onSelect: (id) =>
                                   toggleFilter('grupo_vulnerable_id', id),
                             ),
-                          ),
-                          ExecutiveCard(
-                            title: 'Detalle de solicitudes',
-                            child: rows.isEmpty
-                                ? const Text(
-                                    'No hay solicitudes para mostrar.',
-                                    style: TextStyle(color: muted),
-                                  )
-                                : Column(
-                                    children: [
-                                      SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: DataTable(
-                                          columnSpacing: 20,
-                                          dataRowMaxHeight: 64,
-                                          headingTextStyle: const TextStyle(
-                                            fontFamily: 'Mulish',
-                                            color: ink,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 11,
-                                          ),
-                                          dataTextStyle: const TextStyle(
-                                            fontFamily: 'Mulish',
-                                            color: ink,
-                                            fontSize: 11,
-                                          ),
-                                          columns: [
-                                            const DataColumn(
-                                              label: SizedBox(
-                                                width: 30,
-                                                child: Center(
-                                                  child: Text(
-                                                    'Estado',
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            for (final h in [
-                                              'Solicitud',
-                                              'Municipio',
-                                              'Tipo de apoyo',
-                                              'Remitente',
-                                            ])
-                                              DataColumn(label: Text(h)),
-                                          ],
-                                          rows: rows
-                                              .map(
-                                                (r) => DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Center(
-                                                        child: StatusDaysIcon(
-                                                          status:
-                                                              '${r['estatus']}',
-                                                          registeredAt:
-                                                              r['fecha_registro'],
-                                                        ),
-                                                      ),
-                                                      onTap: () => openDetail(
-                                                        r['solicitud_id']
-                                                            as int,
-                                                      ),
-                                                    ),
-                                                    for (final k in [
-                                                      'folio',
-                                                      'municipio',
-                                                      'tipo_apoyo',
-                                                      'dependencia',
-                                                    ])
-                                                      DataCell(
-                                                        Text('${r[k]}'),
-                                                        onTap: () => openDetail(
-                                                          r['solicitud_id']
-                                                              as int,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              )
-                                              .toList(),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const Text(
-                                        'Toca una solicitud para consultar el detalle.',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: muted,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'Anterior',
-                                            onPressed: page == 0
-                                                ? null
-                                                : () {
-                                                    page--;
-                                                    load();
-                                                  },
-                                            icon: const Icon(
-                                              Icons.chevron_left,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${page + 1} / ${(total / 10).ceil()}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            tooltip: 'Siguiente',
-                                            onPressed: (page + 1) * 10 >= total
-                                                ? null
-                                                : () {
-                                                    page++;
-                                                    load();
-                                                  },
-                                            icon: const Icon(
-                                              Icons.chevron_right,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
                           ),
                         ],
                       ),
