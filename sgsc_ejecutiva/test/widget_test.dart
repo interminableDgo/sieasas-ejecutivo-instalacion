@@ -13,6 +13,7 @@ import 'package:sgsc_ejecutiva/core/theme.dart';
 import 'package:sgsc_ejecutiva/screens/dashboard/dashboard_screen.dart';
 import 'package:sgsc_ejecutiva/screens/solicitudes/nueva_solicitud_screen.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
+import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
 
 const user = {
   'nombres': 'Cuenta',
@@ -252,11 +253,39 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Copying a chart renders it as a PNG without its buttons', (
+    tester,
+  ) async {
+    await prepare(tester);
+    await tester.pumpWidget(wrap(dashboard(mockApi(populated: true))));
+    await tester.pumpAndSettle();
+    final card = find.ancestor(
+      of: find.text('Solicitudes por mes de registro'),
+      matching: find.byType(ExecutiveCard),
+    );
+    final state = tester.state<State<ExecutiveCard>>(card);
+    final png = await tester.runAsync(() async {
+      final future = (state as dynamic).image() as Future<Uint8List>;
+      await tester.pump();
+      return future;
+    });
+    // PNG signature
+    expect(png!.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+    await tester.pump();
+    final opacity = tester.widget<Opacity>(
+      find.ancestor(
+        of: find.byTooltip('Copiar imagen de la gráfica').first,
+        matching: find.byType(Opacity),
+      ),
+    );
+    expect(opacity.opacity, 1);
+  });
   testWidgets('Populated dashboard draws the charts', (tester) async {
     await prepare(tester);
     await tester.pumpWidget(wrap(dashboard(mockApi(populated: true))));
     await tester.pumpAndSettle();
     expect(find.text('36'), findsWidgets);
+    expect(find.byTooltip('Copiar imagen de la gráfica'), findsWidgets);
     await screenshot(tester, '05-panel-con-datos-prueba');
     await tester.scrollUntilVisible(
       find.text('Solicitudes por municipio'),

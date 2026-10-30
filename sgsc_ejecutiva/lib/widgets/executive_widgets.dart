@@ -1,68 +1,171 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/theme.dart';
+import '../services/image_clipboard.dart';
 
-class ExecutiveCard extends StatelessWidget {
+class ExecutiveCard extends StatefulWidget {
   final String title;
   final String? source;
   final Widget child;
+
+  /// Shows a button that copies the card (title and chart) as an image.
+  final bool copyable;
   const ExecutiveCard({
     super.key,
     required this.title,
     required this.child,
     this.source,
+    this.copyable = false,
   });
+
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: border),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x0F1B2A33),
-          blurRadius: 2,
-          offset: Offset(0, 1),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+  State<ExecutiveCard> createState() => _ExecutiveCardState();
+}
+
+class _ExecutiveCardState extends State<ExecutiveCard> {
+  final capture = GlobalKey();
+  bool capturing = false;
+
+  /// Renders the card without its buttons, on a white background so the
+  /// pasted image has no transparent corners.
+  Future<Uint8List> image() async {
+    setState(() => capturing = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          capture.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final picture = await boundary.toImage(pixelRatio: 2);
+      final data = await picture.toByteData(format: ui.ImageByteFormat.png);
+      picture.dispose();
+      return data!.buffer.asUint8List();
+    } finally {
+      if (mounted) setState(() => capturing = false);
+    }
+  }
+
+  Future<void> copy() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final box = context.findRenderObject() as RenderBox?;
+    // The copy starts inside the click so the browser allows the clipboard.
+    final png = image();
+    var message = 'Gráfica copiada. Pégala en WhatsApp o en otro documento.';
+    try {
+      if (!await copyPngToClipboard(png)) {
+        final name =
+            'SIESAS-${widget.title.replaceAll(RegExp(r'[^\wÁÉÍÓÚÑáéíóúñ]+'), '-')}.png';
+        final file = XFile.fromData(
+          await png,
+          name: name,
+          mimeType: 'image/png',
+        );
+        if (kIsWeb) {
+          await file.saveTo(name);
+          message = 'Este navegador no permite copiar imágenes; se descargó la gráfica.';
+        } else {
+          await SharePlus.instance.share(
+            ShareParams(
+              files: [file],
+              fileNameOverrides: [name],
+              sharePositionOrigin: box == null
+                  ? null
+                  : box.localToGlobal(Offset.zero) & box.size,
             ),
-            if (source != null)
-              IconButton(
-                tooltip: 'Cómo se calcula',
-                icon: const Icon(Icons.info_outline, size: 18, color: muted),
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: Text(title),
-                    content: Text(source!),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: const Text('Entendido'),
-                      ),
-                    ],
-                  ),
-                ),
+          );
+          return;
+        }
+      }
+    } catch (_) {
+      message = 'No se pudo copiar la gráfica. Intenta nuevamente.';
+    }
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: RepaintBoundary(
+      key: capture,
+      child: ColoredBox(
+        color: capturing ? Colors.white : Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0F1B2A33),
+                blurRadius: 2,
+                offset: Offset(0, 1),
               ),
-          ],
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  Opacity(
+                    opacity: capturing ? 0 : 1,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.copyable)
+                          IconButton(
+                            tooltip: 'Copiar imagen de la gráfica',
+                            icon: const Icon(
+                              Icons.copy_all_outlined,
+                              size: 18,
+                              color: muted,
+                            ),
+                            onPressed: capturing ? null : copy,
+                          ),
+                        if (widget.source != null)
+                          IconButton(
+                            tooltip: 'Cómo se calcula',
+                            icon: const Icon(
+                              Icons.info_outline,
+                              size: 18,
+                              color: muted,
+                            ),
+                            onPressed: () => showDialog<void>(
+                              context: context,
+                              builder: (c) => AlertDialog(
+                                title: Text(widget.title),
+                                content: Text(widget.source!),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(c),
+                                    child: const Text('Entendido'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              widget.child,
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        child,
-      ],
+      ),
     ),
   );
 }

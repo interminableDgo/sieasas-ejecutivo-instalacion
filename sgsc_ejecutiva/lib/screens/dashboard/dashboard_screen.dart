@@ -351,6 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget bars(String title, String dataKey, String filterKey, String source) =>
       ExecutiveCard(
+        copyable: true,
         title: title,
         source: source,
         child: Column(
@@ -710,6 +711,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               'Este panel incluye ${summary!['datos_demo']} solicitudes ficticias de prueba, identificadas con folios DEMO-COMP-.',
                             ),
                           ExecutiveCard(
+                            copyable: true,
                             title: 'Solicitudes registradas',
                             source: 'Cantidad de solicitudes del estado asignado que cumplen los filtros. No representa personas únicas ni apoyos entregados. Activas incluye todos los estatus que no son Resuelto, Resuelto con observación, Cerrado / Cancelado o No es competencia. Pendientes puede ser una parte de las activas.',
                             child: Column(
@@ -772,6 +774,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                           ExecutiveCard(
+                            copyable: true,
                             title: 'Solicitudes por mes de registro',
                             source: 'Últimos 12 meses. Solicitudes registradas en cada mes y cuántas están resueltas actualmente. No indica el mes en que se resolvieron.',
                             child: Column(
@@ -785,6 +788,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           // The map asset covers Nuevo León (INEGI 19).
                           if ('${widget.user['clave_inegi']}' == '19')
                             ExecutiveCard(
+                              copyable: true,
                               key: const ValueKey('municipality-map-card'),
                               title: 'Mapa de solicitudes por municipio',
                               source:
@@ -816,6 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             'Solicitudes agrupadas por municipio. Toca una barra para aplicar el filtro.',
                           ),
                           ExecutiveCard(
+                            copyable: true,
                             title: 'Apoyos solicitados',
                             source: 'Se grafican los cinco tipos más frecuentes; las demás categorías se indican por separado. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
                             child: CategoryPieChart(
@@ -830,6 +835,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           ExecutiveCard(
+                            copyable: true,
                             title: 'Clasificación por grupo vulnerable',
                             source: 'Distribución de solicitudes por grupo vulnerable. Los porcentajes se calculan sobre las solicitudes clasificadas en el catálogo, incluida la categoría Sin información. Un mismo beneficiario puede generar varias solicitudes. Toca una categoría para aplicar el filtro.',
                             child: CategoryPieChart(

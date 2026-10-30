@@ -310,6 +310,7 @@ class _PeriodComparisonState extends State<PeriodComparison> {
   );
   @override
   Widget build(BuildContext context) => ExecutiveCard(
+    copyable: true,
     title: 'Comparar periodos',
     source: 'Solicitudes registradas en cada periodo y su estatus actual. El cambio se calcula respecto al periodo de referencia. Se conservan los filtros de municipio y catálogo; las fechas elegidas aquí sustituyen el rango general. Un aumento de volumen no implica una mejora.',
     child: Column(
