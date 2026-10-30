@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:path_drawing/path_drawing.dart';
 
 import '../core/theme.dart';
+import 'executive_widgets.dart';
 
 class DataBars extends StatelessWidget {
   final List<dynamic> rows;
@@ -139,27 +140,31 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
     final maximum = values.fold<num>(1, math.max);
     return Column(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              for (final option in ['Dona', 'Barras', 'Apilada', 'Treemap'])
-                ChoiceChip(
-                  label: Text(option == 'Apilada' ? 'Composición' : option),
-                  selected: currentView == option,
-                  onSelected: option == 'Apilada' && !canStack
-                      ? null
-                      : (_) {
-                          setState(() => view = option);
-                          widget.onViewChanged?.call(option);
-                        },
-                ),
-            ],
+        CopyExclude(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final option in ['Dona', 'Barras', 'Apilada', 'Treemap'])
+                    ChoiceChip(
+                      label: Text(option == 'Apilada' ? 'Composición' : option),
+                      selected: currentView == option,
+                      onSelected: option == 'Apilada' && !canStack
+                          ? null
+                          : (_) {
+                              setState(() => view = option);
+                              widget.onViewChanged?.call(option);
+                            },
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
         if (currentView == 'Dona')
           SizedBox(
             height: 190,
@@ -353,15 +358,19 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
               );
             }),
           ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => showAll = !showAll),
-              icon: Icon(
-                showAll ? Icons.expand_less : Icons.expand_more,
-                size: 18,
+          CopyExclude(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => showAll = !showAll),
+                icon: Icon(
+                  showAll ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                ),
+                label: Text(
+                  showAll ? 'Ver menos' : 'Ver todos (${rows.length})',
+                ),
               ),
-              label: Text(showAll ? 'Ver menos' : 'Ver todos (${rows.length})'),
             ),
           ),
         ],
@@ -1022,37 +1031,42 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
             height: 4,
             child: widget.loading ? const LinearProgressIndicator() : null,
           ),
-          SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                if (widget.active.isNotEmpty)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                      ),
-                      onPressed: () => widget.onFilter(null),
-                      icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                      label: const Text(
-                        'Quitar municipio',
-                        overflow: TextOverflow.ellipsis,
+          CopyExclude(
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  if (widget.active.isNotEmpty)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () => widget.onFilter(null),
+                        icon: const Icon(
+                          Icons.filter_alt_off_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Quitar municipio',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                if (pick != null)
-                  IconButton(
-                    tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
-                    onPressed: () => setState(() => zoomed = !zoomed),
-                    icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
-                  ),
-                if (widget.error != null)
-                  IconButton(
-                    tooltip: 'Reintentar mapa',
-                    onPressed: widget.onRetry,
-                    icon: const Icon(Icons.refresh),
-                  ),
-              ],
+                  if (pick != null)
+                    IconButton(
+                      tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
+                      onPressed: () => setState(() => zoomed = !zoomed),
+                      icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+                    ),
+                  if (widget.error != null)
+                    IconButton(
+                      tooltip: 'Reintentar mapa',
+                      onPressed: widget.onRetry,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),

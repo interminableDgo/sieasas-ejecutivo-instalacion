@@ -340,12 +340,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final count = group(dataKey).length;
     if (count <= topRows) return const SizedBox.shrink();
     final open = expanded.contains(dataKey);
-    return TextButton.icon(
-      onPressed: () => setState(
-        () => open ? expanded.remove(dataKey) : expanded.add(dataKey),
+    return CopyExclude(
+      child: TextButton.icon(
+        onPressed: () => setState(
+          () => open ? expanded.remove(dataKey) : expanded.add(dataKey),
+        ),
+        icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 18),
+        label: Text(open ? 'Ver menos' : 'Ver todos ($count)'),
       ),
-      icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 18),
-      label: Text(open ? 'Ver menos' : 'Ver todos ($count)'),
     );
   }
 

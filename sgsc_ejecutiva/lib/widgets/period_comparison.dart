@@ -303,7 +303,7 @@ class _PeriodComparisonState extends State<PeriodComparison> {
               ],
             ),
           ),
-          const Icon(Icons.expand_more, size: 22),
+          const CopyExclude(child: Icon(Icons.expand_more, size: 22)),
         ],
       ),
     ),
@@ -316,45 +316,49 @@ class _PeriodComparisonState extends State<PeriodComparison> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<bool>(
-          showSelectedIcon: false,
-          style: const ButtonStyle(
-            minimumSize: WidgetStatePropertyAll(Size(48, 48)),
+        CopyExclude(
+          child: SegmentedButton<bool>(
+            showSelectedIcon: false,
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(48, 48)),
+            ),
+            segments: const [
+              ButtonSegment(value: false, label: Text('Meses')),
+              ButtonSegment(value: true, label: Text('Años')),
+            ],
+            selected: {annual},
+            onSelectionChanged: (values) => mode(values.first),
           ),
-          segments: const [
-            ButtonSegment(value: false, label: Text('Meses')),
-            ButtonSegment(value: true, label: Text('Años')),
-          ],
-          selected: {annual},
-          onSelectionChanged: (values) => mode(values.first),
         ),
         period(false),
         period(true),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            TextButton(
-              onPressed: () {
-                setState(
-                  () => a = annual
-                      ? DateTime(b.year - 1, a.month)
-                      : DateTime(b.year, b.month - 1),
-                );
-                compare();
-              },
-              child: const Text('Periodo anterior'),
-            ),
-            if (!annual)
+        CopyExclude(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
               TextButton(
                 onPressed: () {
-                  setState(() => a = DateTime(b.year - 1, b.month));
+                  setState(
+                    () => a = annual
+                        ? DateTime(b.year - 1, a.month)
+                        : DateTime(b.year, b.month - 1),
+                  );
                   compare();
                 },
-                child: const Text('Año anterior'),
+                child: const Text('Periodo anterior'),
               ),
-          ],
+              if (!annual)
+                TextButton(
+                  onPressed: () {
+                    setState(() => a = DateTime(b.year - 1, b.month));
+                    compare();
+                  },
+                  child: const Text('Año anterior'),
+                ),
+            ],
+          ),
         ),
         Text(
           widget.filters.isNotEmpty

@@ -253,32 +253,50 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
-  testWidgets('Copying a chart renders it as a PNG without its buttons', (
+  testWidgets('Copied image keeps the title and data but not the controls', (
     tester,
   ) async {
     await prepare(tester);
-    await tester.pumpWidget(wrap(dashboard(mockApi(populated: true))));
-    await tester.pumpAndSettle();
-    final card = find.ancestor(
-      of: find.text('Solicitudes por mes de registro'),
-      matching: find.byType(ExecutiveCard),
-    );
-    final state = tester.state<State<ExecutiveCard>>(card);
-    final png = await tester.runAsync(() async {
-      final future = (state as dynamic).image() as Future<Uint8List>;
-      await tester.pump();
-      return future;
-    });
-    // PNG signature
-    expect(png!.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
-    await tester.pump();
-    final opacity = tester.widget<Opacity>(
-      find.ancestor(
-        of: find.byTooltip('Copiar imagen de la gráfica').first,
-        matching: find.byType(Opacity),
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: executiveTheme(),
+        home: const Scaffold(
+          body: ExecutiveCard(
+            title: 'Apoyos solicitados',
+            source: 'Fuente',
+            copyable: true,
+            child: Column(
+              children: [
+                CopyExclude(child: Text('Dona · Barras')),
+                Text('Cirugía 29'),
+                CopyExclude(child: Text('Ver todos (26)')),
+              ],
+            ),
+          ),
+        ),
       ),
     );
-    expect(opacity.opacity, 1);
+    final state = tester.state<State<ExecutiveCard>>(
+      find.byType(ExecutiveCard),
+    );
+    late Future<Object?> pending;
+    await tester.runAsync(() async {
+      pending = (state as dynamic).image() as Future<Object?>;
+    });
+    await tester.pump();
+    expect(find.text('Apoyos solicitados'), findsOneWidget);
+    expect(find.text('Cirugía 29'), findsOneWidget);
+    expect(find.text('Dona · Barras'), findsNothing);
+    expect(find.text('Ver todos (26)'), findsNothing);
+    expect(find.byTooltip('Copiar imagen de la gráfica'), findsNothing);
+    expect(find.byTooltip('Cómo se calcula'), findsNothing);
+    final png = await tester.runAsync(() => pending) as List<int>;
+    // PNG signature
+    expect(png.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+    await tester.pump();
+    expect(find.text('Dona · Barras'), findsOneWidget);
+    expect(find.text('Ver todos (26)'), findsOneWidget);
+    expect(find.byTooltip('Copiar imagen de la gráfica'), findsOneWidget);
   });
   testWidgets('Populated dashboard draws the charts', (tester) async {
     await prepare(tester);

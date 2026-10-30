@@ -54,7 +54,7 @@ class _ExecutiveCardState extends State<ExecutiveCard> {
     final box = context.findRenderObject() as RenderBox?;
     // The copy starts inside the click so the browser allows the clipboard.
     final png = image();
-    var message = 'Gráfica copiada. Pégala en WhatsApp o en otro documento.';
+    var message = 'Gráfica copiada al portapapeles.';
     try {
       if (!await copyPngToClipboard(png)) {
         final name =
@@ -66,7 +66,7 @@ class _ExecutiveCardState extends State<ExecutiveCard> {
         );
         if (kIsWeb) {
           await file.saveTo(name);
-          message = 'Este navegador no permite copiar imágenes; se descargó la gráfica.';
+          message = 'Tu navegador no permite copiar imágenes. Se descargó la gráfica.';
         } else {
           await SharePlus.instance.share(
             ShareParams(
@@ -81,7 +81,7 @@ class _ExecutiveCardState extends State<ExecutiveCard> {
         }
       }
     } catch (_) {
-      message = 'No se pudo copiar la gráfica. Intenta nuevamente.';
+      message = 'No se pudo copiar la gráfica. Intenta de nuevo.';
     }
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
@@ -91,83 +91,107 @@ class _ExecutiveCardState extends State<ExecutiveCard> {
     padding: const EdgeInsets.only(bottom: 16),
     child: RepaintBoundary(
       key: capture,
-      child: ColoredBox(
-        color: capturing ? Colors.white : Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: border),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0F1B2A33),
-                blurRadius: 2,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleMedium,
+      child: _CardCapture(
+        capturing: capturing,
+        child: ColoredBox(
+          color: capturing ? Colors.white : Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F1B2A33),
+                  blurRadius: 2,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
-                  ),
-                  Opacity(
-                    opacity: capturing ? 0 : 1,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (widget.copyable)
-                          IconButton(
-                            tooltip: 'Copiar imagen de la gráfica',
-                            icon: const Icon(
-                              Icons.copy_all_outlined,
-                              size: 18,
-                              color: muted,
+                    CopyExclude(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.copyable)
+                            IconButton(
+                              tooltip: 'Copiar imagen de la gráfica',
+                              icon: const Icon(
+                                Icons.copy_all_outlined,
+                                size: 18,
+                                color: muted,
+                              ),
+                              onPressed: capturing ? null : copy,
                             ),
-                            onPressed: capturing ? null : copy,
-                          ),
-                        if (widget.source != null)
-                          IconButton(
-                            tooltip: 'Cómo se calcula',
-                            icon: const Icon(
-                              Icons.info_outline,
-                              size: 18,
-                              color: muted,
-                            ),
-                            onPressed: () => showDialog<void>(
-                              context: context,
-                              builder: (c) => AlertDialog(
-                                title: Text(widget.title),
-                                content: Text(widget.source!),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(c),
-                                    child: const Text('Entendido'),
-                                  ),
-                                ],
+                          if (widget.source != null)
+                            IconButton(
+                              tooltip: 'Cómo se calcula',
+                              icon: const Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: muted,
+                              ),
+                              onPressed: () => showDialog<void>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                  title: Text(widget.title),
+                                  content: Text(widget.source!),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(c),
+                                      child: const Text('Entendido'),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              widget.child,
-            ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                widget.child,
+              ],
+            ),
           ),
         ),
       ),
     ),
   );
+}
+
+class _CardCapture extends InheritedWidget {
+  final bool capturing;
+  const _CardCapture({required this.capturing, required super.child});
+
+  @override
+  bool updateShouldNotify(_CardCapture old) => old.capturing != capturing;
+}
+
+/// Leaves controls (view selectors, "Ver todos", buttons) out of the image
+/// copied from an [ExecutiveCard]; only the title and the data remain.
+class CopyExclude extends StatelessWidget {
+  final Widget child;
+  const CopyExclude({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_CardCapture>()?.capturing ??
+          false
+      ? const SizedBox.shrink()
+      : child;
 }
 
 class Notice extends StatelessWidget {
