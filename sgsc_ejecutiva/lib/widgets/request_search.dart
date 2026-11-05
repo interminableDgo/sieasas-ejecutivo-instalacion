@@ -114,13 +114,20 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
           dense: true,
           leading: const Icon(Icons.description_outlined, color: brand),
           title: Text('${o['beneficiario'] ?? o['folio']}'),
+          // The applicant too: the typed name may be theirs, not the
+          // beneficiary's.
           subtitle: Text(
             [
-              o['folio'],
-              o['tipo_apoyo'],
-              shortDate(o['fecha_registro']),
-              o['estatus'],
-            ].where((v) => v != null && '$v'.isNotEmpty).join(' · '),
+              if (o['solicitante'] != null &&
+                  o['solicitante'] != o['beneficiario'])
+                'Solicitó: ${o['solicitante']}\n',
+              [
+                o['folio'],
+                o['tipo_apoyo'],
+                shortDate(o['fecha_registro']),
+                o['estatus'],
+              ].where((v) => v != null && '$v'.isNotEmpty).join(' · '),
+            ].join(),
           ),
           trailing: const Icon(Icons.chevron_right, color: muted),
           onTap: onTap,
@@ -202,11 +209,20 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
           borderRadius: BorderRadius.circular(12),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: 420, maxWidth: box.maxWidth),
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              shrinkWrap: true,
+            // The hint stays under the list, visible however long it is.
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final o in options) option(o, () => onSelected(o)),
+                Flexible(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    shrinkWrap: true,
+                    children: [
+                      for (final o in options) option(o, () => onSelected(o)),
+                    ],
+                  ),
+                ),
                 if (total > shownRequests)
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 6, 16, 8),

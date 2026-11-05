@@ -105,13 +105,18 @@ void main() {
     await tester.enterText(field, 'jose');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    // Each suggestion is one request with what tells it apart.
+    // Each suggestion is one request with who asked for it and what tells
+    // it apart.
     expect(
-      find.text('Solicitud #9 · Medicamento · 20/10/2026 · Recibido'),
+      find.text(
+        'Solicitó: Ana Núñez\nSolicitud #9 · Medicamento · 20/10/2026 · Recibido',
+      ),
       findsOneWidget,
     );
     expect(
-      find.text('Solicitud #14 · Vacunación · 02/09/2026 · Resuelto'),
+      find.text(
+        'Solicitó: Ana Núñez\nSolicitud #14 · Vacunación · 02/09/2026 · Resuelto',
+      ),
       findsOneWidget,
     );
     expect(find.text('Ver las 7 solicitudes de José Pérez'), findsOneWidget);
@@ -137,7 +142,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(
-      find.text('Solicitud #14 · Vacunación · 02/09/2026 · Resuelto'),
+      find.text(
+        'Solicitó: Ana Núñez\nSolicitud #14 · Vacunación · 02/09/2026 · Resuelto',
+      ),
     );
     await tester.pumpAndSettle();
     expect(requests.last.path, '/ejecutivo/solicitudes/14');

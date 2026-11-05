@@ -200,6 +200,13 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     people={(p['nombre'],p['tipo']):p['total'] for p in hints['personas']}
     assert people[('Beneficiario temporal Prueba','Beneficiario')]==1
     assert people[('Solicitante temporal Prueba','Solicitante')]==1
+    # A word of the applicant's name does not offer the beneficiary ("jorge serangue").
+    narrowed=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'temporal solicitante','municipio_id':mid},headers=headers).json()
+    assert sid in [r['solicitud_id'] for r in narrowed['solicitudes']]
+    assert [(p['nombre'],p['tipo']) for p in narrowed['personas']]==[('Solicitante temporal Prueba','Solicitante')]
+    # Request details still narrow a person: "temporal resuelto" keeps both.
+    both={p['tipo'] for p in client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'temporal resuelto','municipio_id':mid},headers=headers).json()['personas']}
+    assert both=={'Beneficiario','Solicitante'}
     dates=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'29/02','municipio_id':mid},headers=headers).json()
     assert sid in [r['solicitud_id'] for r in dates['solicitudes']] and dates['personas']==[]
     found=client.get('/ejecutivo/personas',params={'tipo':'beneficiario','q':'Beneficiario temporal'},headers=headers)

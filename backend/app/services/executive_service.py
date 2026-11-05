@@ -254,10 +254,13 @@ def suggestions(db,user,selected,q,limit=5,people_limit=3):
     base_where, base_params = where_clause(user, selected)
     people, seen = [], set()
     for kind, column in [('Beneficiario', BENEFICIARY), ('Solicitante', APPLICANT)]:
-        # Only people whose name contains at least one of the typed words.
-        extra = {f'n{i}': params[f'q{i}'] for i in range(len(terms))}
+        # Every word must be in this person's name or in a detail of the same
+        # request (type, status, date, folio), never in the other person's
+        # name: "jorge serangue" offers Jorge Seranguelli, not Jorge Pérez.
+        # At least one word must be in the name, so a date alone offers nobody.
+        own, extra = matches([column, *DATES, 'ta.descripcion', 'es.descripcion'], terms, 'n', months=True, folio=True)
         any_name = ' OR '.join(f'{column} LIKE :n{i}' for i in range(len(terms)))
-        for row in query_rows(db, f"SELECT {column} AS nombre, '{kind}' AS tipo {scope} AND ({any_name})"
+        for row in query_rows(db, f"SELECT {column} AS nombre, '{kind}' AS tipo {scope}{own} AND ({any_name})"
             f' GROUP BY {column} ORDER BY MAX(sa.created) DESC LIMIT {people_limit}', {**params, **extra}):
             if row['nombre'] in seen:
                 continue
