@@ -103,12 +103,22 @@ class Backend {
                 }
               : summary,
         '/ejecutivo/comparacion' => {
-          'a': {'total': 3, 'activas': 2, 'resueltas': 1},
-          'b': {'total': 5, 'activas': 3, 'resueltas': 2},
-          'variacion': {
-            for (final k in ['total', 'activas', 'resueltas'])
-              k: {'diferencia': 1, 'porcentaje': 10},
-          },
+          'periodos': [
+            for (final (i, start)
+                in request.url.queryParametersAll['inicio']!.indexed)
+              {
+                'inicio': start,
+                'total': 3 + i,
+                'activas': 2,
+                'resueltas': 1 + i,
+                'variacion': i == 0
+                    ? null
+                    : {
+                        for (final k in ['total', 'activas', 'resueltas'])
+                          k: {'diferencia': 1, 'porcentaje': 10},
+                      },
+              },
+          ],
         },
         _ => <String, Object>{},
       };
@@ -120,6 +130,19 @@ class Backend {
     }),
   );
   int count(String path) => requests.where((u) => u.path == path).length;
+}
+
+/// Adds one month of the current year to the comparison.
+Future<void> choose(WidgetTester tester, String month) async {
+  await tester.tap(find.text('Elegir meses'));
+  await settle(tester);
+  await tester.tap(find.text(month));
+  await tester.pumpAndSettle();
+  final compare = find.textContaining(RegExp(r'^Comparar \d+ periodos$'));
+  await tester.ensureVisible(compare);
+  await tester.pumpAndSettle();
+  await tester.tap(compare);
+  await settle(tester);
 }
 
 Future<void> fonts(WidgetTester tester, Size size) async {
@@ -439,18 +462,8 @@ void main() {
     final backend = await open(tester);
     await tester.tap(find.text('Comparar meses o años'));
     await settle(tester);
-    await tester.tap(find.text('Periodo a analizar'));
-    await settle(tester);
-    await tester.tap(find.text('Marzo'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Usar Marzo'));
-    await settle(tester);
-    await tester.tap(find.text('Comparado con'));
-    await settle(tester);
-    await tester.tap(find.text('Enero'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Usar Enero'));
-    await settle(tester);
+    await choose(tester, 'Marzo');
+    await choose(tester, 'Enero');
     final analyzed = find.textContaining(RegExp(r'^Marzo \d{4}$'));
     final reference = find.textContaining(RegExp(r'^Enero \d{4}$'));
     expect(analyzed, findsWidgets);
@@ -580,12 +593,7 @@ void main() {
     await open(tester);
     await tester.tap(find.text('Comparar meses o años'));
     await settle(tester);
-    await tester.tap(find.text('Periodo a analizar'));
-    await settle(tester);
-    await tester.tap(find.text('Marzo'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Usar Marzo'));
-    await settle(tester);
+    await choose(tester, 'Marzo');
     final march = find.textContaining(RegExp(r'^Marzo \d{4}$'));
     expect(march, findsWidgets);
     final year = RegExp(r'\d{4}')

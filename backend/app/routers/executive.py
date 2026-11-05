@@ -47,20 +47,25 @@ def colonies(municipio_id:int=Query(gt=0),user=Depends(current_user),db:Session=
 def people(tipo:Literal['beneficiario','solicitante'],q:str=Query('',max_length=150),
     user=Depends(current_user),db:Session=Depends(get_db)):
     # Every word must appear in the name, in any order ("martinez maria");
-    # the collation ignores accents and capitals.
+    # the collation ignores accents and capitals. People with the same name
+    # are told apart by CURP or phone, birth date, municipality and requests.
     if tipo=='beneficiario':
         found,params=svc.matches([svc.BENEFICIARY],svc.search_terms(q),'p')
-        sql=f"""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre
+        sql=f"""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre,
+          NULLIF(b.ben_gen_curp,'') AS curp, b.ben_gen_birthdate AS fecha_nacimiento, m.nom_mun AS municipio,
+          (SELECT COUNT(*) FROM Tbl_SolicitudesApoyo sa WHERE sa.solapoyo_beneficiarioid=b.ben_id) AS solicitudes
           FROM Tbl_Beneficiarios b JOIN INEGI_Cat_Municipios m ON m.id=b.ben_dom_municipio AND m.entidad_id=b.ben_dom_entidad
           WHERE b.is_active=1 AND b.ben_dom_entidad=:eid
           AND ((TRUE{found}) OR b.ben_gen_curp=:exact)
           ORDER BY b.ben_gen_name,b.ben_id LIMIT 30"""
     else:
         found,params=svc.matches([svc.APPLICANT],svc.search_terms(q),'p')
-        sql=f"""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre
+        sql=f"""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre,
+          NULLIF(s.sol_telefono,'') AS telefono, s.sol_fecha_nacimiento AS fecha_nacimiento, m.nom_mun AS municipio,
+          (SELECT COUNT(*) FROM Tbl_SolicitudesApoyo sa WHERE sa.solapoyo_solicitanteid=s.sol_id) AS solicitudes
           FROM Tbl_Solicitantes s JOIN INEGI_Cat_Municipios m ON m.id=s.sol_municipioid AND m.entidad_id=s.sol_estadoid
           WHERE s.is_active=1 AND s.sol_estadoid=:eid
-          AND (TRUE{found}) ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
+          AND ((TRUE{found}) OR s.sol_telefono=:exact) ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
     return {'items':svc.query_rows(db,sql,{**params,'eid':user['entidad_id'],'exact':q.strip()})}
 
 
@@ -70,9 +75,12 @@ def dashboard(selected=Depends(svc.filters),user=Depends(current_user),db:Sessio
 
 
 @router.get('/comparacion')
-def comparison(a_inicio:date, a_fin:date, b_inicio:date, b_fin:date,
+def comparison(inicio:list[date]=Query(...),fin:list[date]=Query(...),
     selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db)):
-    return svc.compare_periods(db,user,selected,a_inicio,a_fin,b_inicio,b_fin)
+    # Repeated pairs, in order: ?inicio=2026-01-01&fin=2026-01-31&inicio=2026-02-01&fin=2026-02-28
+    if len(inicio)!=len(fin):
+        raise HTTPException(422,'Cada periodo necesita fecha inicial y final.')
+    return svc.compare_periods(db,user,selected,list(zip(inicio,fin)))
 
 
 @router.get('/solicitudes')
@@ -85,7 +93,7 @@ def requests(selected=Depends(svc.filters),page:int=Query(0,ge=0),q:str|None=Que
 @router.get('/solicitudes/sugerencias')
 def request_suggestions(q:str=Query(...,min_length=1,max_length=80),selected=Depends(svc.filters),
     user=Depends(current_user),db:Session=Depends(get_db)):
-    return {'items': svc.suggestions(db,user,selected,q)}
+    return svc.suggestions(db,user,selected,q)
 
 
 @router.get('/solicitudes/{sid}')

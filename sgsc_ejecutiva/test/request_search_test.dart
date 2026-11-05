@@ -41,10 +41,31 @@ void main() {
               {'id': 1, 'nombre': 'Monterrey', 'total': 1},
             ],
           },
+          // Two requests of the same person, told apart by type and date.
           '/ejecutivo/solicitudes/sugerencias' => {
-            'items': [
-              {'texto': 'José Pérez', 'tipo': 'Beneficiario'},
+            'total': 7,
+            'solicitudes': [
+              row,
+              {
+                ...row,
+                'solicitud_id': 14,
+                'folio': 'Solicitud #14',
+                'tipo_apoyo': 'Vacunación',
+                'fecha_registro': '2026-09-02T10:00:00',
+                'estatus': 'Resuelto',
+              },
             ],
+            'personas': [
+              {'nombre': 'José Pérez', 'tipo': 'Beneficiario', 'total': 7},
+            ],
+          },
+          '/ejecutivo/solicitudes/14' => {
+            ...row,
+            'solicitud_id': 14,
+            'folio': 'Solicitud #14',
+            'nombres': 'José',
+            'apellidos': 'Pérez',
+            'descripcion': 'Vacuna de refuerzo',
           },
           '/ejecutivo/solicitudes' =>
             q == 'sin coincidencias'
@@ -84,14 +105,25 @@ void main() {
     await tester.enterText(field, 'jose');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    final suggestion = find.widgetWithText(ListTile, 'José Pérez');
-    expect(suggestion, findsOneWidget);
+    // Each suggestion is one request with what tells it apart.
     expect(
-      requests.last.path,
-      anyOf('/ejecutivo/solicitudes/sugerencias', '/ejecutivo/solicitudes'),
+      find.text('Solicitud #9 · Medicamento · 20/10/2026 · Recibido'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Solicitud #14 · Vacunación · 02/09/2026 · Resuelto'),
+      findsOneWidget,
+    );
+    expect(find.text('Ver las 7 solicitudes de José Pérez'), findsOneWidget);
+    expect(find.text('Ver los 7 resultados de «jose»'), findsOneWidget);
+    expect(
+      find.text('Agrega el tipo de apoyo, la fecha o el folio para afinar.'),
+      findsOneWidget,
     );
     await screenshot(tester, 'busqueda-sugerencias');
-    await tester.tap(suggestion);
+
+    // Choosing a person shows all of their requests in the table.
+    await tester.tap(find.text('Ver las 7 solicitudes de José Pérez'));
     await tester.pumpAndSettle();
     final searched = requests.lastWhere(
       (u) => u.path == '/ejecutivo/solicitudes',
@@ -100,6 +132,22 @@ void main() {
     expect(searched.queryParameters['page'], '0');
     expect(find.text('1 resultado para «José Pérez»'), findsOneWidget);
 
+    // Choosing a request opens exactly that one.
+    await tester.enterText(field, 'jose vacuna');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Solicitud #14 · Vacunación · 02/09/2026 · Resuelto'),
+    );
+    await tester.pumpAndSettle();
+    expect(requests.last.path, '/ejecutivo/solicitudes/14');
+    expect(find.text('Detalle de solicitud'), findsOneWidget);
+    await tester.tap(find.byTooltip('Volver').first);
+    await tester.pumpAndSettle();
+
+    int dashboardLoads() =>
+        requests.where((u) => u.path == '/ejecutivo/dashboard').length;
+    final loadsBefore = dashboardLoads();
     await tester.enterText(field, 'sin coincidencias');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
@@ -109,7 +157,7 @@ void main() {
     );
     // The search narrows only the table; the charts keep their data.
     expect(find.byType(ExecutiveCard), findsWidgets);
-    expect(requests.where((u) => u.path == '/ejecutivo/dashboard').length, 1);
+    expect(dashboardLoads(), loadsBefore);
 
     await tester.tap(find.byTooltip('Limpiar búsqueda'));
     await tester.pumpAndSettle();

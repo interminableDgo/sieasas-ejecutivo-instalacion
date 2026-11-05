@@ -299,7 +299,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
 
   String? postalCode(String prefix) {
     for (final r in colonies[prefix]!) {
-      if (r['id'] == values['$prefix.colonia_id']) return '${r['codigo_postal']}';
+      if (r['id'] == values['$prefix.colonia_id']) {
+        return '${r['codigo_postal']}';
+      }
     }
     return null;
   }
@@ -326,94 +328,148 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     return false;
   }
 
+  /// What tells apart two people with the same name: CURP (beneficiary) or
+  /// phone (applicant), birth date, municipality and how many requests.
+  static String personDetail(Map<String, dynamic> p) {
+    final birth = DateTime.tryParse('${p['fecha_nacimiento']}');
+    String two(int n) => n.toString().padLeft(2, '0');
+    final requests = p['solicitudes'] as num? ?? 0;
+    return [
+      if (p.containsKey('curp')) 'CURP: ${p['curp'] ?? 'sin registrar'}',
+      if (p.containsKey('telefono'))
+        'Tel.: ${p['telefono'] ?? 'sin registrar'}',
+      if (birth != null)
+        'Nació el ${two(birth.day)}/${two(birth.month)}/${birth.year}',
+      if (p['municipio'] != null) '${p['municipio']}',
+      requests == 1 ? '1 solicitud' : '$requests solicitudes',
+    ].join(' · ');
+  }
+
   Future<void> findPerson(bool isBeneficiary) async {
     final search = TextEditingController();
-    List<dynamic> rows = [];
+    List<dynamic>? rows;
     String? lookupError;
     bool loading = false;
     final chosen = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: Text(
-            isBeneficiary ? 'Buscar beneficiario' : 'Buscar solicitante',
-          ),
-          content: SizedBox(
-            width: 440,
-            height: 370,
-            child: Column(
-              children: [
-                TextField(
-                  controller: search,
-                  decoration: InputDecoration(
-                    labelText: isBeneficiary ? 'Nombre o CURP' : 'Nombre',
+        builder: (context, update) {
+          Future<void> run() async {
+            if (loading) return;
+            update(() {
+              loading = true;
+              lookupError = null;
+            });
+            try {
+              final result = await widget.api.get('/ejecutivo/personas', {
+                'tipo': isBeneficiary ? 'beneficiario' : 'solicitante',
+                'q': search.text.trim(),
+              });
+              if (context.mounted) {
+                update(() => rows = result['items'] as List);
+              }
+            } catch (e) {
+              if (context.mounted) update(() => lookupError = e.toString());
+            } finally {
+              if (context.mounted) update(() => loading = false);
+            }
+          }
+
+          final found = rows ?? const [];
+          final names = [
+            for (final r in found) '${r['nombre']}'.split(' · #').first,
+          ];
+          final repeated = names.toSet().length < names.length;
+          return AlertDialog(
+            title: Text(
+              isBeneficiary ? 'Buscar beneficiario' : 'Buscar solicitante',
+            ),
+            content: SizedBox(
+              width: 480,
+              height: 420,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: search,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => run(),
+                    decoration: InputDecoration(
+                      labelText: isBeneficiary
+                          ? 'Nombre o CURP'
+                          : 'Nombre o teléfono',
+                      helperText: isBeneficiary
+                          ? 'Nombre y apellidos en cualquier orden, o la CURP completa (18 caracteres).'
+                          : 'Nombre y apellidos en cualquier orden, o el teléfono a 10 dígitos.',
+                      helperMaxLines: 2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: loading
-                      ? null
-                      : () async {
-                          update(() {
-                            loading = true;
-                            lookupError = null;
-                          });
-                          try {
-                            final result = await widget.api.get(
-                              '/ejecutivo/personas',
-                              {
-                                'tipo': isBeneficiary
-                                    ? 'beneficiario'
-                                    : 'solicitante',
-                                'q': search.text.trim(),
-                              },
-                            );
-                            if (context.mounted) {
-                              update(() => rows = result['items'] as List);
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              update(() => lookupError = e.toString());
-                            }
-                          } finally {
-                            if (context.mounted) update(() => loading = false);
-                          }
-                        },
-                  child: Text(loading ? 'Buscando…' : 'Buscar'),
-                ),
-                if (lookupError != null)
-                  Text(lookupError!, style: const TextStyle(color: Colors.red)),
-                Expanded(
-                  child: rows.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Busca por nombre. Si no aparece, registra un expediente nuevo.',
-                          ),
-                        )
-                      : ListView(
-                          children: rows
-                              .map(
-                                (r) => ListTile(
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: loading ? null : run,
+                    child: Text(loading ? 'Buscando…' : 'Buscar'),
+                  ),
+                  if (lookupError != null)
+                    Text(
+                      lookupError!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  if (found.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      found.length == 1
+                          ? '1 coincidencia'
+                          : '${found.length} coincidencias',
+                      style: const TextStyle(fontSize: 12, color: muted),
+                    ),
+                    if (repeated)
+                      Text(
+                        isBeneficiary
+                            ? 'Hay personas con el mismo nombre: compáralas por CURP, fecha de nacimiento y municipio.'
+                            : 'Hay personas con el mismo nombre: compáralas por teléfono, fecha de nacimiento y municipio.',
+                        style: const TextStyle(fontSize: 12, color: ink),
+                      ),
+                  ],
+                  Expanded(
+                    child: found.isEmpty
+                        ? Center(
+                            child: Text(
+                              rows == null ? 'Escribe y presiona Buscar.' : 'Sin coincidencias. Revisa la escritura o registra un expediente nuevo.',
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView(
+                            children: [
+                              for (final r in found)
+                                ListTile(
+                                  leading: const Icon(Icons.person_outline),
                                   title: Text('${r['nombre']}'),
+                                  subtitle: Text(
+                                    personDetail(
+                                      Map<String, dynamic>.from(r as Map),
+                                    ),
+                                  ),
+                                  isThreeLine: true,
                                   onTap: () => Navigator.pop(
                                     context,
                                     Map<String, dynamic>.from(r),
                                   ),
                                 ),
-                              )
-                              .toList(),
-                        ),
-                ),
-              ],
+                            ],
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cerrar'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          );
+        },
       ),
     );
     // Dialog exit animations may still use its controller; do not dispose it before removal.
@@ -440,12 +496,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         'municipios',
         changed: (v) => loadColonies(prefix, v),
       ),
-      select(
-        'Colonia',
-        '$prefix.colonia_id',
-        '',
-        options: colonies[prefix],
-      ),
+      select('Colonia', '$prefix.colonia_id', '', options: colonies[prefix]),
       if (municipality != null && colonies[prefix]!.isEmpty)
         const Notice(
           'No hay colonias registradas para este municipio. La administración debe cargar el catálogo de colonias.',
@@ -480,7 +531,8 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         onChanged: busy ? null : (v) => setState(() => existingBeneficiary = v),
       ),
       if (existingBeneficiary) ...[
-        if (beneficiary != null) Notice('${beneficiary!['nombre']}'),
+        if (beneficiary != null)
+          Notice('${beneficiary!['nombre']}\n${personDetail(beneficiary!)}'),
         OutlinedButton(
           onPressed: busy ? null : () => findPerson(true),
           child: const Text('Buscar beneficiario'),
@@ -551,7 +603,8 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         onChanged: busy ? null : (v) => setState(() => existingApplicant = v),
       ),
       if (existingApplicant) ...[
-        if (applicant != null) Notice('${applicant!['nombre']}'),
+        if (applicant != null)
+          Notice('${applicant!['nombre']}\n${personDetail(applicant!)}'),
         OutlinedButton(
           onPressed: busy ? null : () => findPerson(false),
           child: const Text('Buscar solicitante'),

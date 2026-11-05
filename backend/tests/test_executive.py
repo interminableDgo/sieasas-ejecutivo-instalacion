@@ -58,6 +58,9 @@ def test_search_words_are_parameterized_and_dates_need_a_date_shape():
     assert 'DATE_FORMAT' not in sql
     sql,_=matches(['name'],['oct'],'q',months=True)
     assert 'MONTH(sa.created)=10' in sql
+    sql,params=matches(['name'],['#14'],'q',folio=True)
+    assert 'sa.solapoyo_id=:q0_folio' in sql and params['q0_folio']==14
+    assert 'solapoyo_id' not in matches(['name'],['jorge'],'q',folio=True)[0]
 
 
 def test_blank_request_rejected():
@@ -103,14 +106,16 @@ def sign_in(client,address,password):
 
 def test_comparison_api_auth_validation_and_empty_scope(live):
     client,db,uid,address,password,eid=live
-    params={'a_inicio':'2024-02-01','a_fin':'2024-02-29','b_inicio':'2025-02-01','b_fin':'2025-02-28','municipio_id':2147483647}
+    params={'inicio':['2024-02-01','2025-02-01','2026-02-01'],'fin':['2024-02-29','2025-02-28','2026-02-28'],'municipio_id':2147483647}
     assert client.get('/ejecutivo/comparacion',params=params).status_code==401
     headers=sign_in(client,address,password)
     response=client.get('/ejecutivo/comparacion',params=params,headers=headers)
     assert response.status_code==200
-    assert response.json()['a']['total']==response.json()['b']['total']==0
-    assert response.json()['variacion']['total']['porcentaje']==0
-    assert client.get('/ejecutivo/comparacion',params={**params,'b_fin':'2024-01-01'},headers=headers).status_code==422
+    periods=response.json()['periodos']
+    assert [p['total'] for p in periods]==[0,0,0]
+    assert periods[0]['variacion'] is None and periods[2]['variacion']['total']['porcentaje']==0
+    assert client.get('/ejecutivo/comparacion',params={**params,'fin':['2024-01-01','2025-02-28','2026-02-28']},headers=headers).status_code==422
+    assert client.get('/ejecutivo/comparacion',params={**params,'fin':params['fin'][:2]},headers=headers).status_code==422
 
 
 def test_empty_data_scope_registration_exports_and_logout(live):
@@ -160,14 +165,17 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert wrong.status_code==422 and 'colonia' in wrong.text
     summary=client.get('/ejecutivo/dashboard',headers=headers).json()
     assert summary['total']==before+1
+    # The status breakdown shown under the total adds up to it.
+    assert sum(summary[k] for k in ['activas','resueltas','no_competencia','canceladas'])==summary['total']
     assert sum(r['total'] for r in summary['municipios'])==summary['total']
     assert sum(r['total'] for r in summary['grupos'])==summary['total']
     db.execute(text("UPDATE Tbl_SolicitudesApoyo SET created='2024-02-29 12:00:00', solapoyo_statusid=(SELECT id FROM Cat_StatusAtencion WHERE descripcion='Resuelto') WHERE solapoyo_id=:sid"),{'sid':sid})
     db.commit()
-    comparison=client.get('/ejecutivo/comparacion',params={'a_inicio':'2024-02-01','a_fin':'2024-02-29','b_inicio':'2025-02-01','b_fin':'2025-02-28','municipio_id':mid},headers=headers).json()
-    assert comparison['a']['total']==1 and comparison['a']['resueltas']==1 and comparison['a']['activas']==0
-    assert comparison['b']['total']==0
-    assert comparison['variacion']['total']['porcentaje']==-100.0
+    comparison=client.get('/ejecutivo/comparacion',params={'inicio':['2024-02-01','2025-02-01'],'fin':['2024-02-29','2025-02-28'],'municipio_id':mid},headers=headers).json()
+    first,second=comparison['periodos']
+    assert first['total']==1 and first['resueltas']==1 and first['activas']==0
+    assert second['total']==0
+    assert second['variacion']['total']['porcentaje']==-100.0
     # Búsqueda de la tabla: sin importar acentos ni mayúsculas, por persona o por fecha de registro.
     def search(q,**extra):
         result=client.get('/ejecutivo/solicitudes',params={'q':q,'municipio_id':mid,**extra},headers=headers)
@@ -179,14 +187,28 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert sid not in search('Beneficiario temporal 2023')
     row=client.get('/ejecutivo/solicitudes',params={'q':'temporal','municipio_id':mid},headers=headers).json()['items'][0]
     assert (row['beneficiario'],row['solicitante'])==('Beneficiario temporal Prueba','Solicitante temporal Prueba')
+    # Tipo de apoyo, estatus y folio distinguen solicitudes de la misma persona.
+    support=cats['apoyos'][0]['nombre']
+    assert sid in search('beneficiario temporal '+support.split()[0].upper())
+    assert sid in search('temporal resuelto') and sid in search(f'#{sid}') and sid in search(f'temporal {sid}')
     hints=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'TEMPORÁL','municipio_id':mid},headers=headers)
     assert hints.status_code==200,hints.text
-    assert {'texto':'Beneficiario temporal Prueba','tipo':'Beneficiario'} in hints.json()['items']
-    assert {'texto':'Solicitante temporal Prueba','tipo':'Solicitante'} in hints.json()['items']
-    dates=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'29/02','municipio_id':mid},headers=headers).json()['items']
-    assert {'texto':'29/02/2024','tipo':'Fecha de registro'} in dates
+    hints=hints.json()
+    assert hints['total']>=1 and len(hints['solicitudes'])<=5
+    first=hints['solicitudes'][0]
+    assert (first['solicitud_id'],first['tipo_apoyo'],first['estatus'])==(sid,support,'Resuelto')
+    people={(p['nombre'],p['tipo']):p['total'] for p in hints['personas']}
+    assert people[('Beneficiario temporal Prueba','Beneficiario')]==1
+    assert people[('Solicitante temporal Prueba','Solicitante')]==1
+    dates=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'29/02','municipio_id':mid},headers=headers).json()
+    assert sid in [r['solicitud_id'] for r in dates['solicitudes']] and dates['personas']==[]
     found=client.get('/ejecutivo/personas',params={'tipo':'beneficiario','q':'Beneficiario temporal'},headers=headers)
     assert found.status_code==200 and found.json()['items']
+    # Same names are told apart by birth date, municipality, requests and phone.
+    person=next(p for p in found.json()['items'] if p['nombre'].startswith('Beneficiario temporal Prueba'))
+    assert (str(person['fecha_nacimiento']),person['solicitudes'])==('1990-01-01',1) and person['municipio']
+    by_phone=client.get('/ejecutivo/personas',params={'tipo':'solicitante','q':'8112345678'},headers=headers).json()['items']
+    assert any(p['nombre'].startswith('Solicitante temporal Prueba') and p['telefono']=='8112345678' for p in by_phone)
     # Palabras en cualquier orden, sin importar acentos ni mayúsculas.
     for tipo,q in [('beneficiario','PRUEBA temporál beneficiario'),('solicitante','prueba SOLICITANTE')]:
         names=[p['nombre'] for p in client.get('/ejecutivo/personas',params={'tipo':tipo,'q':q},headers=headers).json()['items']]

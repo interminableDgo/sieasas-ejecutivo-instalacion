@@ -507,196 +507,114 @@ class _CategoryPiePainter extends CustomPainter {
       !listEquals(values, old.values) || !listEquals(colors, old.colors);
 }
 
-/// Side-by-side period comparison for independent indicators. A grouped bar
-/// chart makes the two periods directly comparable without implying that the
-/// indicators are steps in a continuous series.
-class PeriodComparisonChart extends StatelessWidget {
-  final Map<String, dynamic> earlier, later;
-  final Map<String, dynamic> variations;
-  final String earlierLabel, laterLabel;
-  const PeriodComparisonChart({
+/// One column per compared period, all on a common scale from 0, so several
+/// months or years read at a glance. A period without records keeps its
+/// place with a flat mark and "0" instead of disappearing from the axis.
+/// Tapping a column selects it; the caller shows its detail.
+class PeriodColumnsChart extends StatelessWidget {
+  final List<String> labels, shortLabels;
+  final List<num> values;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const PeriodColumnsChart({
     super.key,
-    required this.earlier,
-    required this.later,
-    required this.variations,
-    required this.earlierLabel,
-    required this.laterLabel,
+    required this.labels,
+    required this.shortLabels,
+    required this.values,
+    required this.selected,
+    required this.onSelect,
   });
+
+  static const barArea = 150.0;
 
   @override
   Widget build(BuildContext context) {
-    const indicators = [
-      ('Solicitudes registradas', 'total'),
-      ('Activas', 'activas'),
-      ('Resueltas', 'resueltas'),
-    ];
-    final maxValue = indicators.fold<num>(0, (maximum, item) {
-      final key = item.$2;
-      return math.max(
-        maximum,
-        math.max(earlier[key] as num, later[key] as num),
-      );
-    });
+    final maximum = values.fold<num>(0, math.max);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Cada par de barras compara el mismo indicador entre periodos.',
-          style: TextStyle(fontSize: 11, color: muted),
+        Text(
+          maximum == 0
+              ? 'Todos los periodos registran 0.'
+              : 'Escala común desde 0 · máximo $maximum',
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 10, color: muted),
         ),
-        const SizedBox(height: 10),
-        const Text(
-          'Las barras comparan los conteos; el cambio porcentual va junto a cada indicador.',
-          style: TextStyle(fontSize: 11, color: muted),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 14,
-          runSpacing: 6,
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _ChartLegend(color: muted, label: earlierLabel),
-            _ChartLegend(color: salud, label: laterLabel),
+            for (var i = 0; i < values.length; i++)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: i == selected,
+                  label: '${labels[i]}: ${values[i]}',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => onSelect(i),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Column(
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${values[i]}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: values[i] == 0 ? muted : ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            height: values[i] == 0 || maximum == 0
+                                ? 3
+                                : math.max(4, values[i] / maximum * barArea),
+                            constraints: const BoxConstraints(maxWidth: 44),
+                            decoration: BoxDecoration(
+                              color: values[i] == 0
+                                  ? border
+                                  : i == selected
+                                  ? salud
+                                  : salud.withValues(alpha: 0.4),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(5),
+                              ),
+                            ),
+                          ),
+                          Container(height: 1, color: border),
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              shortLabels[i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                height: 1.2,
+                                fontWeight: i == selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: i == selected ? ink : muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            maxValue == 0
-                ? 'Los dos periodos registran 0.'
-                : 'Escala común desde 0: $maxValue',
-            style: const TextStyle(fontSize: 10, color: muted),
-          ),
-        ),
-        const SizedBox(height: 4),
-        for (final (label, key) in indicators)
-          _PeriodIndicatorBars(
-            label: label,
-            earlier: earlier[key] as num,
-            later: later[key] as num,
-            variation: variations[key] as Map<String, dynamic>,
-            maximum: maxValue,
-          ),
       ],
     );
   }
-}
-
-class _PeriodIndicatorBars extends StatelessWidget {
-  final String label;
-  final num earlier, later, maximum;
-  final Map<String, dynamic> variation;
-  const _PeriodIndicatorBars({
-    required this.label,
-    required this.earlier,
-    required this.later,
-    required this.variation,
-    required this.maximum,
-  });
-
-  String get changeLabel {
-    final difference = variation['diferencia'] as num;
-    if (difference == 0) return 'Sin cambio';
-    final sign = difference > 0 ? '+' : '−';
-    final percentage = variation['porcentaje'] as num?;
-    final percentLabel = percentage == null
-        ? '% sin referencia'
-        : '$sign${percentage.abs().toStringAsFixed(1)}%';
-    return 'Δ $sign${difference.abs()} · $percentLabel';
-  }
-
-  Widget bar(num value, Color color) => Padding(
-    padding: const EdgeInsets.only(top: 5),
-    child: Row(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LinearProgressIndicator(
-              value: maximum == 0 ? 0 : (value / maximum).toDouble(),
-              minHeight: 8,
-              color: color,
-              backgroundColor: paper,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 28,
-          child: Text(
-            '$value',
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: label == 'Solicitudes registradas' ? blueTint : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  changeLabel,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: muted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          bar(earlier, muted),
-          bar(later, salud),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ChartLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _ChartLegend({required this.color, required this.label});
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 9,
-        height: 9,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(fontSize: 10)),
-    ],
-  );
 }
 
 class TrendChart extends StatefulWidget {

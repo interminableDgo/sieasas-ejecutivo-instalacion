@@ -60,12 +60,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   final scroll = ScrollController();
+  // Horizontal scroll of the requests table when its columns do not fit.
+  final tableScroll = ScrollController();
   final topKey = GlobalKey(), barKey = GlobalKey();
   double? barHeight;
 
   @override
   void dispose() {
     scroll.dispose();
+    tableScroll.dispose();
     super.dispose();
   }
 
@@ -299,6 +302,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$key: $id';
   }
 
+  /// Parts that add up to the total. The two closing statuses only appear
+  /// when they have requests, so the sentence stays short.
+  static String statusBreakdown(Map<String, dynamic> s) {
+    final notCompetent = s['no_competencia'] as num? ?? 0;
+    final cancelled = s['canceladas'] as num? ?? 0;
+    return [
+      '${s['activas']} activas (incluye pendientes)',
+      '${s['resueltas']} resueltas',
+      if (notCompetent > 0)
+        '$notCompetent ${notCompetent == 1 ? 'no es' : 'no son'} competencia',
+      if (cancelled > 0)
+        '$cancelled ${cancelled == 1 ? 'cerrada o cancelada' : 'cerradas o canceladas'}',
+    ].join(' · ');
+  }
+
+  /// "Reporte ejecutivo SIESAS 2026-11-04 15.30.pdf": the date sorts in
+  /// file lists and the time tells apart several exports of the same day.
+  static String reportFileName(String format, DateTime at) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return 'Reporte ejecutivo SIESAS ${at.year}-${two(at.month)}-${two(at.day)} '
+        '${two(at.hour)}.${two(at.minute)}.$format';
+  }
+
   /// Returns null on success, '' if the person cancelled, or the error.
   Future<String?> export(String format) async {
     setState(() => exporting = true);
@@ -308,13 +334,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         'chart_apoyos': chartCodes[supportView]!,
         'chart_grupos': chartCodes[groupView]!,
       });
+      final name = reportFileName(format, DateTime.now());
       final file = XFile.fromData(
         bytes,
-        name: 'SIESAS-ejecutivo.$format',
+        name: name,
         mimeType: format == 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
       if (kIsWeb) {
-        await file.saveTo('SIESAS-ejecutivo.$format');
+        await file.saveTo(name);
       } else if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) {
         if (!mounted) return '';
@@ -322,16 +349,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await SharePlus.instance.share(
           ShareParams(
             files: [file],
-            fileNameOverrides: ['SIESAS-ejecutivo.$format'],
+            fileNameOverrides: [name],
             sharePositionOrigin: box == null
                 ? null
                 : box.localToGlobal(Offset.zero) & box.size,
           ),
         );
       } else {
-        final location = await getSaveLocation(
-          suggestedName: 'SIESAS-ejecutivo.$format',
-        );
+        final location = await getSaveLocation(suggestedName: name);
         if (location == null) return '';
         await file.saveTo(location.path);
       }
@@ -382,7 +407,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return ExecutiveCard(
       key: const ValueKey('requests-table-card'),
       title: 'Detalle de solicitudes',
-      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante y fecha de registro, sin importar acentos ni mayúsculas, y sólo afecta a esta tabla.',
+      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante, tipo de apoyo, estatus, fecha de registro y folio, sin importar acentos ni mayúsculas. Cada palabra afina el resultado (por ejemplo, «jorge vacunación») y sólo afecta a esta tabla.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -391,6 +416,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             initial: search,
             scope: () => {...filters},
             onSearch: searchRows,
+            onOpen: openDetail,
           ),
           SizedBox(
             height: 4,
@@ -418,64 +444,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 '$total ${total == 1 ? 'resultado' : 'resultados'} para «$search»',
                 style: const TextStyle(fontSize: 12, color: muted),
               ),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columnSpacing: 20,
-                dataRowMaxHeight: 64,
-                headingTextStyle: cellStyle.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-                dataTextStyle: cellStyle,
-                columns: [
-                  const DataColumn(
-                    label: SizedBox(
-                      width: 30,
-                      child: Center(
-                        child: Text('Estado', textAlign: TextAlign.center),
+            // The table spans the whole card on wide screens; when its
+            // columns do not fit, long names wrap to two lines and a visible
+            // scrollbar shows there is more to the right.
+            LayoutBuilder(
+              builder: (context, box) => Scrollbar(
+                controller: tableScroll,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: tableScroll,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      columnSpacing: 18,
+                      horizontalMargin: 12,
+                      dataRowMaxHeight: 64,
+                      headingTextStyle: cellStyle.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
-                    ),
-                  ),
-                  for (final h in [
-                    'Solicitud',
-                    'Fecha de registro',
-                    'Beneficiario',
-                    'Solicitante',
-                    'Municipio',
-                    'Tipo de apoyo',
-                    'Remitente',
-                  ])
-                    DataColumn(label: Text(h)),
-                ],
-                rows: [
-                  for (final r in rows)
-                    DataRow(
-                      cells: [
-                        DataCell(
-                          Center(
-                            child: StatusDaysIcon(
-                              status: '${r['estatus']}',
-                              registeredAt: r['fecha_registro'],
+                      dataTextStyle: cellStyle,
+                      columns: [
+                        const DataColumn(
+                          label: SizedBox(
+                            width: 44,
+                            child: Center(
+                              child: Text(
+                                'Estado',
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                          onTap: () => openDetail(r['solicitud_id'] as int),
                         ),
-                        for (final value in [
-                          r['folio'],
-                          shortDate(r['fecha_registro']),
-                          r['beneficiario'] ?? '',
-                          r['solicitante'] ?? '',
-                          r['municipio'],
-                          r['tipo_apoyo'],
-                          r['dependencia'],
+                        for (final h in [
+                          'Solicitud',
+                          'Fecha de registro',
+                          'Beneficiario',
+                          'Solicitante',
+                          'Municipio',
+                          'Tipo de apoyo',
+                          'Remitente',
                         ])
-                          DataCell(
-                            Text('$value'),
-                            onTap: () => openDetail(r['solicitud_id'] as int),
+                          DataColumn(label: Text(h)),
+                      ],
+                      rows: [
+                        for (final r in rows)
+                          DataRow(
+                            cells: [
+                              DataCell(
+                                Center(
+                                  child: StatusDaysIcon(
+                                    status: '${r['estatus']}',
+                                    registeredAt: r['fecha_registro'],
+                                  ),
+                                ),
+                                onTap: () =>
+                                    openDetail(r['solicitud_id'] as int),
+                              ),
+                              for (final (value, width) in [
+                                (r['folio'], null),
+                                (shortDate(r['fecha_registro']), null),
+                                (r['beneficiario'] ?? '', 170.0),
+                                (r['solicitante'] ?? '', 150.0),
+                                (r['municipio'], 130.0),
+                                (r['tipo_apoyo'], 130.0),
+                                (r['dependencia'], 170.0),
+                              ])
+                                DataCell(
+                                  ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: width ?? double.infinity,
+                                    ),
+                                    child: Text(
+                                      '$value',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  onTap: () =>
+                                      openDetail(r['solicitud_id'] as int),
+                                ),
+                            ],
                           ),
                       ],
                     ),
-                ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -939,7 +994,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
-                                  '${summary!['activas']} activas (incluye pendientes) · ${summary!['resueltas']} resueltas',
+                                  statusBreakdown(summary!),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: muted,
