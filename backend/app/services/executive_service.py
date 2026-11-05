@@ -231,11 +231,19 @@ def search_scope(user, selected, q):
     return JOINS + PEOPLE_JOIN + where + search, {**params, **extra}
 
 
-def list_rows(db,user,selected,limit=10,offset=0,q=None):
+# Columns the table can be sorted by. Only these fixed expressions reach SQL.
+SORT_COLUMNS = {'estatus': 'es.descripcion', 'solicitud': 'sa.solapoyo_id', 'fecha': 'sa.created',
+ 'beneficiario': BENEFICIARY, 'solicitante': APPLICANT, 'municipio': 'm.nom_mun',
+ 'tipo_apoyo': 'ta.descripcion', 'remitente': "COALESCE(d.descripcion,'Sin dependencia remitente')"}
+
+
+def list_rows(db,user,selected,limit=10,offset=0,q=None,sort='fecha',ascending=False):
     scope, params=search_scope(user,selected,q)
     total=db.execute(text('SELECT COUNT(*) '+scope),params).scalar_one()
+    # The newest first breaks ties, so pages never repeat or skip a row.
+    order=f"{SORT_COLUMNS[sort]} {'ASC' if ascending else 'DESC'}, sa.created DESC, sa.solapoyo_id DESC"
     rows=query_rows(db, ROW_SELECT+PEOPLE_SELECT+scope
-      +' ORDER BY sa.created DESC, sa.solapoyo_id DESC LIMIT :limit OFFSET :offset',
+      +f' ORDER BY {order} LIMIT :limit OFFSET :offset',
       {**params,'limit':limit,'offset':offset})
     return {'total':total, 'items':rows}
 

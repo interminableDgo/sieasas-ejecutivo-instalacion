@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.main import app
 from app.database import engine, get_db
 from app.security import hasher, issue_token, now
+from app.services import executive_service as svc
 from app.services.executive_service import DATES, looks_like_date, matches, month_series, where_clause
 from app.routers.executive import NewRequest
 
@@ -185,6 +186,16 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert sid in search('solicitante temporal')
     assert sid in search('29/02/2024') and sid in search('2024-02-29') and sid in search('febrero 2024')
     assert sid not in search('Beneficiario temporal 2023')
+    # Sorting by column covers every page, not only the one on screen.
+    def column(orden,direccion):
+        result=client.get('/ejecutivo/solicitudes',params={'orden':orden,'direccion':direccion},headers=headers)
+        assert result.status_code==200,result.text
+        return [r['solicitud_id'] for r in result.json()['items']]
+    assert column('solicitud','asc')==sorted(column('solicitud','asc'))
+    assert column('solicitud','desc')==sorted(column('solicitud','desc'),reverse=True)
+    for orden in svc.SORT_COLUMNS:
+        assert column(orden,'asc') is not None
+    assert client.get('/ejecutivo/solicitudes',params={'orden':'sa.created; DROP'},headers=headers).status_code==422
     row=client.get('/ejecutivo/solicitudes',params={'q':'temporal','municipio_id':mid},headers=headers).json()['items'][0]
     assert (row['beneficiario'],row['solicitante'])==('Beneficiario temporal Prueba','Solicitante temporal Prueba')
     # Tipo de apoyo, estatus y folio distinguen solicitudes de la misma persona.

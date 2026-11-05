@@ -176,5 +176,25 @@ void main() {
       isFalse,
     );
     expect(find.text('José Pérez'), findsOneWidget);
+
+    // Each header sorts every page on the server: newest first by default,
+    // a tap sorts ascending, a second tap descending.
+    Map<String, String> lastTable() => requests
+        .lastWhere((u) => u.path == '/ejecutivo/solicitudes')
+        .queryParameters;
+    expect(lastTable()['orden'], 'fecha');
+    expect(lastTable()['direccion'], 'desc');
+    final header = find.text('Beneficiario');
+    await tester.ensureVisible(header);
+    await tester.pumpAndSettle();
+    await tester.tap(header);
+    await tester.pumpAndSettle();
+    expect(lastTable()['orden'], 'beneficiario');
+    expect(lastTable()['direccion'], 'asc');
+    expect(lastTable()['page'], '0');
+    await tester.tap(header);
+    await tester.pumpAndSettle();
+    expect(lastTable()['direccion'], 'desc');
+    expect(find.byTooltip('Ordenar por tipo de apoyo'), findsOneWidget);
   });
 }

@@ -339,3 +339,19 @@ def test_treemap_export(summary, tmp_path):
     book = load_workbook(io.BytesIO(render_xlsx(report)))
     assert len(book['Tipos de apoyo']._images) == 1
     assert 'Categoría de prueba' in pdf_text(render_pdf(report), tmp_path)
+
+
+@pytest.mark.parametrize('render', [render_xlsx, render_pdf])
+def test_a_very_long_period_exports_well_within_the_app_timeout(summary, render):
+    # A start date such as 1900 fills ~1,500 months; the Excel merges used to
+    # grow quadratically and took longer than the app waits (timeout).
+    import time
+    months = [f'{1900 + i // 12}-{i % 12 + 1:02d}' for i in range(1523)]
+    summary['tendencia'] = [{'mes': m, 'recibidas': 1, 'resueltas': 0} for m in months]
+    report = report_for(summary, {'fecha_inicio': date(1900, 1, 1)})
+    started = time.perf_counter()
+    content = render(report)
+    assert time.perf_counter() - started < 15
+    if render is render_xlsx:
+        trend = load_workbook(io.BytesIO(content))['Tendencia']
+        assert sum(1 for c in trend['B'] if c.value in months) == len(months)

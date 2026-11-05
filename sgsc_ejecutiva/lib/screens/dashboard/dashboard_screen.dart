@@ -50,6 +50,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   /// Text of the table search; it narrows only the table, not the charts.
   String search = '';
+
+  /// Server sort key of each table column, in order. The server sorts, so
+  /// the order covers every page and not only the rows on screen.
+  static const sortKeys = [
+    'estatus',
+    'solicitud',
+    'fecha',
+    'beneficiario',
+    'solicitante',
+    'municipio',
+    'tipo_apoyo',
+    'remitente',
+  ];
+  int sortColumn = 2; // Newest registrations first.
+  bool sortAscending = false;
   bool loadingRows = false;
   final Set<String> expanded = {};
   static const topRows = 5;
@@ -136,7 +151,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ...filters,
     'page': '$page',
     if (search.isNotEmpty) 'q': search,
+    'orden': sortKeys[sortColumn],
+    'direccion': sortAscending ? 'asc' : 'desc',
   };
+
+  void sortRows(int column, bool ascending) {
+    setState(() {
+      sortColumn = column;
+      sortAscending = ascending;
+    });
+    page = 0;
+    loadRows();
+  }
 
   /// Reloads only the table (search and pages) so the charts stay put.
   Future<void> loadRows() async {
@@ -407,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return ExecutiveCard(
       key: const ValueKey('requests-table-card'),
       title: 'Detalle de solicitudes',
-      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante, tipo de apoyo, estatus, fecha de registro y folio, sin importar acentos ni mayúsculas. Cada palabra afina el resultado (por ejemplo, «jorge vacunación») y sólo afecta a esta tabla.',
+      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante, tipo de apoyo, estatus, fecha de registro y folio, sin importar acentos ni mayúsculas. Cada palabra afina el resultado (por ejemplo, «jorge vacunación») y solo afecta a esta tabla.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -458,6 +484,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: box.maxWidth),
                     child: DataTable(
+                      sortColumnIndex: sortColumn,
+                      sortAscending: sortAscending,
                       columnSpacing: 18,
                       horizontalMargin: 12,
                       dataRowMaxHeight: 64,
@@ -466,8 +494,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       dataTextStyle: cellStyle,
                       columns: [
-                        const DataColumn(
-                          label: SizedBox(
+                        DataColumn(
+                          onSort: sortRows,
+                          tooltip: 'Ordenar por estado',
+                          label: const SizedBox(
                             width: 44,
                             child: Center(
                               child: Text(
@@ -486,7 +516,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           'Tipo de apoyo',
                           'Remitente',
                         ])
-                          DataColumn(label: Text(h)),
+                          DataColumn(
+                            label: Text(h),
+                            tooltip: 'Ordenar por ${h.toLowerCase()}',
+                            onSort: sortRows,
+                          ),
                       ],
                       rows: [
                         for (final r in rows)

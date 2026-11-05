@@ -14,6 +14,8 @@ from openpyxl.drawing.line import LineProperties
 from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, TwoCellAnchor
 from openpyxl.drawing.text import CharacterProperties, Font as DrawingFont, Paragraph, ParagraphProperties
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.cell_range import CellRange
+from openpyxl.worksheet.merge import MergedCellRange
 from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.page import PageMargins
 
@@ -22,6 +24,16 @@ from app.services.executive_chart_style import (
 )
 TITLES = ['Municipios con más solicitudes', 'Apoyos más solicitados',
           'Dependencias que remiten más solicitudes', 'Grupos registrados con más solicitudes']
+
+
+def merge(sheet, start_row, start_column, end_row, end_column):
+    """Like sheet.merge_cells, without its check against every earlier merge,
+    which makes long tables quadratic (1,500 months took 30 s). The report
+    writes each row once, so its ranges never overlap."""
+    coord = CellRange(min_col=start_column, min_row=start_row, max_col=end_column, max_row=end_row).coord
+    merged = MergedCellRange(sheet, coord)
+    sheet.merged_cells.ranges.add(merged)
+    sheet._clean_merge_range(merged)
 
 
 def chart_text(size=11):
@@ -80,7 +92,7 @@ def render(report, dimensions, definitions):
         return c
 
     def span(sheet, row, value, size=11, bold=False):
-        sheet.merge_cells(start_row=row, start_column=2, end_row=row, end_column=17)
+        merge(sheet, start_row=row, start_column=2, end_row=row, end_column=17)
         cell(sheet, row, 2, value, size, bold)
 
     def base(name, title):
@@ -120,13 +132,13 @@ def render(report, dimensions, definitions):
         # Presentation grid: wide category B:M, count N:O, share P:Q.
         for j, value in enumerate(headers):
             col, end = [(2, 13), (14, 15), (16, 17)][j]
-            sheet.merge_cells(start_row=start, start_column=col, end_row=start, end_column=end)
+            merge(sheet, start_row=start, start_column=col, end_row=start, end_column=end)
             cell(sheet, start, col, value, bold=True, fill=ORANGE)
         sheet.row_dimensions[start].height = 30
         for n, values in enumerate(rows, start+1):
             for j, value in enumerate(values):
                 col, end = [(2, 13), (14, 15), (16, 17)][j]
-                sheet.merge_cells(start_row=n, start_column=col, end_row=n, end_column=end)
+                merge(sheet, start_row=n, start_column=col, end_row=n, end_column=end)
                 c = cell(sheet, n, col, value, fill='F5F6F7' if (n-start)%2 else 'FFFFFF')
                 if j:
                     c.number_format = '0.0%' if j == 2 and headers[2] == '% del total' else '#,##0'
@@ -266,7 +278,7 @@ def render(report, dimensions, definitions):
     for i, (label, value) in enumerate(metrics):
         col, end = 2+i*3, (4+i*3 if i<4 else 17)
         for row, v, size in [(start, label, 11), (start+1, value, 20)]:
-            summary.merge_cells(start_row=row, start_column=col, end_row=row, end_column=end)
+            merge(summary, start_row=row, start_column=col, end_row=row, end_column=end)
             c = cell(summary, row, col, v, size, row==start+1, 'FFF1E5' if row==start+1 else None)
             c.number_format = '0.0%' if i==4 else '#,##0'
             c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
