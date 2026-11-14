@@ -35,6 +35,9 @@ SEXO = {'H': 'Masculino', 'M': 'Femenino', 'X': 'Prefiere no especificar'}
 
 # Opciones de la app → descripción en los catálogos de SSNL.
 TIPO_APOYO = {
+    'Andadera, bastón o muletas': 'Equipos y aparatos',
+    'Silla de ruedas': 'Equipos y aparatos',
+    # Nombres anteriores de la app, para solicitudes y versiones ya instaladas.
     'Andadera o bastón': 'Equipos y aparatos',
     'Silla de ruedas o ayuda técnica': 'Equipos y aparatos',
     'Apoyo funerario': 'Apoyo Social',
