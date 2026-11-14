@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Sólo en la compilación de prueba (profile): permite llamar a la API por http://
+         en la red local (p. ej. http://192.168.1.5:8000). La versión release no lo permite. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

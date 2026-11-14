@@ -12,6 +12,7 @@ import 'package:sgsc_ejecutiva/main.dart';
 import 'package:sgsc_ejecutiva/screens/dashboard/dashboard_screen.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
 import 'package:sgsc_ejecutiva/widgets/executive_charts.dart';
+import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
 
 const user = {
   'nombres': 'Cuenta',
@@ -134,6 +135,7 @@ class Backend {
 
 /// Adds one month of the current year to the comparison.
 Future<void> choose(WidgetTester tester, String month) async {
+  await reveal(tester, find.text('Elegir meses'));
   await tester.tap(find.text('Elegir meses'));
   await settle(tester);
   await tester.tap(find.text(month));
@@ -205,7 +207,10 @@ Future<void> tick(
     await tester.pumpAndSettle();
   }
   for (final name in names) {
-    await tester.tap(find.widgetWithText(CheckboxListTile, name));
+    final option = find.widgetWithText(CheckboxListTile, name);
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
     await tester.pumpAndSettle();
   }
   if (close) {
@@ -214,7 +219,43 @@ Future<void> tick(
   }
 }
 
+/// Scrolls [target] to the middle of its list: clear of the pinned bar at
+/// the top and of the export bar at the bottom.
+Future<void> reveal(WidgetTester tester, Finder target) async {
+  await tester.runAsync(
+    () =>
+        Scrollable.ensureVisible(tester.element(target.first), alignment: 0.5),
+  );
+  await tester.pumpAndSettle();
+}
+
 Finder applyButton() => find.textContaining(RegExp(r'^Ver \d+ solicitud'));
+
+/// The comparison now sits under the trend, at the end of «Resumen».
+Future<void> openComparison(WidgetTester tester) async {
+  final toggle = find.text('Comparar meses o años');
+  await tester.scrollUntilVisible(
+    toggle,
+    300,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await reveal(tester, toggle);
+  await tester.tap(toggle);
+  await settle(tester);
+}
+
+/// The map is the second view of the municipalities card.
+Future<void> showMap(WidgetTester tester) async {
+  final views = find.byKey(const ValueKey('municipality-view'));
+  await tester.scrollUntilVisible(
+    views,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await reveal(tester, views);
+  await tester.tap(find.descendant(of: views, matching: find.text('Mapa')));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   testWidgets('selecting a bar keeps the scroll position and the content', (
@@ -284,7 +325,16 @@ void main() {
 
     expect(find.text('2 seleccionados'), findsOneWidget);
     expect(find.text('Ver 14 solicitudes'), findsOneWidget);
-    expect(backend.count('/ejecutivo/dashboard'), 0);
+    expect(backend.count('/ejecutivo/dashboard'), 1);
+    expect(
+      backend.requests
+          .lastWhere((u) => u.path == '/ejecutivo/dashboard')
+          .queryParameters
+          .containsKey('municipio_id'),
+      isFalse,
+      reason: 'counts per municipality ignore the municipality filter',
+    );
+    expect(find.text('Municipio: Linares'), findsNothing);
     final counted = backend.requests.lastWhere(
       (u) => u.path == '/ejecutivo/solicitudes',
     );
@@ -294,11 +344,84 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Municipio: Linares'), findsOneWidget);
     expect(find.text('Municipio: San Nicolás de los Garza'), findsOneWidget);
-    expect(backend.count('/ejecutivo/dashboard'), 1);
+    expect(backend.count('/ejecutivo/dashboard'), 2);
 
     // Reopening shows what is applied.
     await openFilters(tester);
     expect(find.text('2 seleccionados'), findsOneWidget);
+  });
+
+  testWidgets('Resumen opens first; requests live in their own tab', (
+    tester,
+  ) async {
+    await open(tester);
+    expect(find.text('Resumen'), findsOneWidget);
+    expect(find.text('Solicitudes (400)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('summary-card')), findsOneWidget);
+    expect(find.text('Detalle de solicitudes'), findsNothing);
+    // The answer to "which municipality has more" is in the summary itself.
+    await tester.scrollUntilVisible(
+      find.text('Solicitudes por municipio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Monterrey'), findsWidgets);
+    await tester.tap(find.text('Solicitudes (400)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalle de solicitudes'), findsOneWidget);
+    expect(find.text('Solicitudes por municipio'), findsNothing);
+    expect(find.byKey(const ValueKey('panel-tabs')), findsOneWidget);
+  });
+
+  testWidgets('total says what it counts; each part has its status colour', (
+    tester,
+  ) async {
+    await open(tester);
+    expect(
+      find.textContaining('400 solicitudes totales', findRichText: true),
+      findsOneWidget,
+    );
+    final breakdown = tester.widget<RichText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('summary-breakdown')),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(
+      breakdown.text.toPlainText(),
+      '250 activas (incluye pendientes) · 150 resueltas',
+    );
+    final numbers = <String, Color?>{};
+    breakdown.text.visitChildren((span) {
+      if (span is TextSpan && RegExp(r'^\d+$').hasMatch(span.text ?? '')) {
+        numbers[span.text!] = span.style?.color;
+      }
+      return true;
+    });
+    expect(numbers['250'], statusTextColor(StatusKind.pending));
+    expect(numbers['150'], statusGreen);
+  });
+
+  testWidgets('municipality filter shows counts, most requests first', (
+    tester,
+  ) async {
+    await open(tester);
+    await openFilters(tester);
+    await tester.tap(fieldOf('Municipio'));
+    await settle(tester);
+    expect(find.byKey(const ValueKey('option-order')), findsOneWidget);
+    expect(find.byKey(const ValueKey('count-1')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('count-1'))).data,
+      '40',
+    );
+    final first = tester
+        .getTopLeft(find.widgetWithText(CheckboxListTile, 'Monterrey'))
+        .dy;
+    final second = tester
+        .getTopLeft(find.widgetWithText(CheckboxListTile, 'Guadalupe'))
+        .dy;
+    expect(first, lessThan(second), reason: '40 before 39');
   });
 
   testWidgets('"Todos" clears the specific selections of a filter', (
@@ -308,6 +431,13 @@ void main() {
     await openFilters(tester);
     await tick(tester, 'Municipio', ['Monterrey', 'Guadalupe'], close: false);
     expect(find.text('2 seleccionadas'), findsOneWidget);
+    // Back to the top of the option list, where «Todos» is.
+    await tester.scrollUntilVisible(
+      find.widgetWithText(CheckboxListTile, 'Todos'),
+      -100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(CheckboxListTile, 'Todos'));
     await tester.pumpAndSettle();
     expect(
@@ -460,8 +590,7 @@ void main() {
     tester,
   ) async {
     final backend = await open(tester);
-    await tester.tap(find.text('Comparar meses o años'));
-    await settle(tester);
+    await openComparison(tester);
     await choose(tester, 'Marzo');
     await choose(tester, 'Enero');
     final analyzed = find.textContaining(RegExp(r'^Marzo \d{4}$'));
@@ -470,11 +599,11 @@ void main() {
     expect(reference, findsWidgets);
     final requests = backend.count('/ejecutivo/comparacion');
 
+    await reveal(tester, find.text('Ocultar comparación'));
     await tester.tap(find.text('Ocultar comparación'));
     await settle(tester);
     expect(find.text('Comparar periodos'), findsNothing);
-    await tester.tap(find.text('Comparar meses o años'));
-    await settle(tester);
+    await openComparison(tester);
     expect(analyzed, findsWidgets);
     expect(reference, findsWidgets);
     expect(backend.count('/ejecutivo/comparacion'), requests);
@@ -591,18 +720,19 @@ void main() {
 
   testWidgets('switching Meses/Años keeps the chosen periods', (tester) async {
     await open(tester);
-    await tester.tap(find.text('Comparar meses o años'));
-    await settle(tester);
+    await openComparison(tester);
     await choose(tester, 'Marzo');
     final march = find.textContaining(RegExp(r'^Marzo \d{4}$'));
     expect(march, findsWidgets);
     final year = RegExp(r'\d{4}')
         .firstMatch(tester.widget<Text>(march.first).data!)![0]!;
 
+    await reveal(tester, find.text('Años'));
     await tester.tap(find.text('Años'));
     await settle(tester);
     expect(find.text(year), findsWidgets);
     expect(march, findsNothing);
+    await reveal(tester, find.text('Meses'));
     await tester.tap(find.text('Meses'));
     await settle(tester);
     expect(march, findsWidgets, reason: 'the month comes back');
@@ -618,7 +748,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Mi perfil'), findsNothing);
-    expect(find.text('Comparar meses o años'), findsOneWidget);
+    expect(find.byKey(const ValueKey('panel-tabs')), findsOneWidget);
   });
 
   testWidgets(
@@ -691,27 +821,15 @@ void main() {
       return rect.topLeft + (center - view.topLeft) * (rect.width / view.width);
     }
 
-    testWidgets('comes right after the trend and shows real counts', (
+    testWidgets('is the second view of the municipalities card', (
       tester,
     ) async {
       final backend = await open(tester, account: nl);
-      final trend = tester.getTopLeft(
-        find.text('Solicitudes por mes de registro'),
-      );
-      await tester.scrollUntilVisible(
-        find.byType(MunicipalityMap),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      final map = tester.getTopLeft(
-        find.text('Mapa de solicitudes por municipio'),
-      );
-      final bars = find.text('Solicitudes por municipio');
-      expect(map.dy, greaterThan(trend.dy - 2000));
-      if (bars.evaluate().isNotEmpty) {
-        expect(map.dy, lessThan(tester.getTopLeft(bars).dy));
-      }
+      // The ranked list answers "which has more" first; the map is optional.
+      expect(find.byType(MunicipalityMap), findsNothing);
+      await showMap(tester);
+      expect(find.byType(MunicipalityMap), findsOneWidget);
+      expect(find.text('Solicitudes por municipio'), findsOneWidget);
       await tester.ensureVisible(find.byType(MunicipalityMap));
       await tester.pumpAndSettle();
       final painted = find.byKey(const ValueKey('municipality-map'));
@@ -769,11 +887,7 @@ void main() {
         await tick(tester, 'Tipo de apoyo', ['Medicamento']);
         await tester.tap(applyButton());
         await settle(tester);
-        await tester.scrollUntilVisible(
-          find.byType(MunicipalityMap),
-          200,
-          scrollable: find.byType(Scrollable).first,
-        );
+        await showMap(tester);
         await tester.ensureVisible(find.byType(MunicipalityMap));
         await tester.pumpAndSettle();
         await tester.tapAt(await municipality(tester, '19039'));
@@ -808,11 +922,7 @@ void main() {
       'map keeps selection on error, retries and displays filtered empty state',
       (tester) async {
         final backend = await open(tester, account: nl);
-        await tester.scrollUntilVisible(
-          find.byType(MunicipalityMap),
-          200,
-          scrollable: find.byType(Scrollable).first,
-        );
+        await showMap(tester);
         await tester.ensureVisible(find.byType(MunicipalityMap));
         await tester.pumpAndSettle();
         backend.failDashboard = true;

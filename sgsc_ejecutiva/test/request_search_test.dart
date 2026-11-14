@@ -86,13 +86,14 @@ void main() {
     await tester.pumpWidget(wrap(dashboard(api)));
     await tester.pumpAndSettle();
 
-    // Order: total of requests, then the table.
-    final totals = tester
-        .getTopLeft(find.text('Solicitudes registradas').first)
-        .dy;
-    final table = tester.getTopLeft(find.text('Detalle de solicitudes')).dy;
-    expect(totals < table, isTrue);
-    // The charts come after it (still below the visible area).
+    // The panel opens on «Resumen»; the table is its own tab, so the
+    // search is clearly about requests and not about the indicators.
+    expect(find.text('Detalle de solicitudes'), findsNothing);
+    expect(find.byKey(const ValueKey('summary-card')), findsOneWidget);
+    await tester.tap(find.textContaining(RegExp(r'^Solicitudes \(')));
+    await tester.pumpAndSettle();
+    expect(find.text('Detalle de solicitudes'), findsOneWidget);
+    expect(find.byKey(const ValueKey('summary-card')), findsNothing);
     expect(find.text('Solicitudes por mes de registro'), findsNothing);
     expect(find.text('José Pérez'), findsOneWidget);
     expect(find.text('Ana Núñez'), findsOneWidget);

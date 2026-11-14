@@ -9,6 +9,73 @@ import 'package:share_plus/share_plus.dart';
 import '../core/theme.dart';
 import '../services/image_clipboard.dart';
 
+/// Kinds of status in the requests table: yellow triangle (activas), green
+/// square (resueltas) and red cross (closed).
+enum StatusKind { pending, resolved, closed }
+
+/// Colours of [StatusDaysIcon], shared so the summary and the table match.
+const statusYellow = Color(0xFFF4B400);
+const statusGreen = Color(0xFF27834A);
+const statusRed = Color(0xFFD32F2F);
+
+/// Text colour for a status number. Yellow is darkened only for text: on
+/// white the icon's yellow is too light to read as a number.
+Color statusTextColor(StatusKind kind) => switch (kind) {
+  StatusKind.pending => const Color(0xFF9A6C00),
+  StatusKind.resolved => statusGreen,
+  StatusKind.closed => statusRed,
+};
+
+/// Key of the requests table: what each status icon is and what its number
+/// counts. Uses the table's own icons, small.
+class StatusLegend extends StatelessWidget {
+  const StatusLegend({super.key});
+
+  Widget item(Widget icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox.square(dimension: 16, child: icon),
+      const SizedBox(width: 5),
+      Text(text, style: const TextStyle(fontSize: 11, color: ink)),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 14,
+          runSpacing: 6,
+          children: [
+            item(
+              const CustomPaint(painter: _DaysTrianglePainter(statusYellow)),
+              'En proceso',
+            ),
+            item(
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: statusGreen,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              'Resuelta',
+            ),
+            item(
+              const FittedBox(
+                child: Icon(Icons.cancel_rounded, color: statusRed),
+              ),
+              'Cerrada o no es competencia',
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 class ExecutiveCard extends StatefulWidget {
   final String title;
   final String? source;
@@ -227,11 +294,27 @@ class StatusDaysIcon extends StatelessWidget {
   final String status;
   final Object? registeredAt;
 
+  /// The table shows the days in their own «Antigüedad» column, so the icon
+  /// there carries only the status (a bare number read like a folio).
+  final bool showDays;
+
   const StatusDaysIcon({
     super.key,
     required this.status,
     required this.registeredAt,
+    this.showDays = true,
   });
+
+  /// «Hoy», «1 día», «8 días»; «—» for closed requests, whose closing date
+  /// the database does not keep.
+  static String ageLabel(String status, Object? registeredAt) {
+    final icon = StatusDaysIcon(status: status, registeredAt: registeredAt);
+    if (icon.closed && !icon.resolved) return '—';
+    final days = icon.daysSinceRegistration;
+    if (days == null) return '—';
+    if (days == 0) return 'Hoy';
+    return days == 1 ? '1 día' : '$days días';
+  }
 
   String get normalizedStatus => status.trim().toLowerCase();
   bool get resolved => normalizedStatus.startsWith('resuelto');
@@ -258,10 +341,10 @@ class StatusDaysIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final days = daysSinceRegistration;
     const blue = Color(0xFF12A5E5);
-    const yellow = Color(0xFFF4B400);
-    const green = Color(0xFF27834A);
-    const red = Color(0xFFD32F2F);
-    final marker = days?.toString() ?? '?';
+    const yellow = statusYellow;
+    const green = statusGreen;
+    const red = statusRed;
+    final marker = showDays ? (days?.toString() ?? '?') : '';
     final description = closed
         ? resolved
               ? days == null

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -841,10 +842,51 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
   }
 
   bool zoomed = true;
+
+  /// Pinch (or the +/− buttons) zoom; names appear as municipalities get
+  /// big enough on screen, as in map apps.
+  final zoom = TransformationController();
+  double get zoomLevel => zoom.value.getMaxScaleOnAxis();
+  static const maxZoom = 8.0;
+
+  @override
+  void initState() {
+    super.initState();
+    zoom.addListener(_zoomChanged);
+  }
+
+  void _zoomChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    zoom
+      ..removeListener(_zoomChanged)
+      ..dispose();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(covariant MunicipalityMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!setEquals(oldWidget.active, widget.active)) zoomed = true;
+    if (!setEquals(oldWidget.active, widget.active)) {
+      zoomed = true;
+      zoom.value = Matrix4.identity();
+    }
+  }
+
+  /// Zooms by [factor] around the centre of the map of [size].
+  void zoomBy(double factor, Size size) {
+    final current = zoomLevel;
+    final next = (current * factor).clamp(1.0, maxZoom);
+    if (next == current) return;
+    final center = Offset(size.width / 2, size.height / 2);
+    // Keep the point at the centre of the view in place.
+    final focus = zoom.toScene(center);
+    final matrix = Matrix4.identity()
+      ..translateByDouble(center.dx, center.dy, 0, 1)
+      ..scaleByDouble(next, next, 1, 1)
+      ..translateByDouble(-focus.dx, -focus.dy, 0, 1);
+    zoom.value = next == 1 ? Matrix4.identity() : matrix;
   }
 
   Map<String, String> get idByCvegeo => {
@@ -878,6 +920,9 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
     final top = (bounds.center.dy - h / 2).clamp(0.0, data.height - h);
     return Rect.fromLTWH(left, top, w, h);
   }
+
+  /// Size of the drawn map, for zooming around its centre with the buttons.
+  Size mapSize = Size.zero;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<_MapData>(
@@ -935,7 +980,8 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                     : widget.error != null
                     ? 'No se pudieron actualizar los datos.'
                     : pick == null
-                    ? 'Toca para filtrar y acercar.'
+                    ? 'Toca un municipio para filtrar. Acerca el mapa '
+                          '(pellizca o usa + y −) para ver los nombres.'
                     : count(pick.cvegeo) == 0
                     ? 'Sin solicitudes con los filtros actuales.'
                     : '${count(pick.cvegeo)} solicitudes; toca de nuevo para quitar'
@@ -974,9 +1020,29 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                   if (pick != null)
                     IconButton(
                       tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
-                      onPressed: () => setState(() => zoomed = !zoomed),
+                      onPressed: () => setState(() {
+                        zoomed = !zoomed;
+                        zoom.value = Matrix4.identity();
+                      }),
                       icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
                     ),
+                  if (widget.active.isEmpty) const Spacer(),
+                  IconButton(
+                    key: const ValueKey('map-zoom-out'),
+                    tooltip: 'Alejar mapa',
+                    onPressed: zoomLevel <= 1
+                        ? null
+                        : () => zoomBy(1 / 1.6, mapSize),
+                    icon: const Icon(Icons.remove),
+                  ),
+                  IconButton(
+                    key: const ValueKey('map-zoom-in'),
+                    tooltip: 'Acercar mapa',
+                    onPressed: zoomLevel >= maxZoom
+                        ? null
+                        : () => zoomBy(1.6, mapSize),
+                    icon: const Icon(Icons.add),
+                  ),
                   if (widget.error != null)
                     IconButton(
                       tooltip: 'Reintentar mapa',
@@ -995,6 +1061,7 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                 box.maxWidth * data.height / data.width,
               );
               final width = height * data.width / data.height;
+              mapSize = Size(width, height);
               return Center(
                 child: TweenAnimationBuilder<Rect?>(
                   tween: RectTween(end: viewBox(data)),
@@ -1015,44 +1082,75 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                     // central municipality. The bar list is the accessible
                     // way to choose one.
                     child: ExcludeSemantics(
-                      child: GestureDetector(
-                        onTapUp: (event) {
-                          final v = view;
-                          final point =
-                              v.topLeft +
-                              event.localPosition * (v.width / width);
-                          for (final shape in data.shapes) {
-                            if (shape.path.contains(point)) {
-                              final id = ids[shape.cvegeo];
-                              if (id != null) {
-                                widget.onFilter(
-                                  shape.cvegeo == selected ? null : id,
-                                );
+                      child: ClipRect(
+                        child: InteractiveViewer(
+                          transformationController: zoom,
+                          minScale: 1,
+                          maxScale: maxZoom,
+                          // At full view one-finger drags scroll the page;
+                          // once zoomed in, they move the map.
+                          panEnabled: zoomLevel > 1.01,
+                          child: Listener(
+                            // A mouse wheel over the map keeps scrolling the
+                            // panel (Ctrl + wheel zooms), so the map never
+                            // traps the page on a computer.
+                            onPointerSignal: (event) {
+                              if (event is! PointerScrollEvent ||
+                                  HardwareKeyboard.instance.isControlPressed) {
+                                return;
                               }
-                              return;
-                            }
-                          }
-                        },
-                        child: ClipRect(
-                          child: CustomPaint(
-                            key: const ValueKey('municipality-map'),
-                            size: Size(width, height),
-                            painter: _MunicipalityPainter(
-                              data.shapes,
-                              view!,
-                              fill: (s) {
-                                final value = count(s.cvegeo);
-                                if (s.cvegeo == selected) return brand;
-                                if (widget.loading || widget.error != null) {
-                                  return border;
-                                }
-                                return value == 0
-                                    ? border
-                                    : brand.withValues(
-                                        alpha: 0.15 + 0.55 * value / max,
+                              final page = Scrollable.maybeOf(context);
+                              if (page == null) return;
+                              GestureBinding.instance.pointerSignalResolver
+                                  .register(
+                                    event,
+                                    (e) => page.position.pointerScroll(
+                                      (e as PointerScrollEvent).scrollDelta.dy,
+                                    ),
+                                  );
+                            },
+                            child: GestureDetector(
+                              onTapUp: (event) {
+                                final v = view;
+                                final point =
+                                    v.topLeft +
+                                    event.localPosition * (v.width / width);
+                                for (final shape in data.shapes) {
+                                  if (shape.path.contains(point)) {
+                                    final id = ids[shape.cvegeo];
+                                    if (id != null) {
+                                      widget.onFilter(
+                                        shape.cvegeo == selected ? null : id,
                                       );
+                                    }
+                                    return;
+                                  }
+                                }
                               },
-                              outlined: {...activeCvegeo, ?selected},
+                              child: CustomPaint(
+                                key: const ValueKey('municipality-map'),
+                                size: Size(width, height),
+                                painter: _MunicipalityPainter(
+                                  data.shapes,
+                                  view!,
+                                  zoom: zoomLevel,
+                                  labeled: {?selected},
+                                  fill: (s) {
+                                    final value = count(s.cvegeo);
+                                    if (s.cvegeo == selected) return brand;
+                                    if (widget.loading ||
+                                        widget.error != null) {
+                                      return border;
+                                    }
+                                    return value == 0
+                                        ? border
+                                        : brand.withValues(
+                                            alpha: 0.15 + 0.55 * value / max,
+                                          );
+                                  },
+                                  outlined: {...activeCvegeo, ?selected},
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1130,12 +1228,23 @@ class _MunicipalityPainter extends CustomPainter {
   final Rect view;
   final Color Function(_MapShape) fill;
   final Set<String> outlined;
+
+  /// Pinch zoom of the map; names are sized for the screen, not the map.
+  final double zoom;
+
+  /// Always named when they fit (the selected municipality).
+  final Set<String> labeled;
   _MunicipalityPainter(
     this.shapes,
     this.view, {
     required this.fill,
     required this.outlined,
+    this.zoom = 1,
+    this.labeled = const {},
   });
+
+  /// Screen size of the names, in logical pixels.
+  static const labelSize = 11.0;
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.width / view.width;
@@ -1160,6 +1269,87 @@ class _MunicipalityPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.6 / scale,
       );
+    }
+    paintNames(canvas, scale * zoom);
+  }
+
+  /// Names of the municipalities big enough on screen to hold them, the
+  /// selected one and the largest first, skipping any that would overlap.
+  /// Zooming in reveals more names, as in map apps.
+  void paintNames(Canvas canvas, double pixelsPerUnit) {
+    final order = [...shapes]
+      ..sort((a, b) {
+        final pick = (labeled.contains(b.cvegeo) ? 1 : 0).compareTo(
+          labeled.contains(a.cvegeo) ? 1 : 0,
+        );
+        if (pick != 0) return pick;
+        final ra = a.path.getBounds(), rb = b.path.getBounds();
+        return (rb.width * rb.height).compareTo(ra.width * ra.height);
+      });
+    final placed = <Rect>[];
+    final fontSize = labelSize / pixelsPerUnit;
+    for (final shape in order) {
+      final bounds = shape.path.getBounds();
+      final text = TextPainter(
+        text: TextSpan(
+          text: shape.name,
+          style: TextStyle(
+            fontFamily: 'Mulish',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            color: ink,
+            height: 1,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      if (text.width > bounds.width * 0.95 ||
+          text.height > bounds.height * 0.6) {
+        text.dispose();
+        continue;
+      }
+      var center = bounds.center;
+      if (!shape.path.contains(center)) {
+        // Concave shapes: try a little up and down before giving up.
+        center = [
+          for (final f in [-0.2, 0.2, -0.35, 0.35])
+            bounds.center + Offset(0, bounds.height * f),
+        ].firstWhere(shape.path.contains, orElse: () => bounds.center);
+      }
+      final box = Rect.fromCenter(
+        center: center,
+        width: text.width + 4 / pixelsPerUnit,
+        height: text.height + 2 / pixelsPerUnit,
+      );
+      if (placed.any(box.overlaps)) {
+        text.dispose();
+        continue;
+      }
+      placed.add(box);
+      final at = center - Offset(text.width / 2, text.height / 2);
+      // A white halo keeps the name readable over any shade of orange.
+      final halo = TextPainter(
+        text: TextSpan(
+          text: shape.name,
+          style: TextStyle(
+            fontFamily: 'Mulish',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 3 / pixelsPerUnit
+              ..color = Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      halo.paint(canvas, at);
+      text.paint(canvas, at);
+      halo.dispose();
+      text.dispose();
     }
   }
 

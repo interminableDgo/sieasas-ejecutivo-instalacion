@@ -119,6 +119,15 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     resetToken = Uri.base.queryParameters['reset_token'];
     mode = resetToken == null ? 'login' : 'reset';
+    // Correcting the email or password clears the previous error, so the
+    // red message does not stay while the person fixes what was wrong.
+    for (final field in [email, password, code]) {
+      field.addListener(clearError);
+    }
+  }
+
+  void clearError() {
+    if (error != null && mounted) setState(() => error = null);
   }
 
   @override
@@ -190,7 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Eye toggle inside the field; the tooltip gives screen readers the action.
   Widget eye() => IconButton(
     tooltip: show ? 'Ocultar contraseña' : 'Mostrar contraseña',
-    icon: Icon(show ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+    icon: Icon(
+      show ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+    ),
     onPressed: () => setState(() => show = !show),
   );
 

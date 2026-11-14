@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 import '../services/executive_api.dart';
+import 'executive_widgets.dart';
 
 /// Search box of the requests table. While typing it offers the most recent
 /// matching requests (with what tells them apart: type of support, date and
@@ -87,12 +88,14 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
       asked = text;
       total = result['total'] as int;
       shownRequests = requests.length;
+      // «Ver las N solicitudes de …» first: with several matches, the person
+      // should compare them in the table instead of opening the first one.
       return [
-        for (final r in requests) {...r, 'kind': 'request'},
         for (final p
             in (result['personas'] as List).cast<Map<String, dynamic>>())
           {...p, 'kind': 'person'},
         if (total > requests.length) {'kind': 'all', 'total': total},
+        for (final r in requests) {...r, 'kind': 'request'},
       ];
     } catch (_) {
       // Suggestions are optional; the search itself still works.
@@ -110,23 +113,39 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
   Widget option(Map<String, dynamic> o, VoidCallback onTap) {
     switch (o['kind']) {
       case 'request':
+        // What tells one request of the same person from another comes
+        // first and in bold: type of support and date. The status uses the
+        // table's icon, so it reads the same in both places.
         return ListTile(
           dense: true,
-          leading: const Icon(Icons.description_outlined, color: brand),
-          title: Text('${o['beneficiario'] ?? o['folio']}'),
+          leading: StatusDaysIcon(
+            status: '${o['estatus'] ?? ''}',
+            registeredAt: o['fecha_registro'],
+          ),
+          title: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: '${o['tipo_apoyo'] ?? 'Sin tipo de apoyo'}'),
+                TextSpan(
+                  text: '  ${shortDate(o['fecha_registro'])}',
+                  style: const TextStyle(color: salud),
+                ),
+              ],
+            ),
+            style: const TextStyle(fontWeight: FontWeight.w800, color: ink),
+          ),
           // The applicant too: the typed name may be theirs, not the
           // beneficiary's.
           subtitle: Text(
             [
-              if (o['solicitante'] != null &&
-                  o['solicitante'] != o['beneficiario'])
-                'Solicitó: ${o['solicitante']}\n',
               [
+                o['beneficiario'],
                 o['folio'],
-                o['tipo_apoyo'],
-                shortDate(o['fecha_registro']),
                 o['estatus'],
               ].where((v) => v != null && '$v'.isNotEmpty).join(' · '),
+              if (o['solicitante'] != null &&
+                  o['solicitante'] != o['beneficiario'])
+                '\nSolicitó: ${o['solicitante']}',
             ].join(),
           ),
           trailing: const Icon(Icons.chevron_right, color: muted),
@@ -223,12 +242,14 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
                     ],
                   ),
                 ),
-                if (total > shownRequests)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 6, 16, 8),
+                if (total > 1)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
                     child: Text(
-                      'Agrega el tipo de apoyo, la fecha o el folio para afinar.',
-                      style: TextStyle(fontSize: 12, color: muted),
+                      '$total solicitudes coinciden. Agrega el tipo de apoyo '
+                      '(por ejemplo, «traslados»), la fecha o el folio para '
+                      'afinar.',
+                      style: const TextStyle(fontSize: 12, color: muted),
                     ),
                   ),
               ],

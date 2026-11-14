@@ -221,6 +221,7 @@ void main() {
     expect(find.text('Sin resultados'), findsOneWidget);
     await screenshot(tester, '04-sin-resultados');
     await tester.ensureVisible(find.text('Limpiar filtros'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Limpiar filtros'));
     await tester.pumpAndSettle();
     expect(find.text('Aún no hay solicitudes'), findsOneWidget);

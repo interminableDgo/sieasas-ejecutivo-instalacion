@@ -168,13 +168,10 @@ void main() {
         '1',
       );
     }
-    await tester.scrollUntilVisible(
-      find.text('Solicitud #9'),
-      -250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    // Out from under the pinned filter bar.
-    await tester.drag(find.byType(Scrollable).first, const Offset(0, 200));
+    // The list of requests is the second tab of the panel.
+    await tester.tap(find.textContaining(RegExp(r'^Solicitudes \(')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Solicitud #9'));
     await tester.pumpAndSettle();
     await screenshot(tester, 'HU4-listado-filtrado');
     await tester.tap(find.text('Solicitud #9'));
