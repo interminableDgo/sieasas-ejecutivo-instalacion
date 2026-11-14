@@ -231,8 +231,9 @@ def test_password_recovery_with_emailed_code(live, monkeypatch):
     monkeypatch.setattr(router, 'mensaje_codigo_ciudadano', lambda destino, codigo, minutos: (destino, codigo))
     monkeypatch.setattr(router, 'enviar', enviados.append)
 
-    # Misma respuesta exista o no la cuenta; solo la cuenta real recibe correo.
-    assert client.post('/ciudadano/recuperar', json={'correo': 'nadie@example.com'}).status_code == 202
+    # Un correo sin cuenta recibe un aviso claro y no se envía nada.
+    r = client.post('/ciudadano/recuperar', json={'correo': 'nadie@example.com'})
+    assert r.status_code == 404 and 'No existe una cuenta' in r.json()['detail']
     assert enviados == []
     assert client.post('/ciudadano/recuperar', json={'correo': correo}).status_code == 202
     destino, codigo = enviados[-1]

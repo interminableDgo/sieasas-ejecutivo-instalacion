@@ -21,7 +21,7 @@ router = APIRouter(prefix='/ciudadano', tags=['Ciudadano'])
 DIAS_SESION = 30
 MINUTOS_CODIGO = 15
 INTENTOS_CODIGO = 5
-GENERICO = {'message': 'Si el correo corresponde a una cuenta, te enviamos un código para recuperar el acceso.'}
+ENVIADO = {'message': 'Te enviamos un código a tu correo para recuperar el acceso.'}
 
 
 class Credenciales(BaseModel):
@@ -106,7 +106,7 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Sess
 
 
 def enviar_codigo(correo):
-    """Genera y envía el código después de responder, para no revelar si la cuenta existe."""
+    """Genera y envía el código después de responder, para no hacer esperar al usuario."""
     with SessionLocal() as db:
         cuenta_id = db.execute(text('SELECT id FROM ciudadano_cuenta WHERE correo=:c'), {'c': correo}).scalar()
         if not cuenta_id:
@@ -129,9 +129,10 @@ def recuperar(data: Correo, request: Request, tasks: BackgroundTasks, db: Sessio
     limit_request(db, request, 'ciudadano-recuperar', correo)
     if not smtp_configurado():
         raise HTTPException(503, 'El servicio de recuperación por correo no está disponible.')
-    # Misma respuesta exista o no la cuenta.
+    if not db.execute(text('SELECT 1 FROM ciudadano_cuenta WHERE correo=:c'), {'c': correo}).scalar():
+        raise HTTPException(404, 'No existe una cuenta con ese correo. Revisa que esté bien escrito o regístrate.')
     tasks.add_task(enviar_codigo, correo)
-    return GENERICO
+    return ENVIADO
 
 
 @router.post('/restablecer')
