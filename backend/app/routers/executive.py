@@ -24,14 +24,15 @@ CATALOGS = {'apoyos':'Cat_TipoApoyo','dependencias':'Cat_Dependencias','grupos':
 def catalogs(user=Depends(current_user),db:Session=Depends(get_db)):
     result={key:svc.query_rows(db,f'SELECT id,descripcion AS nombre FROM `{table}` WHERE is_active=1 ORDER BY descripcion',{})
       for key,table in CATALOGS.items()}
-    result['municipios']=svc.query_rows(db,'SELECT id,nom_mun AS nombre,cvegeo AS clave_inegi FROM INEGI_Cat_Municipios WHERE entidad_id=:eid ORDER BY nom_mun',{'eid':user['entidad_id']})
+    # cve_mun 999 («No especificado») solo se usa como municipio de nacimiento desde la app del Ciudadano.
+    result['municipios']=svc.query_rows(db,"SELECT id,nom_mun AS nombre,cvegeo AS clave_inegi FROM INEGI_Cat_Municipios WHERE entidad_id=:eid AND cve_mun<>'999' ORDER BY nom_mun",{'eid':user['entidad_id']})
     result['entidades']=svc.query_rows(db,'SELECT id,nom_ent AS nombre FROM INEGI_Cat_Entidades ORDER BY nom_ent',{})
     return result
 
 
 @router.get('/municipios-nacimiento')
 def birth_municipalities(entidad_id:int=Query(gt=0),user=Depends(current_user),db:Session=Depends(get_db)):
-    return {'items':svc.query_rows(db,'SELECT id,nom_mun AS nombre FROM INEGI_Cat_Municipios WHERE entidad_id=:eid ORDER BY nom_mun',{'eid':entidad_id})}
+    return {'items':svc.query_rows(db,"SELECT id,nom_mun AS nombre FROM INEGI_Cat_Municipios WHERE entidad_id=:eid AND cve_mun<>'999' ORDER BY nom_mun",{'eid':entidad_id})}
 
 
 @router.get('/colonias')

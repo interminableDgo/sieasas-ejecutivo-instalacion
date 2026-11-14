@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import health, auth, executive
+from app.routers import health, auth, executive, ciudadano
 
 app = FastAPI(
     title="SGSC Salud API",
@@ -28,6 +28,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(executive.router)
+app.include_router(ciudadano.router)
 
 
 @app.exception_handler(SQLAlchemyError)
