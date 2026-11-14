@@ -1,22 +1,27 @@
 """API del módulo Ciudadano: cuenta propia, perfil y solicitudes de esa cuenta."""
+import hmac
 import json
+import logging
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.security import bearer, digest, hasher, limit_request, now, verify_password
 from app.services import ciudadano_service as svc
+from app.services.auth_service import enviar, mensaje_codigo_ciudadano, smtp_configurado
 
 router = APIRouter(prefix='/ciudadano', tags=['Ciudadano'])
 DIAS_SESION = 30
-GENERICO = {'message': 'Si el correo corresponde a una cuenta, recibirás instrucciones para recuperar el acceso.'}
+MINUTOS_CODIGO = 15
+INTENTOS_CODIGO = 5
+GENERICO = {'message': 'Si el correo corresponde a una cuenta, te enviamos un código para recuperar el acceso.'}
 
 
 class Credenciales(BaseModel):
@@ -30,6 +35,15 @@ class Registro(Credenciales):
 
 class Correo(BaseModel):
     correo: EmailStr = Field(max_length=180)
+
+
+class Restablecer(Correo):
+    codigo: str = Field(pattern=r'^\d{6}$')
+    contrasena: str = Field(min_length=15, max_length=128)
+
+
+def hash_codigo(cuenta_id, codigo):
+    return digest(f'{cuenta_id}:{codigo}')
 
 
 def emitir_sesion(db, cuenta_id):
@@ -91,12 +105,57 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Sess
         db.commit()
 
 
+def enviar_codigo(correo):
+    """Genera y envía el código después de responder, para no revelar si la cuenta existe."""
+    with SessionLocal() as db:
+        cuenta_id = db.execute(text('SELECT id FROM ciudadano_cuenta WHERE correo=:c'), {'c': correo}).scalar()
+        if not cuenta_id:
+            return
+        codigo = f'{secrets.randbelow(10**6):06d}'
+        db.execute(text('''INSERT INTO ciudadano_recuperacion (cuenta_id,codigo_hash,expira,intentos)
+          VALUES (:c,:h,:e,0) ON DUPLICATE KEY UPDATE codigo_hash=:h, expira=:e, intentos=0'''),
+                   {'c': cuenta_id, 'h': hash_codigo(cuenta_id, codigo), 'e': now() + timedelta(minutes=MINUTOS_CODIGO)})
+        try:
+            enviar(mensaje_codigo_ciudadano(correo, codigo, MINUTOS_CODIGO))
+            db.commit()
+        except Exception:
+            db.rollback()
+            logging.getLogger(__name__).error('No se pudo entregar un código de recuperación del Ciudadano; revisar SMTP.')
+
+
 @router.post('/recuperar', status_code=202)
-def recuperar(data: Correo, request: Request, db: Session = Depends(get_db)):
-    # Misma respuesta exista o no la cuenta. El envío del correo de recuperación del
-    # Ciudadano aún no está habilitado.
-    limit_request(db, request, 'ciudadano-recuperar', normalizar(data.correo))
+def recuperar(data: Correo, request: Request, tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    correo = normalizar(data.correo)
+    limit_request(db, request, 'ciudadano-recuperar', correo)
+    if not smtp_configurado():
+        raise HTTPException(503, 'El servicio de recuperación por correo no está disponible.')
+    # Misma respuesta exista o no la cuenta.
+    tasks.add_task(enviar_codigo, correo)
     return GENERICO
+
+
+@router.post('/restablecer')
+def restablecer(data: Restablecer, request: Request, db: Session = Depends(get_db)):
+    correo = normalizar(data.correo)
+    limit_request(db, request, 'ciudadano-restablecer', correo)
+    invalido = HTTPException(400, 'El código no es correcto o ya venció. Solicita uno nuevo.')
+    fila = db.execute(text('''SELECT r.cuenta_id,r.codigo_hash,r.expira,r.intentos FROM ciudadano_recuperacion r
+      JOIN ciudadano_cuenta c ON c.id=r.cuenta_id WHERE c.correo=:c FOR UPDATE'''), {'c': correo}).mappings().first()
+    if not fila or fila['expira'] <= now() or fila['intentos'] >= INTENTOS_CODIGO:
+        db.rollback()
+        raise invalido
+    if not hmac.compare_digest(fila['codigo_hash'], hash_codigo(fila['cuenta_id'], data.codigo)):
+        db.execute(text('UPDATE ciudadano_recuperacion SET intentos=intentos+1 WHERE cuenta_id=:c'), {'c': fila['cuenta_id']})
+        db.commit()
+        raise invalido
+    db.execute(text('UPDATE ciudadano_cuenta SET password_hash=:p WHERE id=:c'),
+               {'p': hasher.hash(data.contrasena), 'c': fila['cuenta_id']})
+    db.execute(text('DELETE FROM ciudadano_recuperacion WHERE cuenta_id=:c'), {'c': fila['cuenta_id']})
+    # Cualquier sesión abierta con la contraseña anterior se cierra.
+    db.execute(text('DELETE FROM ciudadano_sesion WHERE cuenta_id=:c'), {'c': fila['cuenta_id']})
+    token = emitir_sesion(db, fila['cuenta_id'])
+    db.commit()
+    return {'token': token, 'correo': correo}
 
 
 @router.get('/perfil')

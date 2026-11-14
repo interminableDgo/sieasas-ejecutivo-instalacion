@@ -204,3 +204,91 @@ def test_request_validation(live):
     sin_curp = solicitud(beneficiario={'esTitular': False, 'nombres': 'X', 'primerApellido': 'Y', 'relacion': 'Tío', 'curp': ''})
     assert client.post('/ciudadano/solicitudes', headers=auth,
                        json={'idempotencia': str(uuid.uuid4()), 'solicitud': sin_curp}).status_code == 422
+
+
+def test_netlify_web_version_is_allowed_by_cors():
+    with TestClient(app) as client:
+        r = client.options('/ciudadano/login', headers={'Origin': 'https://sieasas-ciudadano.netlify.app',
+                                                         'Access-Control-Request-Method': 'POST'})
+        assert r.headers.get('access-control-allow-origin') == 'https://sieasas-ciudadano.netlify.app'
+        otro = client.options('/ciudadano/login', headers={'Origin': 'https://ejemplo-malicioso.com',
+                                                            'Access-Control-Request-Method': 'POST'})
+        assert 'access-control-allow-origin' not in otro.headers
+
+
+def test_password_recovery_with_emailed_code(live, monkeypatch):
+    from contextlib import contextmanager
+    from app.routers import ciudadano as router
+    client, db = live
+    correo, auth = cuenta(client)
+    enviados = []
+
+    @contextmanager
+    def misma_sesion():
+        yield db
+    monkeypatch.setattr(router, 'SessionLocal', misma_sesion)
+    monkeypatch.setattr(router, 'smtp_configurado', lambda: True)
+    monkeypatch.setattr(router, 'mensaje_codigo_ciudadano', lambda destino, codigo, minutos: (destino, codigo))
+    monkeypatch.setattr(router, 'enviar', enviados.append)
+
+    # Misma respuesta exista o no la cuenta; solo la cuenta real recibe correo.
+    assert client.post('/ciudadano/recuperar', json={'correo': 'nadie@example.com'}).status_code == 202
+    assert enviados == []
+    assert client.post('/ciudadano/recuperar', json={'correo': correo}).status_code == 202
+    destino, codigo = enviados[-1]
+    assert destino == correo and len(codigo) == 6 and codigo.isdigit()
+
+    nueva = 'Otra frase de prueba distinta 2026'
+    incorrecto = '000000' if codigo != '000000' else '111111'
+    r = client.post('/ciudadano/restablecer', json={'correo': correo, 'codigo': incorrecto, 'contrasena': nueva})
+    assert r.status_code == 400
+    r = client.post('/ciudadano/restablecer', json={'correo': correo, 'codigo': codigo, 'contrasena': nueva})
+    assert r.status_code == 200, r.text
+    # La sesión anterior se cierra; la nueva contraseña funciona y el código ya no sirve.
+    assert client.get('/ciudadano/perfil', headers=auth).status_code == 401
+    assert client.post('/ciudadano/login', json={'correo': correo, 'contrasena': nueva}).status_code == 200
+    assert client.post('/ciudadano/login', json={'correo': correo, 'contrasena': 'Una frase de prueba 2026'}).status_code == 401
+    assert client.post('/ciudadano/restablecer', json={'correo': correo, 'codigo': codigo, 'contrasena': nueva}).status_code == 400
+
+
+def test_recovery_code_is_blocked_after_failed_attempts(live, monkeypatch):
+    from contextlib import contextmanager
+    from app.routers import ciudadano as router
+    client, db = live
+    correo, _ = cuenta(client)
+    enviados = []
+
+    @contextmanager
+    def misma_sesion():
+        yield db
+    monkeypatch.setattr(router, 'SessionLocal', misma_sesion)
+    monkeypatch.setattr(router, 'smtp_configurado', lambda: True)
+    monkeypatch.setattr(router, 'mensaje_codigo_ciudadano', lambda destino, codigo, minutos: (destino, codigo))
+    monkeypatch.setattr(router, 'enviar', enviados.append)
+    monkeypatch.setattr(router, 'limit_request', lambda *a, **k: None)
+    client.post('/ciudadano/recuperar', json={'correo': correo})
+    codigo = enviados[-1][1]
+    malo = '000000' if codigo != '000000' else '111111'
+    for _ in range(router.INTENTOS_CODIGO):
+        client.post('/ciudadano/restablecer', json={'correo': correo, 'codigo': malo, 'contrasena': 'x' * 20})
+    # Agotados los intentos, ni el código correcto funciona.
+    assert client.post('/ciudadano/restablecer', json={'correo': correo, 'codigo': codigo, 'contrasena': 'x' * 20}).status_code == 400
+
+
+def test_recovery_needs_mail_service(monkeypatch):
+    from app.routers import ciudadano as router
+    monkeypatch.setattr(router, 'smtp_configurado', lambda: False)
+    if os.getenv('RUN_DB_TESTS') != '1':
+        pytest.skip('Set RUN_DB_TESTS=1 to run transaction-isolated MySQL tests.')
+    with TestClient(app) as client:
+        assert client.post('/ciudadano/recuperar', json={'correo': 'nadie@example.com'}).status_code == 503
+
+
+def test_code_email_contains_code(monkeypatch):
+    from app.services.auth_service import mensaje_codigo_ciudadano
+    monkeypatch.setenv('SMTP_HOST', 'smtp.example.com')
+    monkeypatch.setenv('SMTP_FROM', 'SIESAS <no-responder@example.com>')
+    mensaje = mensaje_codigo_ciudadano('ana@example.com', '123456', 15)
+    assert mensaje['To'] == 'ana@example.com' and '123456' in mensaje['Subject']
+    assert '123456' in mensaje.get_body(('plain',)).get_content()
+    assert '123456' in mensaje.get_body(('html',)).get_content()

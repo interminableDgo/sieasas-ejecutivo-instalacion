@@ -44,7 +44,54 @@ def build_reset_message(address, token):
 
 
 def send_reset(address, token):
-    message = build_reset_message(address, token)
+    enviar(build_reset_message(address, token))
+
+
+def smtp_configurado():
+    return bool(os.getenv('SMTP_HOST') and os.getenv('SMTP_FROM'))
+
+
+def mensaje_codigo_ciudadano(address, codigo, minutos):
+    """Correo con el código para restablecer la contraseña de la app del Ciudadano."""
+    if not smtp_configurado():
+        raise HTTPException(503, 'El servicio de recuperación por correo no está disponible.')
+    message = EmailMessage()
+    message['Subject'] = f'{codigo} es tu código para recuperar tu cuenta de SIEASAS'
+    display, sender = parseaddr(os.environ['SMTP_FROM'])
+    message['From'] = formataddr((display or os.getenv('SMTP_FROM_NAME', 'SIESAS · Gobierno de Nuevo León'), sender))
+    message['To'] = address
+    message['Date'] = formatdate(localtime=False)
+    message['Message-ID'] = make_msgid(domain=sender.rsplit('@', 1)[-1])
+    message.set_content(f'''SIEASAS · Secretaría de Salud
+Gobierno de Nuevo León
+
+RECUPERA TU CUENTA
+
+Recibimos una solicitud para restablecer la contraseña de tu cuenta de la app SIEASAS Ciudadano.
+Escribe este código en la app:
+
+{codigo}
+
+El código vence en {minutos} minutos y solo se puede usar una vez.
+
+Si no solicitaste este cambio, ignora este correo. Tu contraseña permanecerá igual.
+
+Mensaje automático. Nunca te pediremos tu contraseña por correo.
+''')
+    message.add_alternative(f'''<!doctype html><html lang="es"><body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2a37">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:12px;padding:28px">
+<tr><td style="font-size:12px;letter-spacing:.08em;color:#ff8200;font-weight:bold">SIEASAS · CIUDADANO</td></tr>
+<tr><td style="padding-top:8px;font-size:22px;font-weight:bold">Recupera tu cuenta</td></tr>
+<tr><td style="padding-top:12px;font-size:15px;line-height:1.5">Recibimos una solicitud para restablecer la contraseña de tu cuenta. Escribe este código en la app:</td></tr>
+<tr><td align="center" style="padding:20px 0"><span style="display:inline-block;font-size:32px;letter-spacing:8px;font-weight:bold;background:#f4f6f8;border-radius:8px;padding:12px 20px">{codigo}</span></td></tr>
+<tr><td style="font-size:14px;line-height:1.5;color:#4b5563">El código vence en {minutos} minutos y solo se puede usar una vez. Si no solicitaste este cambio, ignora este correo; tu contraseña permanecerá igual.</td></tr>
+<tr><td style="padding-top:20px;font-size:12px;color:#6b7280">Secretaría de Salud · Gobierno de Nuevo León. Mensaje automático: nunca te pediremos tu contraseña por correo.</td></tr>
+</table></td></tr></table></body></html>''', subtype='html')
+    return message
+
+
+def enviar(message):
     secure = os.getenv('SMTP_SSL', 'false').lower() == 'true'
     client = smtplib.SMTP_SSL if secure else smtplib.SMTP
     kwargs = {'timeout': 15}
@@ -56,3 +103,4 @@ def send_reset(address, token):
         if os.getenv('SMTP_USER'):
             smtp.login(os.environ['SMTP_USER'], os.environ.get('SMTP_PASSWORD', ''))
         smtp.send_message(message)
+

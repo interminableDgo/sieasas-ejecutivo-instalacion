@@ -158,7 +158,7 @@ def test_empty_data_scope_registration_exports_and_logout(live):
       s.sol_calle,s.sol_colonia,s.sol_colonia_id,s.sol_codigopostal,s.sol_municipioid
       FROM Tbl_SolicitudesApoyo sa JOIN Tbl_Beneficiarios b ON b.ben_id=sa.solapoyo_beneficiarioid
       JOIN Tbl_Solicitantes s ON s.sol_id=sa.solapoyo_solicitanteid WHERE sa.solapoyo_id=:sid'''),{'sid':sid}).mappings().one()
-    assert (stored['ben_dom_colonia'],stored['ben_dom_colonia_id'],stored['ben_dom_cp'])==('Colonia temporal',home,'64999')
+    assert (stored['ben_dom_colonia'],stored['ben_dom_colonia_id'],stored['ben_dom_cp'])==(home,home,'64999')
     assert stored['ben_estsocioeco_conquienvive']==cats['con_quien_vive'][0]['nombre']
     assert (stored['sol_calle'],stored['sol_colonia_id'],stored['sol_codigopostal'],stored['sol_municipioid'])==('Temporal',home,'64999',mid)
     wrong=client.post('/ejecutivo/solicitudes',json={**data,'beneficiario':{**data['beneficiario'],'colonia_id':away},

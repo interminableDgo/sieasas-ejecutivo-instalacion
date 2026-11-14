@@ -44,3 +44,12 @@ INSERT INTO INEGI_Cat_Municipios (entidad_id,cvegeo,cve_ent,nom_ent,nom_abr,cve_
  SELECT e.id,CONCAT(e.cve_ent,'999'),e.cve_ent,e.nom_ent,e.nom_abr,'999','No especificado','0000','','','',''
  FROM INEGI_Cat_Entidades e
  WHERE NOT EXISTS (SELECT 1 FROM INEGI_Cat_Municipios m WHERE m.entidad_id=e.id AND m.cve_mun='999');
+
+-- Recuperación de contraseña: un código de 6 dígitos por cuenta, con vencimiento e intentos.
+CREATE TABLE IF NOT EXISTS ciudadano_recuperacion (
+ cuenta_id INT PRIMARY KEY,
+ codigo_hash CHAR(64) NOT NULL,
+ expira DATETIME NOT NULL,
+ intentos INT NOT NULL DEFAULT 0,
+ FOREIGN KEY (cuenta_id) REFERENCES ciudadano_cuenta(id) ON DELETE CASCADE
+) ENGINE=InnoDB

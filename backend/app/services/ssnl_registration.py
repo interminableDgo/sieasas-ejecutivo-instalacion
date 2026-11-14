@@ -122,9 +122,11 @@ def colony(db,cid,mid):
 
 
 def beneficiary_address(db,bid):
-    return db.execute(text('''SELECT ben_dom_calle AS calle,ben_dom_num AS numero,ben_dom_colonia AS colonia,
-      ben_dom_colonia_id AS colonia_id,ben_dom_cp AS codigo_postal,ben_dom_municipio AS municipio_id
-      FROM Tbl_Beneficiarios WHERE ben_id=:id'''),{'id':bid}).mappings().first()
+    # ben_dom_colonia es numérica en SSNL: el nombre sale del catálogo (o de la clave, en expedientes antiguos).
+    return db.execute(text('''SELECT b.ben_dom_calle AS calle,b.ben_dom_num AS numero,
+      COALESCE(c.nombre,CAST(b.ben_dom_colonia AS CHAR)) AS colonia,
+      b.ben_dom_colonia_id AS colonia_id,b.ben_dom_cp AS codigo_postal,b.ben_dom_municipio AS municipio_id
+      FROM Tbl_Beneficiarios b LEFT JOIN Cat_Colonias c ON c.id=b.ben_dom_colonia_id WHERE b.ben_id=:id'''),{'id':bid}).mappings().first()
 
 
 def municipality(db,mid,eid=None):
@@ -174,7 +176,8 @@ def create_request(data,user,db):
           'area_estudio':catalog_value(db,'Cat_AreasEstudio',b.area_estudio_id),
           'profesion':catalog_value(db,'Cat_Ocupaciones',b.ocupacion_id),
           'fuente_ingresos':catalog_value(db,'Cat_FuentesIngreso',b.fuente_ingresos_id),
-          'colonia':home['nombre'],'codigo_postal':home['codigo_postal']}
+          # ben_dom_colonia es INT en SSNL: guarda la clave del catálogo, igual que ben_dom_colonia_id.
+          'colonia':b.colonia_id,'codigo_postal':home['codigo_postal']}
     applicant_home={}
     if data.solicitante:
         a=data.solicitante
