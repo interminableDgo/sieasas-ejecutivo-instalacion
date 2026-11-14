@@ -24,7 +24,7 @@ Prueba realizada el 10 de noviembre de 2026 con 4 participantes. Cada cambio ind
 | 5 | El mapa muestra el nombre de los municipios que caben en pantalla y más nombres al acercar (pellizcar o botones + / −). | ![](tarea1/antes/04_mapa.jpg) | ![](tarea1/despues/04_mapa_con_nombres.jpg) ![](tarea1/despues/05_mapa_zoom.jpg) |
 | 6 | El filtro de municipio muestra cuántas solicitudes tiene cada uno y se ordena por «Más solicitudes» o «A–Z». | ![](tarea1/antes/07_filtro_municipio.jpg) | ![](tarea1/despues/06_filtro_municipio_conteos.jpg) |
 | 7 | «Comparar meses o años» pasó a la parte de tendencia; se quitó «Ámbito estatal». | ![](tarea1/antes/01_inicio_total.jpg) | ![](tarea1/despues/01_resumen.jpg) |
-| 8 | El aviso «Filtro quitado» se quita solo a los 3 segundos (antes no se quitaba) y ya no tapa «Exportar», que subió; es semitransparente, con ícono y «Deshacer» en naranja. | — | ![](tarea1/despues/07_aviso_arriba.jpg) |
+| 8 | El aviso «Filtro quitado» se quita solo a los 3 segundos (antes no se quitaba) y ya no tapa «Exportar», que subió; es semitransparente, con ícono y «Deshacer» en naranja. | — | ![](tarea1/despues/07_aviso.jpg) |
 
 ---
 

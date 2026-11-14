@@ -121,6 +121,8 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
           leading: StatusDaysIcon(
             status: '${o['estatus'] ?? ''}',
             registeredAt: o['fecha_registro'],
+            // As in the table: no bare number that reads like a folio.
+            showDays: false,
           ),
           title: Text.rich(
             TextSpan(
