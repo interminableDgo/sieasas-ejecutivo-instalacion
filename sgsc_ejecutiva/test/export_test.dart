@@ -78,7 +78,7 @@ void main() {
     await tester.tap(find.widgetWithText(ChoiceChip, 'Treemap').last);
     await tester.pumpAndSettle();
     expect(backend.requests.length, requestCount);
-    await tester.tap(find.text('Exportar reporte'));
+    await tester.tap(find.byKey(const ValueKey('export-button')));
     await tester.pumpAndSettle();
     expect(find.textContaining('2024-02-01 al 2024-02-29'), findsOneWidget);
     expect(

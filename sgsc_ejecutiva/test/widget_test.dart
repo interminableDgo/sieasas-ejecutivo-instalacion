@@ -163,10 +163,12 @@ void main() {
     expect(find.text('Aún no hay solicitudes'), findsOneWidget);
     expect(find.text('Registrar primera solicitud'), findsOneWidget);
     final export = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('Exportar reporte'),
-        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
-      ),
+      find
+          .ancestor(
+            of: find.text('Exportar reporte'),
+            matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+          )
+          .first,
     );
     expect(export.onPressed, isNull);
     expect(tester.takeException(), isNull);

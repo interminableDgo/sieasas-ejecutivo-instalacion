@@ -144,6 +144,13 @@ class _RequestSearchFieldState extends State<RequestSearchField> {
                 o['beneficiario'],
                 o['folio'],
                 o['estatus'],
+                // Written out, as in the table's «Antigüedad» column.
+                if (StatusDaysIcon.ageLabel(
+                      '${o['estatus'] ?? ''}',
+                      o['fecha_registro'],
+                    )
+                    case final age when age != '—')
+                  'Antigüedad: $age',
               ].where((v) => v != null && '$v'.isNotEmpty).join(' · '),
               if (o['solicitante'] != null &&
                   o['solicitante'] != o['beneficiario'])

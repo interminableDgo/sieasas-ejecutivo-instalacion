@@ -106,26 +106,33 @@ void main() {
     await tester.enterText(field, 'jose');
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
-    // Each suggestion is one request with who asked for it and what tells
-    // it apart.
+    // Each suggestion leads with what tells it apart (type of support and
+    // date), then who and which request.
+    for (final (type, date) in [
+      ('Medicamento', '20/10/2026'),
+      ('Vacunación', '02/09/2026'),
+    ]) {
+      expect(
+        find.textContaining('$type  $date', findRichText: true),
+        findsOneWidget,
+      );
+    }
+    // Age written out, as in the table (it depends on today's date).
     expect(
-      find.text(
-        'Solicitó: Ana Núñez\nSolicitud #9 · Medicamento · 20/10/2026 · Recibido',
+      find.textContaining(
+        RegExp(
+          r'^José Pérez · Solicitud #9 · Recibido · Antigüedad: \d+ días\nSolicitó: Ana Núñez$',
+        ),
       ),
       findsOneWidget,
     );
     expect(
-      find.text(
-        'Solicitó: Ana Núñez\nSolicitud #14 · Vacunación · 02/09/2026 · Resuelto',
-      ),
+      find.textContaining('José Pérez · Solicitud #14 · Resuelto'),
       findsOneWidget,
     );
     expect(find.text('Ver las 7 solicitudes de José Pérez'), findsOneWidget);
     expect(find.text('Ver los 7 resultados de «jose»'), findsOneWidget);
-    expect(
-      find.text('Agrega el tipo de apoyo, la fecha o el folio para afinar.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('7 solicitudes coinciden'), findsOneWidget);
     await screenshot(tester, 'busqueda-sugerencias');
 
     // Choosing a person shows all of their requests in the table.
@@ -143,9 +150,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
     await tester.tap(
-      find.text(
-        'Solicitó: Ana Núñez\nSolicitud #14 · Vacunación · 02/09/2026 · Resuelto',
-      ),
+      find.textContaining('José Pérez · Solicitud #14 · Resuelto'),
     );
     await tester.pumpAndSettle();
     expect(requests.last.path, '/ejecutivo/solicitudes/14');

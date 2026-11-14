@@ -378,7 +378,7 @@ void main() {
   ) async {
     await open(tester);
     expect(
-      find.textContaining('400 solicitudes totales', findRichText: true),
+      find.textContaining('400 totales en Nuevo León', findRichText: true),
       findsOneWidget,
     );
     final breakdown = tester.widget<RichText>(
@@ -523,7 +523,14 @@ void main() {
     ]);
     await tester.tap(applyButton());
     await tester.pumpAndSettle();
-    expect(find.text('Filtros (4)'), findsOneWidget);
+    // «Filtros» with the count in a badge.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('filters-button')),
+        matching: find.text('4'),
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(InputChip), findsNWidgets(3));
     expect(find.text('Ver todos (4)'), findsOneWidget);
     expect(find.byType(ListView), findsNothing, reason: 'no horizontal list');
@@ -617,7 +624,7 @@ void main() {
     await tick(tester, 'Tipo de apoyo', ['Traslado', 'Estudio']);
     await tester.tap(applyButton());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Exportar reporte'));
+    await tester.tap(find.byKey(const ValueKey('export-button')));
     await settle(tester);
     expect(find.text('•  Tipo de apoyo: Traslado, Estudio'), findsOneWidget);
     expect(
@@ -686,7 +693,7 @@ void main() {
         await settle(tester);
         await tester.tap(find.byTooltip('Cerrar'));
         await settle(tester);
-        await tester.tap(find.text('Exportar reporte'));
+        await tester.tap(find.byKey(const ValueKey('export-button')));
         await settle(tester);
         fits(find.byType(BottomSheet));
         expect(
@@ -765,7 +772,7 @@ void main() {
       await settle(tester);
       await tester.tap(find.byTooltip('Cerrar'));
       await settle(tester);
-      await tester.tap(find.text('Exportar reporte'));
+      await tester.tap(find.byKey(const ValueKey('export-button')));
       await settle(tester);
       expect(tester.takeException(), isNull);
     },
