@@ -10,6 +10,7 @@ import '../../widgets/executive_charts.dart';
 import '../../widgets/export_sheet.dart';
 import '../../widgets/filter_sheet.dart';
 import '../../widgets/period_comparison.dart';
+import '../../widgets/request_search.dart';
 import '../solicitudes/nueva_solicitud_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -37,8 +38,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String screen = 'dashboard';
   String? error, message;
   bool loading = true, exporting = false;
+  String supportView = 'Dona', groupView = 'Dona';
+  static const chartCodes = {
+    'Dona': 'donut',
+    'Barras': 'bars',
+    'Apilada': 'stacked',
+    'Treemap': 'treemap',
+  };
   bool showComparison = false;
-  int page = 0, total = 0, generation = 0;
+  int page = 0, total = 0, generation = 0, rowsGeneration = 0;
+
+  /// The panel has two parts: indicators ('resumen') and the list of
+  /// requests ('solicitudes'). Separating them keeps the summary short enough
+  /// to scroll through, and makes clear that the search finds requests.
+  String tab = 'resumen';
+
+  /// Municipalities card: ranked list (answers "which has more") or map.
+  String municipalityView = 'Lista';
+
+  /// Text of the table search; it narrows only the table, not the charts.
+  String search = '';
+
+  /// Server sort key of each table column, in order. The server sorts, so
+  /// the order covers every page and not only the rows on screen.
+  static const sortKeys = [
+    'estatus',
+    'solicitud',
+    'antiguedad',
+    'fecha',
+    'beneficiario',
+    'solicitante',
+    'municipio',
+    'tipo_apoyo',
+    'remitente',
+  ];
+  int sortColumn = 3; // Newest registrations first.
+  bool sortAscending = false;
+  bool loadingRows = false;
   final Set<String> expanded = {};
   static const topRows = 5;
   @override
@@ -48,12 +84,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   final scroll = ScrollController();
+  // Horizontal scroll of the requests table when its columns do not fit.
+  final tableScroll = ScrollController();
   final topKey = GlobalKey(), barKey = GlobalKey();
   double? barHeight;
 
   @override
   void dispose() {
     scroll.dispose();
+    tableScroll.dispose();
     super.dispose();
   }
 
@@ -82,6 +121,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> load() async {
     final current = ++generation;
+    // A search typed while this loads must not be replaced by older rows.
+    final currentRows = ++rowsGeneration;
     setState(() {
       loading = true;
       error = null;
@@ -90,14 +131,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final Map<String, Object> query = {...filters};
       final results = await Future.wait([
         widget.api.get('/ejecutivo/dashboard', query),
-        widget.api.get('/ejecutivo/solicitudes', {...query, 'page': '$page'}),
+        widget.api.get('/ejecutivo/solicitudes', rowsQuery()),
         if (catalogs == null) widget.api.get('/ejecutivo/catalogos'),
       ]);
       if (!mounted || current != generation) return;
       setState(() {
         summary = results[0];
-        rows = results[1]['items'] as List;
-        total = results[1]['total'] as int;
+        if (currentRows == rowsGeneration) {
+          rows = results[1]['items'] as List;
+          total = results[1]['total'] as int;
+          loadingRows = false;
+        }
         if (results.length > 2) catalogs = results[2];
       });
     } catch (e) {
@@ -110,6 +154,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } finally {
       if (mounted && current == generation) setState(() => loading = false);
     }
+  }
+
+  Map<String, Object> rowsQuery() => {
+    ...filters,
+    'page': '$page',
+    if (search.isNotEmpty) 'q': search,
+    // Age is the registration date read backwards: youngest = newest.
+    'orden': sortKeys[sortColumn] == 'antiguedad'
+        ? 'fecha'
+        : sortKeys[sortColumn],
+    'direccion': (sortAscending != (sortKeys[sortColumn] == 'antiguedad'))
+        ? 'asc'
+        : 'desc',
+  };
+
+  void sortRows(int column, bool ascending) {
+    setState(() {
+      sortColumn = column;
+      sortAscending = ascending;
+    });
+    page = 0;
+    loadRows();
+  }
+
+  /// Reloads only the table (search and pages) so the charts stay put.
+  Future<void> loadRows() async {
+    final current = ++rowsGeneration;
+    setState(() => loadingRows = true);
+    try {
+      final result = await widget.api.get(
+        '/ejecutivo/solicitudes',
+        rowsQuery(),
+      );
+      if (!mounted || current != rowsGeneration) return;
+      setState(() {
+        rows = result['items'] as List;
+        total = result['total'] as int;
+      });
+    } catch (e) {
+      if (!mounted || current != rowsGeneration) return;
+      if (e is ApiException && e.status == 401) {
+        widget.onLogout();
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo consultar la tabla. Intenta de nuevo.'),
+        ),
+      );
+    } finally {
+      if (mounted && current == rowsGeneration) {
+        setState(() => loadingRows = false);
+      }
+    }
+  }
+
+  void searchRows(String text) {
+    search = text;
+    page = 0;
+    loadRows();
+  }
+
+  static String shortDate(Object? value) {
+    final date = DateTime.tryParse('$value');
+    if (date == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year}';
   }
 
   void applyFilters(Filters next, {String? undo}) {
@@ -162,6 +273,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'page': '0',
                 }))['total']
                 as int,
+        optionCounts: (catalog, others) async {
+          final result = await widget.api.get('/ejecutivo/dashboard', {
+            ...others,
+          });
+          return {
+            for (final r in (result[catalog] as List? ?? []))
+              '${r['id']}': r['total'] as num,
+          };
+        },
       ),
     );
     if (result == null ||
@@ -208,9 +328,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ?..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(text),
+          // At the bottom, where the system shows its messages; nothing is
+          // fixed there any more since «Exportar» moved up.
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text)),
+            ],
+          ),
           behavior: SnackBarBehavior.floating,
+          backgroundColor: ink.withValues(alpha: 0.88),
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          // Snack bars with an action stay until dismissed by default; this
+          // one leaves on its own after 3 s.
+          persist: false,
+          duration: const Duration(seconds: 3),
           action: SnackBarAction(
+            textColor: brand,
             label: 'Deshacer',
             onPressed: () {
               if (mounted) applyFilters(previous);
@@ -218,6 +357,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       );
+  }
+
+  /// "Municipio: **Hidalgo**": the value, which is what matters, in bold.
+  TextSpan filterLabelSpan(String key, String id) {
+    final label = filterLabel(key, id);
+    final split = label.indexOf(': ');
+    if (split < 0) return TextSpan(text: label);
+    return TextSpan(
+      children: [
+        TextSpan(
+          text: label.substring(0, split + 2),
+          style: const TextStyle(color: muted),
+        ),
+        TextSpan(
+          text: label.substring(split + 2),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
   }
 
   String filterLabel(String key, String id) {
@@ -231,18 +389,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$key: $id';
   }
 
+  /// "Reporte ejecutivo SIESAS 2026-11-04 15.30.pdf": the date sorts in
+  /// file lists and the time tells apart several exports of the same day.
+  static String reportFileName(String format, DateTime at) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return 'Reporte ejecutivo SIESAS ${at.year}-${two(at.month)}-${two(at.day)} '
+        '${two(at.hour)}.${two(at.minute)}.$format';
+  }
+
   /// Returns null on success, '' if the person cancelled, or the error.
   Future<String?> export(String format) async {
     setState(() => exporting = true);
     try {
-      final bytes = await widget.api.export(format, {...filters});
+      final bytes = await widget.api.export(format, {
+        ...filters,
+        'chart_apoyos': chartCodes[supportView]!,
+        'chart_grupos': chartCodes[groupView]!,
+      });
+      final name = reportFileName(format, DateTime.now());
       final file = XFile.fromData(
         bytes,
-        name: 'SIESAS-ejecutivo.$format',
+        name: name,
         mimeType: format == 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
       if (kIsWeb) {
-        await file.saveTo('SIESAS-ejecutivo.$format');
+        await file.saveTo(name);
       } else if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) {
         if (!mounted) return '';
@@ -250,16 +421,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await SharePlus.instance.share(
           ShareParams(
             files: [file],
-            fileNameOverrides: ['SIESAS-ejecutivo.$format'],
+            fileNameOverrides: [name],
             sharePositionOrigin: box == null
                 ? null
                 : box.localToGlobal(Offset.zero) & box.size,
           ),
         );
       } else {
-        final location = await getSaveLocation(
-          suggestedName: 'SIESAS-ejecutivo.$format',
-        );
+        final location = await getSaveLocation(suggestedName: name);
         if (location == null) return '';
         await file.saveTo(location.path);
       }
@@ -301,6 +470,219 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<dynamic> group(String key) => summary?[key] as List? ?? [];
+
+  /// Requests of the current filters, searchable by beneficiary, applicant
+  /// or registration date.
+  Widget requestsTable() {
+    const cellStyle = TextStyle(fontFamily: 'Mulish', color: ink, fontSize: 11);
+    final pages = (total / 10).ceil();
+    return ExecutiveCard(
+      key: const ValueKey('requests-table-card'),
+      title: 'Detalle de solicitudes',
+      source: 'Solicitudes que cumplen los filtros del panel. La búsqueda considera beneficiario, solicitante, tipo de apoyo, estatus, fecha de registro y folio, sin importar acentos ni mayúsculas. Cada palabra afina el resultado (por ejemplo, «jorge vacunación») y solo afecta a esta tabla.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RequestSearchField(
+            api: widget.api,
+            initial: search,
+            scope: () => {...filters},
+            onSearch: searchRows,
+            onOpen: openDetail,
+          ),
+          SizedBox(
+            height: 4,
+            child: loadingRows ? const LinearProgressIndicator() : null,
+          ),
+          const SizedBox(height: 8),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    search.isEmpty
+                        ? 'No hay solicitudes para mostrar.'
+                        : filters.isEmpty
+                        ? 'No hay solicitudes que coincidan con «$search».'
+                        : 'No hay solicitudes de «$search» con los filtros aplicados.',
+                    style: const TextStyle(color: muted),
+                  ),
+                  // A filter set earlier can hide what is searched: say so
+                  // and offer to search the whole state.
+                  if (search.isNotEmpty && filters.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Notice(
+                      'Estás filtrando por ${filterSummary().skip(1).join('; ')}. '
+                      'Quita los filtros para buscar en todo el estado.',
+                    ),
+                    OutlinedButton.icon(
+                      key: const ValueKey('search-without-filters'),
+                      onPressed: () =>
+                          applyFilters({}, undo: 'Filtros quitados'),
+                      icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                      label: const Text('Buscar sin filtros'),
+                    ),
+                  ],
+                ],
+              ),
+            )
+          else ...[
+            if (search.isNotEmpty)
+              Text(
+                '$total ${total == 1 ? 'resultado' : 'resultados'} para «$search»',
+                style: const TextStyle(fontSize: 12, color: muted),
+              ),
+            // On a phone there is no hover: the meaning of the status icons
+            // and of their number is written here instead of in a tooltip.
+            const StatusLegend(),
+            // The table spans the whole card on wide screens; when its
+            // columns do not fit, long names wrap to two lines and a visible
+            // scrollbar shows there is more to the right.
+            LayoutBuilder(
+              builder: (context, box) => Scrollbar(
+                controller: tableScroll,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: tableScroll,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      sortColumnIndex: sortColumn,
+                      sortAscending: sortAscending,
+                      columnSpacing: 18,
+                      horizontalMargin: 12,
+                      dataRowMaxHeight: 64,
+                      headingTextStyle: cellStyle.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      dataTextStyle: cellStyle,
+                      columns: [
+                        DataColumn(
+                          onSort: sortRows,
+                          tooltip: 'Ordenar por estado',
+                          label: const SizedBox(
+                            width: 44,
+                            child: Center(
+                              child: Text(
+                                'Estado',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        ),
+                        for (final h in [
+                          'Solicitud',
+                          'Antigüedad',
+                          'Fecha de registro',
+                          'Beneficiario',
+                          'Solicitante',
+                          'Municipio',
+                          'Tipo de apoyo',
+                          'Remitente',
+                        ])
+                          DataColumn(
+                            label: Text(h),
+                            tooltip: 'Ordenar por ${h.toLowerCase()}',
+                            onSort: sortRows,
+                          ),
+                      ],
+                      rows: [
+                        for (final r in rows)
+                          DataRow(
+                            cells: [
+                              DataCell(
+                                Center(
+                                  child: StatusDaysIcon(
+                                    status: '${r['estatus']}',
+                                    registeredAt: r['fecha_registro'],
+                                    showDays: false,
+                                  ),
+                                ),
+                                onTap: () =>
+                                    openDetail(r['solicitud_id'] as int),
+                              ),
+                              for (final (value, width) in [
+                                (r['folio'], null),
+                                (
+                                  StatusDaysIcon.ageLabel(
+                                    '${r['estatus']}',
+                                    r['fecha_registro'],
+                                  ),
+                                  null,
+                                ),
+                                (shortDate(r['fecha_registro']), null),
+                                (r['beneficiario'] ?? '', 170.0),
+                                (r['solicitante'] ?? '', 150.0),
+                                (r['municipio'], 130.0),
+                                (r['tipo_apoyo'], 130.0),
+                                (r['dependencia'], 170.0),
+                              ])
+                                DataCell(
+                                  ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: width ?? double.infinity,
+                                    ),
+                                    child: Text(
+                                      '$value',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  onTap: () =>
+                                      openDetail(r['solicitud_id'] as int),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Toca una solicitud para consultar el detalle.',
+              style: TextStyle(fontSize: 11, color: muted),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  tooltip: 'Anterior',
+                  onPressed: page == 0 || loadingRows
+                      ? null
+                      : () {
+                          page--;
+                          loadRows();
+                        },
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Text(
+                  '${page + 1} / $pages',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                IconButton(
+                  tooltip: 'Siguiente',
+                  onPressed: (page + 1) * 10 >= total || loadingRows
+                      ? null
+                      : () {
+                          page++;
+                          loadRows();
+                        },
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget heading(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
     child: Text(
@@ -329,17 +711,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final count = group(dataKey).length;
     if (count <= topRows) return const SizedBox.shrink();
     final open = expanded.contains(dataKey);
-    return TextButton.icon(
-      onPressed: () => setState(
-        () => open ? expanded.remove(dataKey) : expanded.add(dataKey),
+    return CopyExclude(
+      child: TextButton.icon(
+        onPressed: () => setState(
+          () => open ? expanded.remove(dataKey) : expanded.add(dataKey),
+        ),
+        icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 18),
+        label: Text(open ? 'Ver menos' : 'Ver todos ($count)'),
       ),
-      icon: Icon(open ? Icons.expand_less : Icons.expand_more, size: 18),
-      label: Text(open ? 'Ver menos' : 'Ver todos ($count)'),
     );
   }
 
   Widget bars(String title, String dataKey, String filterKey, String source) =>
       ExecutiveCard(
+        copyable: true,
         title: title,
         source: source,
         child: Column(
@@ -354,6 +739,225 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       );
+
+  /// Total and its parts, written as before the usability test (one sentence
+  /// under the total). Only the numbers change: bold and in their status
+  /// colour (green resolved, red closed, amber active, dark grey for «no es
+  /// competencia», which is not an error), so they no longer blend into grey.
+  /// Closing statuses appear only when they have requests.
+  Widget summaryCard() {
+    final s = summary!;
+    num part(String key) => s[key] as num? ?? 0;
+    final notCompetent = part('no_competencia'), cancelled = part('canceladas');
+    final parts = [
+      (
+        'activas',
+        statusTextColor(StatusKind.pending),
+        part('activas'),
+        'activas (incluye pendientes)',
+      ),
+      ('resueltas', statusGreen, part('resueltas'), 'resueltas'),
+      if (notCompetent > 0)
+        (
+          'no_competencia',
+          ink,
+          notCompetent,
+          notCompetent == 1 ? 'no es competencia' : 'no son competencia',
+        ),
+      if (cancelled > 0)
+        (
+          'canceladas',
+          statusRed,
+          cancelled,
+          cancelled == 1 ? 'cerrada o cancelada' : 'cerradas o canceladas',
+        ),
+    ];
+    return ExecutiveCard(
+      copyable: true,
+      key: const ValueKey('summary-card'),
+      title: 'Solicitudes registradas',
+      source: 'Cantidad de solicitudes del estado asignado que cumplen los filtros. No representa personas únicas ni apoyos entregados. Activas incluye todos los estatus que no son Resuelto, Resuelto con observación, Cerrado / Cancelado o No es competencia. Pendientes puede ser una parte de las activas.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The number says its scope: the whole state, or the filtered set.
+          Text.rich(
+            key: const ValueKey('summary-total'),
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '${s['total']}',
+                  style: const TextStyle(fontSize: 42),
+                ),
+                TextSpan(
+                  text: filters.isEmpty
+                      ? ' totales en ${widget.user['entidad'] ?? 'el estado'}'
+                      : (s['total'] as num) == 1
+                      ? ' solicitud filtrada'
+                      : ' solicitudes filtradas',
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ],
+            ),
+            style: const TextStyle(fontWeight: FontWeight.w800, color: salud),
+          ),
+          const SizedBox(height: 10),
+          Text.rich(
+            key: const ValueKey('summary-breakdown'),
+            TextSpan(
+              children: [
+                for (final (i, (_, color, value, label)) in parts.indexed) ...[
+                  if (i > 0) const TextSpan(text: ' · '),
+                  TextSpan(
+                    text: '$value',
+                    semanticsLabel: '$value',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: color),
+                  ),
+                  TextSpan(text: ' $label'),
+                ],
+              ],
+            ),
+            style: const TextStyle(fontSize: 12, color: muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One card answers "where": ranked list first (the answer at a glance),
+  /// map as an alternative view, so the map no longer pushes the list down.
+  Widget municipalityCard() {
+    final hasMap = '${widget.user['clave_inegi']}' == '19';
+    final view = hasMap ? municipalityView : 'Lista';
+    return ExecutiveCard(
+      copyable: true,
+      key: const ValueKey('municipality-card'),
+      title: 'Solicitudes por municipio',
+      source: view == 'Lista'
+          ? 'Municipios ordenados de más a menos solicitudes con los filtros actuales. Toca una barra para aplicar el filtro.'
+          : 'Municipios de Nuevo León coloreados según la cantidad de solicitudes con los filtros actuales. '
+                'Toca un municipio para filtrar y acercar; vuelve a tocarlo para quitarlo. '
+                'Límites municipales: INEGI, Marco Geoestadístico.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasMap)
+            CopyExclude(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Wrap(
+                  key: const ValueKey('municipality-view'),
+                  spacing: 6,
+                  children: [
+                    for (final option in ['Lista', 'Mapa'])
+                      ChoiceChip(
+                        label: Text(option),
+                        selected: view == option,
+                        onSelected: (_) =>
+                            setState(() => municipalityView = option),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          if (view == 'Lista') ...[
+            DataBars(
+              rows: visibleRows('municipios', 'municipio_id'),
+              active: {...?filters['municipio_id']},
+              onSelect: (v) => toggleFilter('municipio_id', v),
+            ),
+            moreToggle('municipios'),
+          ] else
+            MunicipalityMap(
+              key: const ValueKey('municipality-map-card'),
+              rows: group('municipios'),
+              catalog: catalogs?['municipios'] as List? ?? [],
+              active: {...?filters['municipio_id']},
+              activeCount: (filters['municipio_id']?.length ?? 0) == 1
+                  ? summary!['activas'] as num
+                  : null,
+              resolvedCount: (filters['municipio_id']?.length ?? 0) == 1
+                  ? summary!['resueltas'] as num
+                  : null,
+              onFilter: selectMapMunicipality,
+              loading: loading,
+              error: error,
+              onRetry: load,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// No request meets the filters (or none registered yet).
+  Widget emptyCard() => ExecutiveCard(
+    title: filters.isEmpty ? 'Aún no hay solicitudes' : 'Sin resultados',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.inbox_outlined, size: 46, color: muted),
+        const SizedBox(height: 14),
+        Text(
+          filters.isEmpty
+              ? 'Las solicitudes de tu estado aparecerán aquí cuando se registren.'
+              : 'No hay solicitudes que coincidan con los filtros seleccionados.',
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton(
+          onPressed: filters.isEmpty
+              ? () => setState(() => screen = 'new')
+              : clear,
+          child: Text(
+            filters.isEmpty ? 'Registrar primera solicitud' : 'Limpiar filtros',
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// Two parts of the panel, always visible in the pinned bar.
+  Widget tabs() => Padding(
+    padding: const EdgeInsets.only(top: 10, bottom: 8),
+    child: SegmentedButton<String>(
+      key: const ValueKey('panel-tabs'),
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: blueTint,
+        selectedForegroundColor: ink,
+        minimumSize: const Size(0, 44),
+      ),
+      segments: [
+        const ButtonSegment(
+          value: 'resumen',
+          label: Text('Resumen'),
+          icon: Icon(Icons.dashboard_outlined, size: 18),
+        ),
+        ButtonSegment(
+          value: 'solicitudes',
+          label: Text(
+            summary == null
+                ? 'Solicitudes'
+                : 'Solicitudes (${summary!['total']})',
+          ),
+          icon: const Icon(Icons.list_alt_outlined, size: 18),
+        ),
+      ],
+      selected: {tab},
+      onSelectionChanged: (value) => selectTab(value.first),
+    ),
+  );
+
+  void selectTab(String value) {
+    if (value == tab) return;
+    setState(() => tab = value);
+    // Each part starts at its top, right under the pinned bar.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final top = topKey.currentContext?.findRenderObject() as RenderBox?;
+      if (!scroll.hasClients || top == null || !top.hasSize) return;
+      final pinned = top.size.height;
+      if (scroll.offset > pinned) scroll.jumpTo(pinned);
+    });
+  }
 
   /// Pinned bar: filter toggle, active filters and a discreet progress line,
   /// so selections never lose sight of what is applied.
@@ -375,24 +979,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          tabs(),
+          if (refreshing)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  'Actualizando…',
+                  style: TextStyle(fontSize: 11, color: muted),
+                ),
+              ),
+            ),
+          // Filter, then export: the two steps of a report, side by side.
+          // The applied filters appear right below, so the person sees what
+          // the report will contain.
           Row(
             children: [
-              const Expanded(
-                child: Text('Ámbito estatal', style: TextStyle(fontSize: 12)),
-              ),
-              if (refreshing)
-                Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    'Actualizando…',
-                    style: TextStyle(fontSize: 11, color: muted),
+              // A button like the app's others (white, grey border, as
+              // «Nueva solicitud»), so it does not look like the orange
+              // filter chips under it; the count sits in an orange badge.
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('filters-button'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onPressed: catalogs == null ? null : openFilters,
+                  icon: const Icon(Icons.tune, size: 18, color: brand),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Filtros'),
+                      if (active.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          constraints: const BoxConstraints(minWidth: 20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: brand,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${active.length}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: ink, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              TextButton.icon(
-                onPressed: catalogs == null ? null : openFilters,
-                icon: const Icon(Icons.tune, size: 16),
-                label: Text(
-                  active.isEmpty ? 'Filtros' : 'Filtros (${active.length})',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  key: const ValueKey('export-button'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onPressed:
+                      summary == null ||
+                          (summary!['total'] as num) == 0 ||
+                          exporting ||
+                          error != null
+                      ? null
+                      : openExport,
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  // Two lines so both fit on a phone: what (and whether
+                  // it is filtered), then the file formats.
+                  label: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        filters.isEmpty
+                            ? 'Exportar reporte'
+                            : 'Exportar filtrado',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                        ),
+                      ),
+                      const Text(
+                        'PDF o Excel',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -405,14 +1091,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
+                // Said once, so the chips read as an active filter and not
+                // as a tag: everything below is limited to them.
+                const Padding(
+                  padding: EdgeInsets.only(right: 2),
+                  child: Text(
+                    'Filtrando por:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: brand,
+                    ),
+                  ),
+                ),
                 for (final f in shown)
                   InputChip(
+                    backgroundColor: brandTint,
+                    side: const BorderSide(color: brand),
+                    deleteIconColor: brand,
                     label: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: chipWidth),
-                      child: Text(
-                        filterLabel(f.key, f.id),
+                      child: Text.rich(
+                        filterLabelSpan(f.key, f.id),
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
+                        style: const TextStyle(fontSize: 12, color: ink),
                       ),
                     ),
                     deleteButtonTooltipMessage: 'Quitar filtro',
@@ -646,23 +1348,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   sliver: SliverList.list(
                     children: [
                       if (message != null) Notice(message!),
-                      if (catalogs != null)
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              setState(() => showComparison = !showComparison),
-                          icon: const Icon(Icons.compare_arrows),
-                          label: Text(
-                            showComparison
-                                ? 'Ocultar comparación'
-                                : 'Comparar meses o años',
-                          ),
-                        ),
-                      if (catalogs != null && showComparison)
-                        PeriodComparison(
-                          api: widget.api,
-                          filters: copyFilters(filters),
-                          selection: comparison,
-                        ),
                       if (error != null) ...[
                         Notice(error!, error: true),
                         OutlinedButton.icon(
@@ -698,301 +1383,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Notice(
                               'Este panel incluye ${summary!['datos_demo']} solicitudes ficticias de prueba, identificadas con folios DEMO-COMP-.',
                             ),
-                          ExecutiveCard(
-                            title: 'Solicitudes registradas',
-                            source: 'Cantidad de solicitudes del estado asignado que cumplen los filtros. No representa personas únicas ni apoyos entregados. Activas incluye todos los estatus que no son Resuelto, Resuelto con observación, Cerrado / Cancelado o No es competencia. Pendientes puede ser una parte de las activas.',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${summary!['total']}',
-                                  style: const TextStyle(
-                                    fontSize: 42,
-                                    fontWeight: FontWeight.w800,
-                                    color: salud,
+                          if (tab == 'resumen') ...[
+                            summaryCard(),
+                            if (!hasData) emptyCard(),
+                            // Shown even without data: the map keeps "Quitar
+                            // municipio" when a filter leaves no requests.
+                            ...[
+                              municipalityCard(),
+                              ExecutiveCard(
+                                copyable: true,
+                                title: 'Apoyos solicitados',
+                                source: 'Se grafican los cinco tipos más frecuentes; las demás categorías se indican por separado. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
+                                child: CategoryPieChart(
+                                  selectedView: supportView,
+                                  onViewChanged: (value) =>
+                                      setState(() => supportView = value),
+                                  rows: group('apoyos'),
+                                  total: summary!['total'] as num,
+                                  active: {...?filters['tipo_apoyo_id']},
+                                  onSelect: (id) =>
+                                      toggleFilter('tipo_apoyo_id', id),
+                                ),
+                              ),
+                              ExecutiveCard(
+                                copyable: true,
+                                title: 'Clasificación por grupo vulnerable',
+                                source: 'Distribución de solicitudes por grupo vulnerable. Los porcentajes se calculan sobre las solicitudes clasificadas en el catálogo, incluida la categoría Sin información. Un mismo beneficiario puede generar varias solicitudes. Toca una categoría para aplicar el filtro.',
+                                child: CategoryPieChart(
+                                  selectedView: groupView,
+                                  onViewChanged: (value) =>
+                                      setState(() => groupView = value),
+                                  rows: group('grupos'),
+                                  total: group('grupos').fold<num>(
+                                    0,
+                                    (sum, row) => sum + (row['total'] as num),
+                                  ),
+                                  active: {...?filters['grupo_vulnerable_id']},
+                                  onSelect: (id) =>
+                                      toggleFilter('grupo_vulnerable_id', id),
+                                ),
+                              ),
+                              ExecutiveCard(
+                                copyable: true,
+                                title: 'Solicitudes por mes de registro',
+                                source: 'Últimos 12 meses. Solicitudes registradas en cada mes y cuántas están resueltas actualmente. No indica el mes en que se resolvieron.',
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    heading('TENDENCIA · ÚLTIMOS 12 MESES'),
+                                    TrendChart(points: group('tendencia')),
+                                  ],
+                                ),
+                              ),
+                              if (catalogs != null)
+                                OutlinedButton.icon(
+                                  key: const ValueKey('comparison-toggle'),
+                                  onPressed: () => setState(
+                                    () => showComparison = !showComparison,
+                                  ),
+                                  icon: const Icon(Icons.compare_arrows),
+                                  label: Text(
+                                    showComparison
+                                        ? 'Ocultar comparación'
+                                        : 'Comparar meses o años',
                                   ),
                                 ),
-                                const Text(
-                                  'Total según los filtros seleccionados',
-                                  style: TextStyle(fontSize: 12),
+                              if (catalogs != null && showComparison)
+                                PeriodComparison(
+                                  api: widget.api,
+                                  filters: copyFilters(filters),
+                                  selection: comparison,
                                 ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  '${summary!['activas']} activas (incluye pendientes) · ${summary!['resueltas']} resueltas',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: muted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!hasData)
-                            ExecutiveCard(
-                              title: filters.isEmpty
-                                  ? 'Aún no hay solicitudes'
-                                  : 'Sin resultados',
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const Icon(
-                                    Icons.inbox_outlined,
-                                    size: 46,
-                                    color: muted,
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    filters.isEmpty
-                                        ? 'Las solicitudes de tu estado aparecerán aquí cuando se registren.'
-                                        : 'No hay solicitudes que coincidan con los filtros seleccionados.',
-                                  ),
-                                  const SizedBox(height: 16),
-                                  OutlinedButton(
-                                    onPressed: filters.isEmpty
-                                        ? () => setState(() => screen = 'new')
-                                        : clear,
-                                    child: Text(
-                                      filters.isEmpty
-                                          ? 'Registrar primera solicitud'
-                                          : 'Limpiar filtros',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ExecutiveCard(
-                            title: 'Solicitudes por mes de registro',
-                            source: 'Últimos 12 meses. Solicitudes registradas en cada mes y cuántas están resueltas actualmente. No indica el mes en que se resolvieron.',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                heading('TENDENCIA · ÚLTIMOS 12 MESES'),
-                                TrendChart(points: group('tendencia')),
-                              ],
-                            ),
-                          ),
-                          // The map asset covers Nuevo León (INEGI 19).
-                          if ('${widget.user['clave_inegi']}' == '19')
-                            ExecutiveCard(
-                              key: const ValueKey('municipality-map-card'),
-                              title: 'Mapa de solicitudes por municipio',
-                              source:
-                                  'Municipios de Nuevo León coloreados según la cantidad de solicitudes con los filtros actuales. '
-                                  'Toca un municipio para filtrar y acercar; vuelve a tocarlo para quitarlo. '
-                                  'Límites municipales: INEGI, Marco Geoestadístico.',
-                              child: MunicipalityMap(
-                                rows: group('municipios'),
-                                catalog: catalogs?['municipios'] as List? ?? [],
-                                active: {...?filters['municipio_id']},
-                                activeCount:
-                                    (filters['municipio_id']?.length ?? 0) == 1
-                                    ? summary!['activas'] as num
-                                    : null,
-                                resolvedCount:
-                                    (filters['municipio_id']?.length ?? 0) == 1
-                                    ? summary!['resueltas'] as num
-                                    : null,
-                                onFilter: selectMapMunicipality,
-                                loading: loading,
-                                error: error,
-                                onRetry: load,
-                              ),
-                            ),
-                          bars(
-                            'Solicitudes por municipio',
-                            'municipios',
-                            'municipio_id',
-                            'Solicitudes agrupadas por municipio. Toca una barra para aplicar el filtro.',
-                          ),
-                          ExecutiveCard(
-                            title: 'Tipos de apoyo más solicitados',
-                            source: 'Participación de los cinco tipos más frecuentes y el resto agrupado como Otros. Los porcentajes se calculan sobre todas las solicitudes que cumplen los filtros. Toca una categoría para filtrar.',
-                            child: CategoryPieChart(
-                              rows: group('apoyos'),
-                              total: summary!['total'] as num,
-                              active: {...?filters['tipo_apoyo_id']},
-                              onSelect: (id) =>
-                                  toggleFilter('tipo_apoyo_id', id),
-                            ),
-                          ),
-                          ExecutiveCard(
-                            title: 'Solicitudes por grupo vulnerable',
-                            source: 'Distribución de solicitudes por grupo vulnerable. Los porcentajes se calculan sobre las solicitudes clasificadas en el catálogo, incluida la categoría Sin información. Un mismo beneficiario puede generar varias solicitudes. Toca una categoría para aplicar el filtro.',
-                            child: CategoryPieChart(
-                              rows: group('grupos'),
-                              total: group('grupos').fold<num>(
-                                0,
-                                (sum, row) => sum + (row['total'] as num),
-                              ),
-                              active: {...?filters['grupo_vulnerable_id']},
-                              onSelect: (id) =>
-                                  toggleFilter('grupo_vulnerable_id', id),
-                            ),
-                          ),
-                          ExecutiveCard(
-                            title: 'Detalle de solicitudes',
-                            child: rows.isEmpty
-                                ? const Text(
-                                    'No hay solicitudes para mostrar.',
-                                    style: TextStyle(color: muted),
-                                  )
-                                : Column(
-                                    children: [
-                                      SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: DataTable(
-                                          columnSpacing: 20,
-                                          dataRowMaxHeight: 64,
-                                          headingTextStyle: const TextStyle(
-                                            fontFamily: 'Mulish',
-                                            color: ink,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 11,
-                                          ),
-                                          dataTextStyle: const TextStyle(
-                                            fontFamily: 'Mulish',
-                                            color: ink,
-                                            fontSize: 11,
-                                          ),
-                                          columns: [
-                                            const DataColumn(
-                                              label: SizedBox(
-                                                width: 30,
-                                                child: Center(
-                                                  child: Text(
-                                                    'Estado',
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            for (final h in [
-                                              'Solicitud',
-                                              'Municipio',
-                                              'Tipo de apoyo',
-                                              'Remitente',
-                                            ])
-                                              DataColumn(label: Text(h)),
-                                          ],
-                                          rows: rows
-                                              .map(
-                                                (r) => DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Center(
-                                                        child: StatusDaysIcon(
-                                                          status:
-                                                              '${r['estatus']}',
-                                                          registeredAt:
-                                                              r['fecha_registro'],
-                                                        ),
-                                                      ),
-                                                      onTap: () => openDetail(
-                                                        r['solicitud_id']
-                                                            as int,
-                                                      ),
-                                                    ),
-                                                    for (final k in [
-                                                      'folio',
-                                                      'municipio',
-                                                      'tipo_apoyo',
-                                                      'dependencia',
-                                                    ])
-                                                      DataCell(
-                                                        Text('${r[k]}'),
-                                                        onTap: () => openDetail(
-                                                          r['solicitud_id']
-                                                              as int,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              )
-                                              .toList(),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const Text(
-                                        'Toca una solicitud para consultar el detalle.',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: muted,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'Anterior',
-                                            onPressed: page == 0
-                                                ? null
-                                                : () {
-                                                    page--;
-                                                    load();
-                                                  },
-                                            icon: const Icon(
-                                              Icons.chevron_left,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${page + 1} / ${(total / 10).ceil()}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            tooltip: 'Siguiente',
-                                            onPressed: (page + 1) * 10 >= total
-                                                ? null
-                                                : () {
-                                                    page++;
-                                                    load();
-                                                  },
-                                            icon: const Icon(
-                                              Icons.chevron_right,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                          ),
+                            ],
+                          ] else ...[
+                            // Nothing to search when no request meets the filters.
+                            if (hasData) requestsTable() else emptyCard(),
+                          ],
                         ],
                       ),
                     ),
                   ),
               ],
             ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
-          decoration: const BoxDecoration(
-            color: paper,
-            border: Border(top: BorderSide(color: border)),
-          ),
-          // One neutral entry point: format is chosen and confirmed in the
-          // export sheet, so no button looks "selected" by colour alone.
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              OutlinedButton.icon(
-                onPressed: !hasData || loading || exporting || error != null
-                    ? null
-                    : openExport,
-                icon: const Icon(Icons.download, size: 18),
-                label: const Text('Exportar reporte'),
-              ),
-              if (!hasData && !loading && error == null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Disponible cuando haya solicitudes.',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
-                ),
-            ],
           ),
         ),
       ],

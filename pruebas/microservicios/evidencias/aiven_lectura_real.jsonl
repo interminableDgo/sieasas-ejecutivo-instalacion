@@ -1,0 +1,35 @@
+﻿{"rol": "indicadores", "prueba": "dashboard", "sha": "cb6dfd3ef93f306e", "total": 563, "activas": "230", "resueltas": "197", "meses": 12, "municipios": 51, "apoyos": 26}
+{"rol": "indicadores", "prueba": "dashboard_filtrado", "sha": "f36c3420cac7c1ed", "total": 4, "meses": 12}
+{"rol": "indicadores", "prueba": "comparacion", "sha": "9d318617c86807ce", "totales": [102, 102]}
+{"rol": "indicadores", "prueba": "catalogos", "sha": "5cd444dbdaa2fb4f", "catalogos": 17, "municipios": 51}
+{"rol": "indicadores", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}
+{"rol": "detalle", "prueba": "solicitudes", "sha": "0f67898471543f1e", "total": 563, "filas": 10}
+{"rol": "detalle", "prueba": "solicitudes_filtradas_p2", "sha": "0af9ec31dc745607", "total": 204, "filas": 10}
+{"rol": "detalle", "prueba": "sugerencias", "sha": "d8b3f1f8141cf52a", "total": 563, "solicitudes": 5, "personas": 3}
+{"rol": "detalle", "prueba": "detalle_primera", "sha": "ad2be292b7a0381b", "campos": 16}
+{"rol": "detalle", "prueba": "detalle_inexistente", "sha": "6b3c238ebcf1f3c0", "estado": 404}
+{"rol": "detalle", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}
+{"rol": "registro", "prueba": "municipios_nacimiento", "sha": "83eb38e11d7b5e76", "filas": 51}
+{"rol": "registro", "prueba": "colonias", "sha": "eeb85c2675888473", "filas": 0}
+{"rol": "registro", "prueba": "personas_beneficiario", "sha": "61197f563b9e3205", "filas": 30}
+{"rol": "registro", "prueba": "personas_solicitante", "sha": "eda933fbb623cd5a", "filas": 30}
+{"rol": "registro", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}
+{"rol": "reportes", "prueba": "exportar_xlsx", "sha": "7f8b6e24de66e359", "formato_valido": true, "hojas": 6, "kb": 33}
+{"rol": "reportes", "prueba": "exportar_pdf", "sha": "b5bea41b6c623f7c", "formato_valido": true, "kb": 38}
+{"rol": "reportes", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}
+{"rol": "monolito", "prueba": "dashboard", "sha": "cb6dfd3ef93f306e", "total": 563, "activas": "230", "resueltas": "197", "meses": 12, "municipios": 51, "apoyos": 26}
+{"rol": "monolito", "prueba": "dashboard_filtrado", "sha": "f36c3420cac7c1ed", "total": 4, "meses": 12}
+{"rol": "monolito", "prueba": "comparacion", "sha": "9d318617c86807ce", "totales": [102, 102]}
+{"rol": "monolito", "prueba": "catalogos", "sha": "5cd444dbdaa2fb4f", "catalogos": 17, "municipios": 51}
+{"rol": "monolito", "prueba": "solicitudes", "sha": "0f67898471543f1e", "total": 563, "filas": 10}
+{"rol": "monolito", "prueba": "solicitudes_filtradas_p2", "sha": "0af9ec31dc745607", "total": 204, "filas": 10}
+{"rol": "monolito", "prueba": "sugerencias", "sha": "d8b3f1f8141cf52a", "total": 563, "solicitudes": 5, "personas": 3}
+{"rol": "monolito", "prueba": "detalle_primera", "sha": "ad2be292b7a0381b", "campos": 16}
+{"rol": "monolito", "prueba": "detalle_inexistente", "sha": "6b3c238ebcf1f3c0", "estado": 404}
+{"rol": "monolito", "prueba": "municipios_nacimiento", "sha": "83eb38e11d7b5e76", "filas": 51}
+{"rol": "monolito", "prueba": "colonias", "sha": "eeb85c2675888473", "filas": 0}
+{"rol": "monolito", "prueba": "personas_beneficiario", "sha": "61197f563b9e3205", "filas": 30}
+{"rol": "monolito", "prueba": "personas_solicitante", "sha": "eda933fbb623cd5a", "filas": 30}
+{"rol": "monolito", "prueba": "exportar_xlsx", "sha": "7f8b6e24de66e359", "formato_valido": true, "hojas": 6, "kb": 33}
+{"rol": "monolito", "prueba": "exportar_pdf", "sha": "b5bea41b6c623f7c", "formato_valido": true, "kb": 38}
+{"rol": "monolito", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}

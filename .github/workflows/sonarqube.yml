@@ -1,0 +1,38 @@
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: Análisis SonarQube Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historial completo para que Sonar detecte el código nuevo
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - name: Instalar dependencias de Flutter
+        working-directory: sgsc_ejecutiva
+        run: flutter pub get
+
+      - name: Pruebas de Flutter con cobertura
+        working-directory: sgsc_ejecutiva
+        run: flutter test --coverage
+        continue-on-error: true # si una prueba falla, el análisis se hace de todos modos
+
+      - name: Análisis SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

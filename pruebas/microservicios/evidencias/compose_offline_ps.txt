@@ -1,0 +1,7 @@
+﻿SERVICE       STATUS                    PORTS
+detalle       Up 32 seconds (healthy)   8000/tcp
+gateway       Up 32 seconds (healthy)   127.0.0.1:8080->80/tcp
+indicadores   Up 33 seconds (healthy)   8000/tcp
+nucleo        Up 33 seconds (healthy)   8000/tcp
+registro      Up 33 seconds (healthy)   8000/tcp
+reportes      Up 33 seconds (healthy)   8000/tcp

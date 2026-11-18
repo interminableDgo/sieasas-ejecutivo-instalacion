@@ -1,0 +1,92 @@
+﻿[
+    {
+        "Metodo":  "POST",
+        "Ruta":  "/auth/login",
+        "Servicio":  "nucleo",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  1401,
+        "ms máx":  1401
+    },
+    {
+        "Metodo":  "POST",
+        "Ruta":  "/auth/logout",
+        "Servicio":  "nucleo",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  291,
+        "ms máx":  291
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/auth/me",
+        "Servicio":  "nucleo",
+        "Peticiones":  1,
+        "Codigos":  "401",
+        "ms promedio":  202,
+        "ms máx":  202
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/catalogos",
+        "Servicio":  "indicadores",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  1322,
+        "ms máx":  1322
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/dashboard",
+        "Servicio":  "indicadores",
+        "Peticiones":  15,
+        "Codigos":  "200,401",
+        "ms promedio":  467,
+        "ms máx":  801
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/exportar/pdf",
+        "Servicio":  "reportes",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  1620,
+        "ms máx":  1620
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/exportar/xlsx",
+        "Servicio":  "reportes",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  2955,
+        "ms máx":  2955
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/solicitudes",
+        "Servicio":  "detalle",
+        "Peticiones":  20,
+        "Codigos":  "200",
+        "ms promedio":  285,
+        "ms máx":  623
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/solicitudes/{id}",
+        "Servicio":  "detalle",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  203,
+        "ms máx":  203
+    },
+    {
+        "Metodo":  "GET",
+        "Ruta":  "/ejecutivo/solicitudes/sugerencias",
+        "Servicio":  "detalle",
+        "Peticiones":  1,
+        "Codigos":  "200",
+        "ms promedio":  345,
+        "ms máx":  345
+    }
+]

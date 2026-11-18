@@ -7,6 +7,17 @@ backend/*.local.*
 backend/ca.pem
 backend/.pytest_cache/
 
+# Microservicios del Ejecutivo, librería común y gateway (Docker)
+backend/**/.venv/
+backend/**/*.egg-info/
+backend/**/build/
+gateway/.venv/
+gateway/**/__pycache__/
+gateway/certs/
+pruebas/microservicios/**/__pycache__/
+pruebas/microservicios/evidencias/*.local.*
+pruebas/microservicios/offline/salida/
+
 # Variables de entorno / secretos
 backend/.env
 .env

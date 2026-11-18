@@ -8,6 +8,7 @@ import 'package:sgsc_ejecutiva/main.dart';
 import 'package:sgsc_ejecutiva/core/theme.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
 import 'package:sgsc_ejecutiva/widgets/executive_charts.dart';
+import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
 
 import 'widget_test.dart'
     show prepare, wrap, screenshot, dashboard, catalogs, emptySummary;
@@ -145,8 +146,19 @@ void main() {
       250,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.ensureVisible(find.text('Monterrey').first);
-    await tester.tap(find.text('Monterrey').hitTestable().first);
+    // The bar of the chart, not the Municipio column of the table above.
+    final bar = find.descendant(
+      of: find.ancestor(
+        of: find.text('Solicitudes por municipio'),
+        matching: find.byType(ExecutiveCard),
+      ),
+      matching: find.text('Monterrey'),
+    );
+    await tester.ensureVisible(bar);
+    // Move it out from under the pinned filter bar before tapping.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 200));
+    await tester.pumpAndSettle();
+    await tester.tap(bar);
     await tester.pumpAndSettle();
     for (final path in ['/ejecutivo/dashboard', '/ejecutivo/solicitudes']) {
       expect(
@@ -156,11 +168,11 @@ void main() {
         '1',
       );
     }
-    await tester.scrollUntilVisible(
-      find.text('Solicitud #9'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
+    // The list of requests is the second tab of the panel.
+    await tester.tap(find.textContaining(RegExp(r'^Solicitudes \(')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Solicitud #9'));
+    await tester.pumpAndSettle();
     await screenshot(tester, 'HU4-listado-filtrado');
     await tester.tap(find.text('Solicitud #9'));
     await tester.pumpAndSettle();

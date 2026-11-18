@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_drawing/path_drawing.dart';
 
 import '../core/theme.dart';
+import 'executive_widgets.dart';
 
 class DataBars extends StatelessWidget {
   final List<dynamic> rows;
@@ -82,12 +84,16 @@ class DataBars extends StatelessWidget {
 }
 
 class CategoryPieChart extends StatefulWidget {
+  final String? selectedView;
+  final ValueChanged<String>? onViewChanged;
   final List<dynamic> rows;
   final num total;
   final Set<String> active;
   final ValueChanged<String> onSelect;
   const CategoryPieChart({
     super.key,
+    this.selectedView,
+    this.onViewChanged,
     required this.rows,
     required this.total,
     required this.onSelect,
@@ -100,6 +106,7 @@ class CategoryPieChart extends StatefulWidget {
 
 class _CategoryPieChartState extends State<CategoryPieChart> {
   bool showAll = false;
+  String view = 'Dona';
 
   static const colors = [
     salud,
@@ -124,41 +131,113 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
     final otherTotal = rows
         .skip(5)
         .fold<num>(0, (sum, row) => sum + (row['total'] as num));
-    final values = <num>[
-      ...top.map((row) => row['total'] as num),
-      if (otherTotal > 0) otherTotal,
-    ];
-    final names = <String>[
-      ...top.map((row) => '${row['nombre']}'),
-      if (otherTotal > 0) 'Otros',
-    ];
+    final values = <num>[...top.map((row) => row['total'] as num)];
+    final names = <String>[...top.map((row) => '${row['nombre']}')];
+    final sum = values.fold<num>(0, (sum, value) => sum + value);
+    final canStack =
+        sum + otherTotal == total && values.every((value) => value >= 0);
+    final chosen = widget.selectedView ?? view;
+    final currentView = chosen == 'Apilada' && !canStack ? 'Dona' : chosen;
+    final maximum = values.fold<num>(1, math.max);
     return Column(
       children: [
-        SizedBox(
-          height: 190,
-          width: 190,
-          child: CustomPaint(
-            painter: _CategoryPiePainter(values, colors),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        CopyExclude(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
                 children: [
-                  Text(
-                    '$total',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+                  for (final option in ['Dona', 'Barras', 'Apilada', 'Treemap'])
+                    ChoiceChip(
+                      label: Text(option == 'Apilada' ? 'Composición' : option),
+                      selected: currentView == option,
+                      onSelected: option == 'Apilada' && !canStack
+                          ? null
+                          : (_) {
+                              setState(() => view = option);
+                              widget.onViewChanged?.call(option);
+                            },
                     ),
-                  ),
-                  const Text(
-                    'solicitudes',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
                 ],
               ),
             ),
           ),
         ),
+        if (currentView == 'Dona')
+          SizedBox(
+            height: 190,
+            width: 190,
+            child: CustomPaint(
+              painter: _CategoryPiePainter(values, colors),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$sum',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      otherTotal > 0 ? 'mostradas' : 'solicitudes',
+                      style: TextStyle(fontSize: 11, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (currentView != 'Dona')
+          Text(
+            otherTotal > 0
+                ? '$sum solicitudes mostradas'
+                : '$total solicitudes',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+        if (currentView == 'Barras')
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Escala común: 0 a $maximum solicitudes',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+          ),
+        if (currentView == 'Treemap') ...[
+          const SizedBox(height: 12),
+          ExcludeSemantics(
+            child: SizedBox(
+              height: 190,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _CategoryTreemapPainter(values, colors),
+              ),
+            ),
+          ),
+        ],
+        if (currentView == 'Apilada') ...[
+          const SizedBox(height: 12),
+          ExcludeSemantics(
+            child: SizedBox(
+              height: 28,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _CategoryStackPainter(values, colors),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            otherTotal > 0
+                ? 'Composición de las categorías mostradas'
+                : 'Composición del total · 100%',
+            style: TextStyle(fontSize: 11, color: muted),
+          ),
+        ],
         const SizedBox(height: 12),
         ...List.generate(values.length, (i) {
           final row = i < top.length ? top[i] : null;
@@ -172,43 +251,68 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
             borderRadius: BorderRadius.circular(8),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: colors[i],
-                      shape: BoxShape.circle,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: colors[i],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          names[i],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${values[i]} · ${percent.toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      names[i],
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: selected
-                            ? FontWeight.w800
-                            : FontWeight.normal,
+                  if (currentView == 'Barras') ...[
+                    const SizedBox(height: 6),
+                    ExcludeSemantics(
+                      child: LinearProgressIndicator(
+                        value: (values[i] / maximum).clamp(0.0, 1.0),
+                        minHeight: 10,
+                        color: colors[i],
+                        backgroundColor: paper,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${values[i]} · ${percent.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
           );
         }),
+        if (otherTotal > 0)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Fuera de la gráfica: $otherTotal solicitudes en ${rows.length - 5} categorías. '
+              'Total: $total. Porcentajes sobre el total; áreas sobre las $sum mostradas.',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+          ),
         if (rows.length > 5) ...[
           if (showAll) ...[
             const Divider(height: 20),
@@ -255,21 +359,113 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
               );
             }),
           ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => showAll = !showAll),
-              icon: Icon(
-                showAll ? Icons.expand_less : Icons.expand_more,
-                size: 18,
+          CopyExclude(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() => showAll = !showAll),
+                icon: Icon(
+                  showAll ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                ),
+                label: Text(
+                  showAll ? 'Ver menos' : 'Ver todos (${rows.length})',
+                ),
               ),
-              label: Text(showAll ? 'Ver menos' : 'Ver todos (${rows.length})'),
             ),
           ),
         ],
       ],
     );
   }
+}
+
+/// Uses exactly the same ordered values and palette as the donut and legend.
+class _CategoryTreemapPainter extends CustomPainter {
+  final List<num> values;
+  final List<Color> colors;
+  const _CategoryTreemapPainter(this.values, this.colors);
+  @override
+  void paint(Canvas canvas, Size size) {
+    void draw(int start, int end, Rect rect) {
+      final sum = values.sublist(start, end).fold<num>(0, (a, b) => a + b);
+      if (sum <= 0) return;
+      if (end - start == 1) {
+        canvas.drawRect(rect, Paint()..color = colors[start]);
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+        final label = TextPainter(
+          text: TextSpan(
+            text: '${values[start]}',
+            style: TextStyle(
+              fontFamily: 'Mulish',
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: colors[start].computeLuminance() > 0.179
+                  ? Colors.black
+                  : Colors.white,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (rect.width >= label.width + 4 && rect.height >= label.height + 4) {
+          label.paint(
+            canvas,
+            rect.center - Offset(label.width / 2, label.height / 2),
+          );
+        }
+        return;
+      }
+      final mid = (start + end) ~/ 2;
+      final fraction =
+          values.sublist(start, mid).fold<num>(0, (a, b) => a + b) / sum;
+      if (rect.width >= rect.height) {
+        final cut = rect.left + rect.width * fraction;
+        draw(start, mid, Rect.fromLTRB(rect.left, rect.top, cut, rect.bottom));
+        draw(mid, end, Rect.fromLTRB(cut, rect.top, rect.right, rect.bottom));
+      } else {
+        final cut = rect.top + rect.height * fraction;
+        draw(start, mid, Rect.fromLTRB(rect.left, rect.top, rect.right, cut));
+        draw(mid, end, Rect.fromLTRB(rect.left, cut, rect.right, rect.bottom));
+      }
+    }
+
+    draw(0, values.length, Offset.zero & size);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryTreemapPainter old) =>
+      !listEquals(values, old.values) || !listEquals(colors, old.colors);
+}
+
+class _CategoryStackPainter extends CustomPainter {
+  final List<num> values;
+  final List<Color> colors;
+  const _CategoryStackPainter(this.values, this.colors);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sum = values.fold<num>(0, (sum, value) => sum + value);
+    if (sum <= 0) return;
+    double left = 0;
+    for (var i = 0; i < values.length; i++) {
+      final width = size.width * values[i] / sum;
+      canvas.drawRect(
+        Rect.fromLTWH(left, 0, width, size.height),
+        Paint()..color = colors[i],
+      );
+      left += width;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryStackPainter old) =>
+      !listEquals(values, old.values) || !listEquals(colors, old.colors);
 }
 
 class _CategoryPiePainter extends CustomPainter {
@@ -281,18 +477,30 @@ class _CategoryPiePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final sum = values.fold<num>(0, (total, value) => total + value);
     if (sum == 0) return;
-    final rect = Offset.zero & size;
+    final center = size.center(Offset.zero);
+    final outer = Rect.fromCircle(
+      center: center,
+      radius: size.shortestSide / 2 - 10,
+    );
+    final inner = Rect.fromCircle(
+      center: center,
+      radius: size.shortestSide * .29,
+    );
+    final largest = values.indexOf(values.reduce((a, b) => a > b ? a : b));
     var start = -math.pi / 2;
     for (var i = 0; i < values.length; i++) {
       final sweep = values[i] / sum * math.pi * 2;
-      canvas.drawArc(rect, start, sweep, true, Paint()..color = colors[i]);
+      final mid = start + sweep / 2;
+      final offset = i == largest && values.where((v) => v > 0).length > 1
+          ? Offset(math.cos(mid), math.sin(mid)) * 8
+          : Offset.zero;
+      final path = Path()
+        ..arcTo(outer.shift(offset), start, sweep, true)
+        ..arcTo(inner.shift(offset), start + sweep, -sweep, false)
+        ..close();
+      canvas.drawPath(path, Paint()..color = colors[i]);
       start += sweep;
     }
-    canvas.drawCircle(
-      size.center(Offset.zero),
-      size.width * 0.29,
-      Paint()..color = Colors.white,
-    );
   }
 
   @override
@@ -300,196 +508,114 @@ class _CategoryPiePainter extends CustomPainter {
       !listEquals(values, old.values) || !listEquals(colors, old.colors);
 }
 
-/// Side-by-side period comparison for independent indicators. A grouped bar
-/// chart makes the two periods directly comparable without implying that the
-/// indicators are steps in a continuous series.
-class PeriodComparisonChart extends StatelessWidget {
-  final Map<String, dynamic> earlier, later;
-  final Map<String, dynamic> variations;
-  final String earlierLabel, laterLabel;
-  const PeriodComparisonChart({
+/// One column per compared period, all on a common scale from 0, so several
+/// months or years read at a glance. A period without records keeps its
+/// place with a flat mark and "0" instead of disappearing from the axis.
+/// Tapping a column selects it; the caller shows its detail.
+class PeriodColumnsChart extends StatelessWidget {
+  final List<String> labels, shortLabels;
+  final List<num> values;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const PeriodColumnsChart({
     super.key,
-    required this.earlier,
-    required this.later,
-    required this.variations,
-    required this.earlierLabel,
-    required this.laterLabel,
+    required this.labels,
+    required this.shortLabels,
+    required this.values,
+    required this.selected,
+    required this.onSelect,
   });
+
+  static const barArea = 150.0;
 
   @override
   Widget build(BuildContext context) {
-    const indicators = [
-      ('Solicitudes registradas', 'total'),
-      ('Activas', 'activas'),
-      ('Resueltas', 'resueltas'),
-    ];
-    final maxValue = indicators.fold<num>(0, (maximum, item) {
-      final key = item.$2;
-      return math.max(
-        maximum,
-        math.max(earlier[key] as num, later[key] as num),
-      );
-    });
+    final maximum = values.fold<num>(0, math.max);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Cada par de barras compara el mismo indicador entre periodos.',
-          style: TextStyle(fontSize: 11, color: muted),
+        Text(
+          maximum == 0
+              ? 'Todos los periodos registran 0.'
+              : 'Escala común desde 0 · máximo $maximum',
+          textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 10, color: muted),
         ),
-        const SizedBox(height: 10),
-        const Text(
-          'Las barras comparan los conteos; el cambio porcentual va junto a cada indicador.',
-          style: TextStyle(fontSize: 11, color: muted),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 14,
-          runSpacing: 6,
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            _ChartLegend(color: muted, label: earlierLabel),
-            _ChartLegend(color: salud, label: laterLabel),
+            for (var i = 0; i < values.length; i++)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: i == selected,
+                  label: '${labels[i]}: ${values[i]}',
+                  excludeSemantics: true,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => onSelect(i),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Column(
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${values[i]}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: values[i] == 0 ? muted : ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            height: values[i] == 0 || maximum == 0
+                                ? 3
+                                : math.max(4, values[i] / maximum * barArea),
+                            constraints: const BoxConstraints(maxWidth: 44),
+                            decoration: BoxDecoration(
+                              color: values[i] == 0
+                                  ? border
+                                  : i == selected
+                                  ? salud
+                                  : salud.withValues(alpha: 0.4),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(5),
+                              ),
+                            ),
+                          ),
+                          Container(height: 1, color: border),
+                          const SizedBox(height: 6),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              shortLabels[i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                height: 1.2,
+                                fontWeight: i == selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: i == selected ? ink : muted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            maxValue == 0
-                ? 'Los dos periodos registran 0.'
-                : 'Escala común desde 0: $maxValue',
-            style: const TextStyle(fontSize: 10, color: muted),
-          ),
-        ),
-        const SizedBox(height: 4),
-        for (final (label, key) in indicators)
-          _PeriodIndicatorBars(
-            label: label,
-            earlier: earlier[key] as num,
-            later: later[key] as num,
-            variation: variations[key] as Map<String, dynamic>,
-            maximum: maxValue,
-          ),
       ],
     );
   }
-}
-
-class _PeriodIndicatorBars extends StatelessWidget {
-  final String label;
-  final num earlier, later, maximum;
-  final Map<String, dynamic> variation;
-  const _PeriodIndicatorBars({
-    required this.label,
-    required this.earlier,
-    required this.later,
-    required this.variation,
-    required this.maximum,
-  });
-
-  String get changeLabel {
-    final difference = variation['diferencia'] as num;
-    if (difference == 0) return 'Sin cambio';
-    final sign = difference > 0 ? '+' : '−';
-    final percentage = variation['porcentaje'] as num?;
-    final percentLabel = percentage == null
-        ? '% sin referencia'
-        : '$sign${percentage.abs().toStringAsFixed(1)}%';
-    return 'Δ $sign${difference.abs()} · $percentLabel';
-  }
-
-  Widget bar(num value, Color color) => Padding(
-    padding: const EdgeInsets.only(top: 5),
-    child: Row(
-      children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LinearProgressIndicator(
-              value: maximum == 0 ? 0 : (value / maximum).toDouble(),
-              minHeight: 8,
-              color: color,
-              backgroundColor: paper,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 28,
-          child: Text(
-            '$value',
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: label == 'Solicitudes registradas' ? blueTint : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  changeLabel,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: muted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          bar(earlier, muted),
-          bar(later, salud),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ChartLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _ChartLegend({required this.color, required this.label});
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Container(
-        width: 9,
-        height: 9,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      const SizedBox(width: 5),
-      Text(label, style: const TextStyle(fontSize: 10)),
-    ],
-  );
 }
 
 class TrendChart extends StatefulWidget {
@@ -716,10 +842,51 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
   }
 
   bool zoomed = true;
+
+  /// Pinch (or the +/− buttons) zoom; names appear as municipalities get
+  /// big enough on screen, as in map apps.
+  final zoom = TransformationController();
+  double get zoomLevel => zoom.value.getMaxScaleOnAxis();
+  static const maxZoom = 8.0;
+
+  @override
+  void initState() {
+    super.initState();
+    zoom.addListener(_zoomChanged);
+  }
+
+  void _zoomChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    zoom
+      ..removeListener(_zoomChanged)
+      ..dispose();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(covariant MunicipalityMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!setEquals(oldWidget.active, widget.active)) zoomed = true;
+    if (!setEquals(oldWidget.active, widget.active)) {
+      zoomed = true;
+      zoom.value = Matrix4.identity();
+    }
+  }
+
+  /// Zooms by [factor] around the centre of the map of [size].
+  void zoomBy(double factor, Size size) {
+    final current = zoomLevel;
+    final next = (current * factor).clamp(1.0, maxZoom);
+    if (next == current) return;
+    final center = Offset(size.width / 2, size.height / 2);
+    // Keep the point at the centre of the view in place.
+    final focus = zoom.toScene(center);
+    final matrix = Matrix4.identity()
+      ..translateByDouble(center.dx, center.dy, 0, 1)
+      ..scaleByDouble(next, next, 1, 1)
+      ..translateByDouble(-focus.dx, -focus.dy, 0, 1);
+    zoom.value = next == 1 ? Matrix4.identity() : matrix;
   }
 
   Map<String, String> get idByCvegeo => {
@@ -753,6 +920,9 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
     final top = (bounds.center.dy - h / 2).clamp(0.0, data.height - h);
     return Rect.fromLTWH(left, top, w, h);
   }
+
+  /// Size of the drawn map, for zooming around its centre with the buttons.
+  Size mapSize = Size.zero;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<_MapData>(
@@ -810,7 +980,8 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                     : widget.error != null
                     ? 'No se pudieron actualizar los datos.'
                     : pick == null
-                    ? 'Toca para filtrar y acercar.'
+                    ? 'Toca un municipio para filtrar. Acerca el mapa '
+                          '(pellizca o usa + y −) para ver los nombres.'
                     : count(pick.cvegeo) == 0
                     ? 'Sin solicitudes con los filtros actuales.'
                     : '${count(pick.cvegeo)} solicitudes; toca de nuevo para quitar'
@@ -824,37 +995,62 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
             height: 4,
             child: widget.loading ? const LinearProgressIndicator() : null,
           ),
-          SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                if (widget.active.isNotEmpty)
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                      ),
-                      onPressed: () => widget.onFilter(null),
-                      icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                      label: const Text(
-                        'Quitar municipio',
-                        overflow: TextOverflow.ellipsis,
+          CopyExclude(
+            child: SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  if (widget.active.isNotEmpty)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                        ),
+                        onPressed: () => widget.onFilter(null),
+                        icon: const Icon(
+                          Icons.filter_alt_off_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Quitar municipio',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                if (pick != null)
+                  if (pick != null)
+                    IconButton(
+                      tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
+                      onPressed: () => setState(() {
+                        zoomed = !zoomed;
+                        zoom.value = Matrix4.identity();
+                      }),
+                      icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+                    ),
+                  if (widget.active.isEmpty) const Spacer(),
                   IconButton(
-                    tooltip: zoomed ? 'Ver todo el estado' : 'Acercar',
-                    onPressed: () => setState(() => zoomed = !zoomed),
-                    icon: Icon(zoomed ? Icons.zoom_out_map : Icons.zoom_in),
+                    key: const ValueKey('map-zoom-out'),
+                    tooltip: 'Alejar mapa',
+                    onPressed: zoomLevel <= 1
+                        ? null
+                        : () => zoomBy(1 / 1.6, mapSize),
+                    icon: const Icon(Icons.remove),
                   ),
-                if (widget.error != null)
                   IconButton(
-                    tooltip: 'Reintentar mapa',
-                    onPressed: widget.onRetry,
-                    icon: const Icon(Icons.refresh),
+                    key: const ValueKey('map-zoom-in'),
+                    tooltip: 'Acercar mapa',
+                    onPressed: zoomLevel >= maxZoom
+                        ? null
+                        : () => zoomBy(1.6, mapSize),
+                    icon: const Icon(Icons.add),
                   ),
-              ],
+                  if (widget.error != null)
+                    IconButton(
+                      tooltip: 'Reintentar mapa',
+                      onPressed: widget.onRetry,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -865,6 +1061,7 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                 box.maxWidth * data.height / data.width,
               );
               final width = height * data.width / data.height;
+              mapSize = Size(width, height);
               return Center(
                 child: TweenAnimationBuilder<Rect?>(
                   tween: RectTween(end: viewBox(data)),
@@ -885,44 +1082,75 @@ class _MunicipalityMapState extends State<MunicipalityMap> {
                     // central municipality. The bar list is the accessible
                     // way to choose one.
                     child: ExcludeSemantics(
-                      child: GestureDetector(
-                        onTapUp: (event) {
-                          final v = view;
-                          final point =
-                              v.topLeft +
-                              event.localPosition * (v.width / width);
-                          for (final shape in data.shapes) {
-                            if (shape.path.contains(point)) {
-                              final id = ids[shape.cvegeo];
-                              if (id != null) {
-                                widget.onFilter(
-                                  shape.cvegeo == selected ? null : id,
-                                );
+                      child: ClipRect(
+                        child: InteractiveViewer(
+                          transformationController: zoom,
+                          minScale: 1,
+                          maxScale: maxZoom,
+                          // At full view one-finger drags scroll the page;
+                          // once zoomed in, they move the map.
+                          panEnabled: zoomLevel > 1.01,
+                          child: Listener(
+                            // A mouse wheel over the map keeps scrolling the
+                            // panel (Ctrl + wheel zooms), so the map never
+                            // traps the page on a computer.
+                            onPointerSignal: (event) {
+                              if (event is! PointerScrollEvent ||
+                                  HardwareKeyboard.instance.isControlPressed) {
+                                return;
                               }
-                              return;
-                            }
-                          }
-                        },
-                        child: ClipRect(
-                          child: CustomPaint(
-                            key: const ValueKey('municipality-map'),
-                            size: Size(width, height),
-                            painter: _MunicipalityPainter(
-                              data.shapes,
-                              view!,
-                              fill: (s) {
-                                final value = count(s.cvegeo);
-                                if (s.cvegeo == selected) return brand;
-                                if (widget.loading || widget.error != null) {
-                                  return border;
-                                }
-                                return value == 0
-                                    ? border
-                                    : brand.withValues(
-                                        alpha: 0.15 + 0.55 * value / max,
+                              final page = Scrollable.maybeOf(context);
+                              if (page == null) return;
+                              GestureBinding.instance.pointerSignalResolver
+                                  .register(
+                                    event,
+                                    (e) => page.position.pointerScroll(
+                                      (e as PointerScrollEvent).scrollDelta.dy,
+                                    ),
+                                  );
+                            },
+                            child: GestureDetector(
+                              onTapUp: (event) {
+                                final v = view;
+                                final point =
+                                    v.topLeft +
+                                    event.localPosition * (v.width / width);
+                                for (final shape in data.shapes) {
+                                  if (shape.path.contains(point)) {
+                                    final id = ids[shape.cvegeo];
+                                    if (id != null) {
+                                      widget.onFilter(
+                                        shape.cvegeo == selected ? null : id,
                                       );
+                                    }
+                                    return;
+                                  }
+                                }
                               },
-                              outlined: {...activeCvegeo, ?selected},
+                              child: CustomPaint(
+                                key: const ValueKey('municipality-map'),
+                                size: Size(width, height),
+                                painter: _MunicipalityPainter(
+                                  data.shapes,
+                                  view!,
+                                  zoom: zoomLevel,
+                                  labeled: {?selected},
+                                  fill: (s) {
+                                    final value = count(s.cvegeo);
+                                    if (s.cvegeo == selected) return brand;
+                                    if (widget.loading ||
+                                        widget.error != null) {
+                                      return border;
+                                    }
+                                    return value == 0
+                                        ? border
+                                        : brand.withValues(
+                                            alpha: 0.15 + 0.55 * value / max,
+                                          );
+                                  },
+                                  outlined: {...activeCvegeo, ?selected},
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1000,12 +1228,23 @@ class _MunicipalityPainter extends CustomPainter {
   final Rect view;
   final Color Function(_MapShape) fill;
   final Set<String> outlined;
+
+  /// Pinch zoom of the map; names are sized for the screen, not the map.
+  final double zoom;
+
+  /// Always named when they fit (the selected municipality).
+  final Set<String> labeled;
   _MunicipalityPainter(
     this.shapes,
     this.view, {
     required this.fill,
     required this.outlined,
+    this.zoom = 1,
+    this.labeled = const {},
   });
+
+  /// Screen size of the names, in logical pixels.
+  static const labelSize = 11.0;
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.width / view.width;
@@ -1030,6 +1269,87 @@ class _MunicipalityPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.6 / scale,
       );
+    }
+    paintNames(canvas, scale * zoom);
+  }
+
+  /// Names of the municipalities big enough on screen to hold them, the
+  /// selected one and the largest first, skipping any that would overlap.
+  /// Zooming in reveals more names, as in map apps.
+  void paintNames(Canvas canvas, double pixelsPerUnit) {
+    final order = [...shapes]
+      ..sort((a, b) {
+        final pick = (labeled.contains(b.cvegeo) ? 1 : 0).compareTo(
+          labeled.contains(a.cvegeo) ? 1 : 0,
+        );
+        if (pick != 0) return pick;
+        final ra = a.path.getBounds(), rb = b.path.getBounds();
+        return (rb.width * rb.height).compareTo(ra.width * ra.height);
+      });
+    final placed = <Rect>[];
+    final fontSize = labelSize / pixelsPerUnit;
+    for (final shape in order) {
+      final bounds = shape.path.getBounds();
+      final text = TextPainter(
+        text: TextSpan(
+          text: shape.name,
+          style: TextStyle(
+            fontFamily: 'Mulish',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            color: ink,
+            height: 1,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      if (text.width > bounds.width * 0.95 ||
+          text.height > bounds.height * 0.6) {
+        text.dispose();
+        continue;
+      }
+      var center = bounds.center;
+      if (!shape.path.contains(center)) {
+        // Concave shapes: try a little up and down before giving up.
+        center = [
+          for (final f in [-0.2, 0.2, -0.35, 0.35])
+            bounds.center + Offset(0, bounds.height * f),
+        ].firstWhere(shape.path.contains, orElse: () => bounds.center);
+      }
+      final box = Rect.fromCenter(
+        center: center,
+        width: text.width + 4 / pixelsPerUnit,
+        height: text.height + 2 / pixelsPerUnit,
+      );
+      if (placed.any(box.overlaps)) {
+        text.dispose();
+        continue;
+      }
+      placed.add(box);
+      final at = center - Offset(text.width / 2, text.height / 2);
+      // A white halo keeps the name readable over any shade of orange.
+      final halo = TextPainter(
+        text: TextSpan(
+          text: shape.name,
+          style: TextStyle(
+            fontFamily: 'Mulish',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 3 / pixelsPerUnit
+              ..color = Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      halo.paint(canvas, at);
+      text.paint(canvas, at);
+      halo.dispose();
+      text.dispose();
     }
   }
 

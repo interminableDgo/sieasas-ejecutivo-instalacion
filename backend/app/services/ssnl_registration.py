@@ -20,15 +20,14 @@ class Beneficiary(Input):
     calle: str = Field(min_length=1,max_length=150)
     numero: str = Field(min_length=1,max_length=15)
     colonia_id: int = Field(gt=0)
-    codigo_postal: str = Field(pattern=r'^\d{5}$')
     tiempo_residencia: int = Field(ge=0,le=150)
-    con_quien_vive: str = Field(min_length=1,max_length=50)
+    con_quien_vive_id: int = Field(gt=0)
     numero_hijos: int = Field(ge=0,le=100)
     hijo_seguridad_social: bool = False
     estudia: bool = False
-    area_estudio: str | None = Field(None,max_length=150)
-    profesion: str | None = Field(None,max_length=150)
-    fuente_ingresos: str | None = Field(None,max_length=150)
+    area_estudio_id: int | None = Field(None,gt=0)
+    ocupacion_id: int | None = Field(None,gt=0)
+    fuente_ingresos_id: int | None = Field(None,gt=0)
     seguridad_social_id: int = Field(gt=0)
     afiliacion: str | None = Field(None,max_length=150)
     grupo_vulnerable_id: int = Field(gt=0)
@@ -43,19 +42,36 @@ class Beneficiary(Input):
             raise ValueError('Revisa la fecha de nacimiento.')
         return v
 
+    @model_validator(mode='after')
+    def study_area(self):
+        if self.estudia and self.area_estudio_id is None:
+            raise ValueError('Selecciona el área de estudio.')
+        if not self.estudia: self.area_estudio_id=None
+        return self
+
 class Applicant(Input):
     nombres: str = Field(min_length=1,max_length=100)
     apellidos: str = Field(min_length=1,max_length=100)
     parentesco_id: int = Field(gt=0)
     otro_parentesco: str | None = Field(None,max_length=100)
     fecha_nacimiento: date
-    calle: str = Field(min_length=1,max_length=150)
-    numero: str = Field(min_length=1,max_length=20)
-    colonia: str = Field(min_length=1,max_length=150)
-    codigo_postal: str = Field(pattern=r'^\d{5}$')
-    municipio_id: int = Field(gt=0)
+    # Evita capturar dos veces la misma ubicación: el domicilio se copia del beneficiario.
+    mismo_domicilio: bool = False
+    calle: str | None = Field(None,min_length=1,max_length=150)
+    numero: str | None = Field(None,min_length=1,max_length=20)
+    colonia_id: int | None = Field(None,gt=0)
+    municipio_id: int | None = Field(None,gt=0)
     telefono: str = Field(min_length=7,max_length=15,pattern=r'^[+0-9 ()-]+$')
     _birth=field_validator('fecha_nacimiento')(Beneficiary.valid_birth.__func__)
+
+    @model_validator(mode='after')
+    def own_address(self):
+        fields=(self.calle,self.numero,self.colonia_id,self.municipio_id)
+        if self.mismo_domicilio and any(v is not None for v in fields):
+            raise ValueError('Con el mismo domicilio del beneficiario no se captura otra ubicación.')
+        if not self.mismo_domicilio and any(v is None for v in fields):
+            raise ValueError('Completa el domicilio del solicitante o indica que es el mismo del beneficiario.')
+        return self
 
 class NewRequest(Input):
     beneficiario_id: int | None = Field(None,gt=0)
@@ -86,6 +102,31 @@ class NewRequest(Input):
 def require_catalog(db,table,value):
     if value is not None and not db.execute(text(f'SELECT id FROM `{table}` WHERE id=:id AND is_active=1'),{'id':value}).scalar():
         raise HTTPException(422,'Una opción seleccionada ya no está disponible. Actualiza los catálogos.')
+
+
+def catalog_value(db,table,value):
+    """Descripción de un elemento activo; SSNL guarda el texto en sus columnas originales."""
+    if value is None: return None
+    label=db.execute(text(f'SELECT descripcion FROM `{table}` WHERE id=:id AND is_active=1'),{'id':value}).scalar()
+    if label is None:
+        raise HTTPException(422,'Una opción seleccionada ya no está disponible. Actualiza los catálogos.')
+    return label
+
+
+def colony(db,cid,mid):
+    row=db.execute(text('SELECT id,nombre,codigo_postal FROM Cat_Colonias WHERE id=:id AND municipio_id=:m AND is_active=1'),
+      {'id':cid,'m':mid}).mappings().first()
+    if not row:
+        raise HTTPException(422,'La colonia no corresponde al municipio seleccionado.')
+    return row
+
+
+def beneficiary_address(db,bid):
+    # ben_dom_colonia es numérica en SSNL: el nombre sale del catálogo (o de la clave, en expedientes antiguos).
+    return db.execute(text('''SELECT b.ben_dom_calle AS calle,b.ben_dom_num AS numero,
+      COALESCE(c.nombre,CAST(b.ben_dom_colonia AS CHAR)) AS colonia,
+      b.ben_dom_colonia_id AS colonia_id,b.ben_dom_cp AS codigo_postal,b.ben_dom_municipio AS municipio_id
+      FROM Tbl_Beneficiarios b LEFT JOIN Cat_Colonias c ON c.id=b.ben_dom_colonia_id WHERE b.ben_id=:id'''),{'id':bid}).mappings().first()
 
 
 def municipality(db,mid,eid=None):
@@ -123,15 +164,34 @@ def create_request(data,user,db):
       ON m.id=s.sol_municipioid AND m.entidad_id=s.sol_estadoid
       WHERE s.sol_id=:id AND s.sol_estadoid=:eid AND s.is_active=1'''),{'id':aid,'eid':eid}).scalar():
         raise HTTPException(422,'Solicitante no disponible en tu estado.')
+    social={}
     if data.beneficiario:
         b=data.beneficiario
         municipality(db,b.municipio_id,eid)
         birth=municipality(db,b.municipio_nacimiento_id)
         for table,value in [('Cat_Generos',b.genero_id),('Cat_SeguridadSocial',b.seguridad_social_id),('Cat_GruposVulnerables',b.grupo_vulnerable_id)]:
             require_catalog(db,table,value)
+        home=colony(db,b.colonia_id,b.municipio_id)
+        social={'con_quien_vive':catalog_value(db,'Cat_ConQuienVive',b.con_quien_vive_id),
+          'area_estudio':catalog_value(db,'Cat_AreasEstudio',b.area_estudio_id),
+          'profesion':catalog_value(db,'Cat_Ocupaciones',b.ocupacion_id),
+          'fuente_ingresos':catalog_value(db,'Cat_FuentesIngreso',b.fuente_ingresos_id),
+          # ben_dom_colonia es INT en SSNL: guarda la clave del catálogo, igual que ben_dom_colonia_id.
+          'colonia':b.colonia_id,'codigo_postal':home['codigo_postal']}
+    applicant_home={}
     if data.solicitante:
         a=data.solicitante
-        municipality(db,a.municipio_id,eid)
+        if a.mismo_domicilio:
+            if data.beneficiario:
+                applicant_home={'calle':b.calle,'numero':b.numero,'colonia':home['nombre'],'colonia_id':b.colonia_id,
+                  'codigo_postal':home['codigo_postal'],'municipio_id':b.municipio_id}
+            else:
+                applicant_home=dict(beneficiary_address(db,bid))
+        else:
+            municipality(db,a.municipio_id,eid)
+            place=colony(db,a.colonia_id,a.municipio_id)
+            applicant_home={'calle':a.calle,'numero':a.numero,'colonia':place['nombre'],'colonia_id':a.colonia_id,
+              'codigo_postal':place['codigo_postal'],'municipio_id':a.municipio_id}
         require_catalog(db,'Cat_Parentescos',a.parentesco_id)
         relation=db.execute(text('SELECT descripcion FROM Cat_Parentescos WHERE id=:id'),{'id':a.parentesco_id}).scalar()
         if relation=='Otro' and not a.otro_parentesco:
@@ -142,24 +202,24 @@ def create_request(data,user,db):
             today=date.today(); age=today.year-b.fecha_nacimiento.year-((today.month,today.day)<(b.fecha_nacimiento.month,b.fecha_nacimiento.day))
             bid=db.execute(text('''INSERT INTO Tbl_Beneficiarios
               (ben_gen_name,ben_gen_lastname,ben_gen_curp,ben_gen_isnocurp,ben_gen_birthdate,ben_gen_age,ben_gen_sex,
-               ben_gen_entidad_nacimiento,ben_gen_municipio_nacimiento,ben_dom_calle,ben_dom_num,ben_dom_colonia,
+               ben_gen_entidad_nacimiento,ben_gen_municipio_nacimiento,ben_dom_calle,ben_dom_num,ben_dom_colonia,ben_dom_colonia_id,
                ben_dom_cp,ben_dom_entidad,ben_dom_municipio,ben_dom_tiemporesidencia,
                ben_estsocioeco_conquienvive,ben_estsocioeco_numhijos,ben_estsocioeco_hijoconsegsocial,
                ben_estsocioeco_estudiaactualmente,ben_estsocioeco_estudiaactualmente_areaestudio,ben_estsocioeco_profesion,
                ben_estsocioeco_fuenteingresos,ben_segsocial_segsocial_id,ben_segsocial_numafiliacion,
                ben_misc_elmismotramita,ben_misc_grupovulnerable_id,ben_misc_ismigrante,ben_misc_iscodigo2024,is_active,createdBy,updatedBy)
               VALUES (:nombres,:apellidos,:curp,:no_curp,:fecha_nacimiento,:edad,:genero_id,
-               :birth_eid,:municipio_nacimiento_id,:calle,:numero,:colonia_id,:codigo_postal,:eid,:municipio_id,:tiempo_residencia,
+               :birth_eid,:municipio_nacimiento_id,:calle,:numero,:colonia,:colonia_id,:codigo_postal,:eid,:municipio_id,:tiempo_residencia,
                :con_quien_vive,:numero_hijos,:hijo_seguridad_social,:estudia,:area_estudio,:profesion,:fuente_ingresos,
                :seguridad_social_id,:afiliacion,:tramita_personalmente,:grupo_vulnerable_id,:migrante,:codigo2024,1,:uid,:uid)'''),
-              {**b.model_dump(),'uid':uid,'eid':eid,'edad':age,'birth_eid':birth['entidad_id'],'no_curp':b.curp is None}).lastrowid
+              {**b.model_dump(),**social,'uid':uid,'eid':eid,'edad':age,'birth_eid':birth['entidad_id'],'no_curp':b.curp is None}).lastrowid
         if data.solicitante:
             a=data.solicitante
             aid=db.execute(text('''INSERT INTO Tbl_Solicitantes (sol_nombres,sol_apellidos,sol_parentescoid,sol_otroparentesco,
-              sol_fecha_nacimiento,sol_calle,sol_numero,sol_colonia,sol_codigopostal,sol_estadoid,sol_municipioid,sol_telefono,
+              sol_fecha_nacimiento,sol_calle,sol_numero,sol_colonia,sol_colonia_id,sol_codigopostal,sol_estadoid,sol_municipioid,sol_telefono,
               is_active,createdBy,updatedBy) VALUES (:nombres,:apellidos,:parentesco_id,:otro_parentesco,:fecha_nacimiento,
-              :calle,:numero,:colonia,:codigo_postal,:eid,:municipio_id,:telefono,1,:uid,:uid)'''),
-              {**a.model_dump(),'eid':eid,'uid':uid}).lastrowid
+              :calle,:numero,:colonia,:colonia_id,:codigo_postal,:eid,:municipio_id,:telefono,1,:uid,:uid)'''),
+              {**a.model_dump(),**applicant_home,'eid':eid,'uid':uid}).lastrowid
         sid=db.execute(text('''INSERT INTO Tbl_SolicitudesApoyo (solapoyo_beneficiarioid,solapoyo_solicitanteid,
           solapoyo_enviadoporid,solapoyo_enviadopor_dependenciaid,solapoyo_enviadopor_partidopoliticoid,
           solapoyo_enviadopor_municipioid,solapoyo_enviadopor_detalles,solapoyo_tipoapoyoid,

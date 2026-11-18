@@ -66,11 +66,18 @@ class FilterSheet extends StatefulWidget {
   final Map<String, dynamic> catalogs;
   final Filters initial;
   final Future<int> Function(Filters filters) count;
+
+  /// Requests per option of a catalog (e.g. per municipality) with the other
+  /// filters of the draft, so options can show their count and be ordered by
+  /// it. Optional: without it the lists show names only.
+  final Future<Map<String, num>> Function(String catalog, Filters others)?
+  optionCounts;
   const FilterSheet({
     super.key,
     required this.catalogs,
     required this.initial,
     required this.count,
+    this.optionCounts,
   });
   @override
   State<FilterSheet> createState() => _FilterSheetState();
@@ -155,8 +162,17 @@ class _FilterSheetState extends State<FilterSheet> {
     }
   }
 
+  /// Catalogs whose options are counted in the dashboard summary.
+  static const countedCatalogs = {
+    'municipios',
+    'apoyos',
+    'dependencias',
+    'grupos',
+  };
+
   Future<void> openPicker(List<String> def) async {
     final options = widget.catalogs[def[2]] as List? ?? [];
+    final counts = widget.optionCounts;
     await showPhoneSheet<void>(
       context,
       (_) => OptionPicker(
@@ -166,6 +182,11 @@ class _FilterSheetState extends State<FilterSheet> {
         ],
         initial: draft[def[1]] ?? const [],
         onChanged: (ids) => select(def[1], ids),
+        // Counted without this filter itself, so every option shows how many
+        // requests it would add, not only the ones already selected.
+        counts: counts != null && countedCatalogs.contains(def[2])
+            ? counts(def[2], copyFilters(draft)..remove(def[1]))
+            : null,
       ),
       heightFactor: 0.75,
     );
@@ -364,12 +385,17 @@ class OptionPicker extends StatefulWidget {
   final List<({String id, String name})> options;
   final List<String> initial;
   final ValueChanged<List<String>> onChanged;
+
+  /// Requests per option id; when present, each option shows its count and
+  /// the list can be ordered by "Más solicitudes" (default) or "A–Z".
+  final Future<Map<String, num>>? counts;
   const OptionPicker({
     super.key,
     required this.title,
     required this.options,
     required this.initial,
     required this.onChanged,
+    this.counts,
   });
   @override
   State<OptionPicker> createState() => _OptionPickerState();
@@ -378,6 +404,21 @@ class OptionPicker extends StatefulWidget {
 class _OptionPickerState extends State<OptionPicker> {
   late final List<String> selected = [...widget.initial];
   final search = TextEditingController();
+  Map<String, num>? counts;
+  bool countsFailed = false;
+  String order = 'Más solicitudes';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.counts
+        ?.then((value) {
+          if (mounted) setState(() => counts = value);
+        })
+        .catchError((_) {
+          if (mounted) setState(() => countsFailed = true);
+        });
+  }
 
   @override
   void dispose() {
@@ -403,6 +444,17 @@ class _OptionPickerState extends State<OptionPicker> {
     final visible = widget.options
         .where((o) => q.isEmpty || fold(o.name).contains(q))
         .toList();
+    final counted = counts != null;
+    if (counted && order == 'Más solicitudes') {
+      // Stable: equal counts keep the alphabetical catalog order.
+      final index = {
+        for (var i = 0; i < widget.options.length; i++) widget.options[i].id: i,
+      };
+      visible.sort((a, b) {
+        final byCount = (counts![b.id] ?? 0).compareTo(counts![a.id] ?? 0);
+        return byCount != 0 ? byCount : index[a.id]!.compareTo(index[b.id]!);
+      });
+    }
     final searchable = widget.options.length > 8;
     return Padding(
       // Keep the list and "Listo" above the on-screen keyboard.
@@ -430,6 +482,31 @@ class _OptionPickerState extends State<OptionPicker> {
                         ),
                 ),
               ),
+            ),
+          if (widget.counts != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: counted
+                  ? SegmentedButton<String>(
+                      key: const ValueKey('option-order'),
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: 'Más solicitudes',
+                          label: Text('Más solicitudes'),
+                        ),
+                        ButtonSegment(value: 'A–Z', label: Text('A–Z')),
+                      ],
+                      selected: {order},
+                      onSelectionChanged: (v) =>
+                          setState(() => order = v.first),
+                    )
+                  : Text(
+                      countsFailed
+                          ? 'No se pudieron cargar los totales.'
+                          : 'Calculando solicitudes por opción…',
+                      style: const TextStyle(fontSize: 12, color: muted),
+                    ),
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
@@ -460,6 +537,16 @@ class _OptionPickerState extends State<OptionPicker> {
                     value: selected.contains(o.id),
                     onChanged: (_) => toggle(o.id),
                     title: Text(o.name),
+                    secondary: counted
+                        ? Text(
+                            '${counts![o.id] ?? 0}',
+                            key: ValueKey('count-${o.id}'),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: ink,
+                            ),
+                          )
+                        : null,
                     controlAffinity: ListTileControlAffinity.leading,
                     // Brand orange on both platforms (iOS defaults to blue).
                     activeColor: brand,

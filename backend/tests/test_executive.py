@@ -7,12 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.main import app
 from app.database import engine, get_db
 from app.security import hasher, issue_token, now
-from app.services.executive_service import month_series, where_clause
+from app.services import executive_service as svc
+from app.services.executive_service import DATES, looks_like_date, matches, month_series, where_clause
 from app.routers.executive import NewRequest
 
 
@@ -46,6 +48,20 @@ def test_filters_accept_repeated_params_and_reject_invalid():
         filters(municipio_id=[0])
     with pytest.raises(Exception):
         filters(tipo_apoyo_id=list(range(1,102)))
+
+
+def test_search_words_are_parameterized_and_dates_need_a_date_shape():
+    sql,params=matches(['name'],['50%_off'],'q')
+    assert params=={'q0':'%50\\%\\_off%'} and '50' not in sql
+    assert looks_like_date('29/02/2024') and looks_like_date('2024-02') and looks_like_date('2024')
+    assert not looks_like_date('026') and not looks_like_date('maria')
+    sql,_=matches(['name',*DATES],['026'],'q')
+    assert 'DATE_FORMAT' not in sql
+    sql,_=matches(['name'],['oct'],'q',months=True)
+    assert 'MONTH(sa.created)=10' in sql
+    sql,params=matches(['name'],['#14'],'q',folio=True)
+    assert 'sa.solapoyo_id=:q0_folio' in sql and params['q0_folio']==14
+    assert 'solapoyo_id' not in matches(['name'],['jorge'],'q',folio=True)[0]
 
 
 def test_blank_request_rejected():
@@ -91,14 +107,16 @@ def sign_in(client,address,password):
 
 def test_comparison_api_auth_validation_and_empty_scope(live):
     client,db,uid,address,password,eid=live
-    params={'a_inicio':'2024-02-01','a_fin':'2024-02-29','b_inicio':'2025-02-01','b_fin':'2025-02-28','municipio_id':2147483647}
+    params={'inicio':['2024-02-01','2025-02-01','2026-02-01'],'fin':['2024-02-29','2025-02-28','2026-02-28'],'municipio_id':2147483647}
     assert client.get('/ejecutivo/comparacion',params=params).status_code==401
     headers=sign_in(client,address,password)
     response=client.get('/ejecutivo/comparacion',params=params,headers=headers)
     assert response.status_code==200
-    assert response.json()['a']['total']==response.json()['b']['total']==0
-    assert response.json()['variacion']['total']['porcentaje']==0
-    assert client.get('/ejecutivo/comparacion',params={**params,'b_fin':'2024-01-01'},headers=headers).status_code==422
+    periods=response.json()['periodos']
+    assert [p['total'] for p in periods]==[0,0,0]
+    assert periods[0]['variacion'] is None and periods[2]['variacion']['total']['porcentaje']==0
+    assert client.get('/ejecutivo/comparacion',params={**params,'fin':['2024-01-01','2025-02-28','2026-02-28']},headers=headers).status_code==422
+    assert client.get('/ejecutivo/comparacion',params={**params,'fin':params['fin'][:2]},headers=headers).status_code==422
 
 
 def test_empty_data_scope_registration_exports_and_logout(live):
@@ -109,15 +127,25 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert initial.status_code==200,initial.text
     before=initial.json()['total']
     cats=client.get('/ejecutivo/catalogos',headers=headers).json()
-    mid=cats['municipios'][0]['id']
+    mid,other_mid=cats['municipios'][0]['id'],cats['municipios'][1]['id']
+    home=db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'Colonia temporal','64999')"),{'m':mid}).lastrowid
+    away=db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'Colonia temporal','65999')"),{'m':other_mid}).lastrowid
+    db.commit()
+    # La misma colonia con otra escritura (mayúsculas o acentos) no puede repetirse en el catálogo.
+    with pytest.raises(IntegrityError):
+        db.execute(text("INSERT INTO Cat_Colonias (municipio_id,nombre,codigo_postal) VALUES (:m,'COLONIA TEMPORÁL','64999')"),{'m':mid})
+    db.rollback()
+    colonies=client.get('/ejecutivo/colonias',params={'municipio_id':mid},headers=headers).json()['items']
+    assert {'id':home,'nombre':'Colonia temporal','codigo_postal':'64999'} in colonies
     data={'beneficiario':{'nombres':'Beneficiario temporal','apellidos':'Prueba',
       'fecha_nacimiento':'1990-01-01','genero_id':cats['generos'][0]['id'],
-      'municipio_nacimiento_id':mid,'municipio_id':mid,'calle':'Temporal','numero':'1','colonia_id':1,
-      'codigo_postal':'64000','tiempo_residencia':1,'con_quien_vive':'Familia','numero_hijos':0,
+      'municipio_nacimiento_id':mid,'municipio_id':mid,'calle':'Temporal','numero':'1','colonia_id':home,
+      'tiempo_residencia':1,'con_quien_vive_id':cats['con_quien_vive'][0]['id'],'numero_hijos':0,
+      'estudia':True,'area_estudio_id':cats['areas_estudio'][0]['id'],'ocupacion_id':cats['ocupaciones'][0]['id'],
       'seguridad_social_id':cats['seguridad_social'][0]['id'],'grupo_vulnerable_id':cats['grupos'][0]['id']},
       'solicitante':{'nombres':'Solicitante temporal','apellidos':'Prueba',
       'parentesco_id':cats['parentescos'][0]['id'],'fecha_nacimiento':'1990-01-01',
-      'municipio_id':mid,'calle':'Temporal','numero':'1','colonia':'Temporal','codigo_postal':'64000','telefono':'8112345678'},
+      'mismo_domicilio':True,'telefono':'8112345678'},
       'tipo_apoyo_id':cats['apoyos'][0]['id'],'dependencia_id':cats['dependencias'][0]['id'],
       'enviado_por_id':cats['origenes'][0]['id'],'canal_id':cats['canales'][0]['id'],
       'unidad_tratante_id':cats['unidades'][0]['id'],'descripcion':'Prueba aislada, se revierte',
@@ -126,18 +154,83 @@ def test_empty_data_scope_registration_exports_and_logout(live):
     assert created.status_code==201,created.text
     assert client.post('/ejecutivo/solicitudes',json=data,headers=headers).json()==created.json()
     sid=created.json()['solicitud_id']
+    stored=db.execute(text('''SELECT b.ben_dom_colonia,b.ben_dom_colonia_id,b.ben_dom_cp,b.ben_estsocioeco_conquienvive,
+      s.sol_calle,s.sol_colonia,s.sol_colonia_id,s.sol_codigopostal,s.sol_municipioid
+      FROM Tbl_SolicitudesApoyo sa JOIN Tbl_Beneficiarios b ON b.ben_id=sa.solapoyo_beneficiarioid
+      JOIN Tbl_Solicitantes s ON s.sol_id=sa.solapoyo_solicitanteid WHERE sa.solapoyo_id=:sid'''),{'sid':sid}).mappings().one()
+    assert (stored['ben_dom_colonia'],stored['ben_dom_colonia_id'],stored['ben_dom_cp'])==(home,home,'64999')
+    assert stored['ben_estsocioeco_conquienvive']==cats['con_quien_vive'][0]['nombre']
+    assert (stored['sol_calle'],stored['sol_colonia_id'],stored['sol_codigopostal'],stored['sol_municipioid'])==('Temporal',home,'64999',mid)
+    wrong=client.post('/ejecutivo/solicitudes',json={**data,'beneficiario':{**data['beneficiario'],'colonia_id':away},
+      'idempotencia':str(uuid.uuid4())},headers=headers)
+    assert wrong.status_code==422 and 'colonia' in wrong.text
     summary=client.get('/ejecutivo/dashboard',headers=headers).json()
     assert summary['total']==before+1
+    # The status breakdown shown under the total adds up to it.
+    assert sum(summary[k] for k in ['activas','resueltas','no_competencia','canceladas'])==summary['total']
     assert sum(r['total'] for r in summary['municipios'])==summary['total']
     assert sum(r['total'] for r in summary['grupos'])==summary['total']
     db.execute(text("UPDATE Tbl_SolicitudesApoyo SET created='2024-02-29 12:00:00', solapoyo_statusid=(SELECT id FROM Cat_StatusAtencion WHERE descripcion='Resuelto') WHERE solapoyo_id=:sid"),{'sid':sid})
     db.commit()
-    comparison=client.get('/ejecutivo/comparacion',params={'a_inicio':'2024-02-01','a_fin':'2024-02-29','b_inicio':'2025-02-01','b_fin':'2025-02-28','municipio_id':mid},headers=headers).json()
-    assert comparison['a']['total']==1 and comparison['a']['resueltas']==1 and comparison['a']['activas']==0
-    assert comparison['b']['total']==0
-    assert comparison['variacion']['total']['porcentaje']==-100.0
+    comparison=client.get('/ejecutivo/comparacion',params={'inicio':['2024-02-01','2025-02-01'],'fin':['2024-02-29','2025-02-28'],'municipio_id':mid},headers=headers).json()
+    first,second=comparison['periodos']
+    assert first['total']==1 and first['resueltas']==1 and first['activas']==0
+    assert second['total']==0
+    assert second['variacion']['total']['porcentaje']==-100.0
+    # Búsqueda de la tabla: sin importar acentos ni mayúsculas, por persona o por fecha de registro.
+    def search(q,**extra):
+        result=client.get('/ejecutivo/solicitudes',params={'q':q,'municipio_id':mid,**extra},headers=headers)
+        assert result.status_code==200,result.text
+        return [r['solicitud_id'] for r in result.json()['items']]
+    assert sid in search('BENEFICIARIO TEMPORÁL prúeba')
+    assert sid in search('solicitante temporal')
+    assert sid in search('29/02/2024') and sid in search('2024-02-29') and sid in search('febrero 2024')
+    assert sid not in search('Beneficiario temporal 2023')
+    # Sorting by column covers every page, not only the one on screen.
+    def column(orden,direccion):
+        result=client.get('/ejecutivo/solicitudes',params={'orden':orden,'direccion':direccion},headers=headers)
+        assert result.status_code==200,result.text
+        return [r['solicitud_id'] for r in result.json()['items']]
+    assert column('solicitud','asc')==sorted(column('solicitud','asc'))
+    assert column('solicitud','desc')==sorted(column('solicitud','desc'),reverse=True)
+    for orden in svc.SORT_COLUMNS:
+        assert column(orden,'asc') is not None
+    assert client.get('/ejecutivo/solicitudes',params={'orden':'sa.created; DROP'},headers=headers).status_code==422
+    row=client.get('/ejecutivo/solicitudes',params={'q':'temporal','municipio_id':mid},headers=headers).json()['items'][0]
+    assert (row['beneficiario'],row['solicitante'])==('Beneficiario temporal Prueba','Solicitante temporal Prueba')
+    # Tipo de apoyo, estatus y folio distinguen solicitudes de la misma persona.
+    support=cats['apoyos'][0]['nombre']
+    assert sid in search('beneficiario temporal '+support.split()[0].upper())
+    assert sid in search('temporal resuelto') and sid in search(f'#{sid}') and sid in search(f'temporal {sid}')
+    hints=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'TEMPORÁL','municipio_id':mid},headers=headers)
+    assert hints.status_code==200,hints.text
+    hints=hints.json()
+    assert hints['total']>=1 and len(hints['solicitudes'])<=5
+    first=hints['solicitudes'][0]
+    assert (first['solicitud_id'],first['tipo_apoyo'],first['estatus'])==(sid,support,'Resuelto')
+    people={(p['nombre'],p['tipo']):p['total'] for p in hints['personas']}
+    assert people[('Beneficiario temporal Prueba','Beneficiario')]==1
+    assert people[('Solicitante temporal Prueba','Solicitante')]==1
+    # A word of the applicant's name does not offer the beneficiary ("jorge serangue").
+    narrowed=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'temporal solicitante','municipio_id':mid},headers=headers).json()
+    assert sid in [r['solicitud_id'] for r in narrowed['solicitudes']]
+    assert [(p['nombre'],p['tipo']) for p in narrowed['personas']]==[('Solicitante temporal Prueba','Solicitante')]
+    # Request details still narrow a person: "temporal resuelto" keeps both.
+    both={p['tipo'] for p in client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'temporal resuelto','municipio_id':mid},headers=headers).json()['personas']}
+    assert both=={'Beneficiario','Solicitante'}
+    dates=client.get('/ejecutivo/solicitudes/sugerencias',params={'q':'29/02','municipio_id':mid},headers=headers).json()
+    assert sid in [r['solicitud_id'] for r in dates['solicitudes']] and dates['personas']==[]
     found=client.get('/ejecutivo/personas',params={'tipo':'beneficiario','q':'Beneficiario temporal'},headers=headers)
     assert found.status_code==200 and found.json()['items']
+    # Same names are told apart by birth date, municipality, requests and phone.
+    person=next(p for p in found.json()['items'] if p['nombre'].startswith('Beneficiario temporal Prueba'))
+    assert (str(person['fecha_nacimiento']),person['solicitudes'])==('1990-01-01',1) and person['municipio']
+    by_phone=client.get('/ejecutivo/personas',params={'tipo':'solicitante','q':'8112345678'},headers=headers).json()['items']
+    assert any(p['nombre'].startswith('Solicitante temporal Prueba') and p['telefono']=='8112345678' for p in by_phone)
+    # Palabras en cualquier orden, sin importar acentos ni mayúsculas.
+    for tipo,q in [('beneficiario','PRUEBA temporál beneficiario'),('solicitante','prueba SOLICITANTE')]:
+        names=[p['nombre'] for p in client.get('/ejecutivo/personas',params={'tipo':tipo,'q':q},headers=headers).json()['items']]
+        assert any(n.startswith(tipo.capitalize()+' temporal Prueba') for n in names),(q,names)
     assert client.get('/ejecutivo/dashboard?region_id=1',headers=headers).status_code==422
     filtered=client.get('/ejecutivo/dashboard?municipio_id=2147483647',headers=headers).json()
     assert filtered['total']==0

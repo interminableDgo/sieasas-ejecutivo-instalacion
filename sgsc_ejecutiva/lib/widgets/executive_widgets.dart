@@ -1,70 +1,264 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/theme.dart';
+import '../services/image_clipboard.dart';
 
-class ExecutiveCard extends StatelessWidget {
+/// Kinds of status in the requests table: yellow triangle (activas), green
+/// square (resueltas) and red cross (closed).
+enum StatusKind { pending, resolved, closed }
+
+/// Colours of [StatusDaysIcon], shared so the summary and the table match.
+const statusYellow = Color(0xFFF4B400);
+const statusGreen = Color(0xFF27834A);
+const statusRed = Color(0xFFD32F2F);
+
+/// Text colour for a status number. Yellow is darkened only for text: on
+/// white the icon's yellow is too light to read as a number.
+Color statusTextColor(StatusKind kind) => switch (kind) {
+  StatusKind.pending => const Color(0xFF9A6C00),
+  StatusKind.resolved => statusGreen,
+  StatusKind.closed => statusRed,
+};
+
+/// Key of the requests table: what each status icon is and what its number
+/// counts. Uses the table's own icons, small.
+class StatusLegend extends StatelessWidget {
+  const StatusLegend({super.key});
+
+  Widget item(Widget icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      SizedBox.square(dimension: 16, child: icon),
+      const SizedBox(width: 5),
+      Text(text, style: const TextStyle(fontSize: 11, color: ink)),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 14,
+          runSpacing: 6,
+          children: [
+            item(
+              const CustomPaint(painter: _DaysTrianglePainter(statusYellow)),
+              'En proceso',
+            ),
+            item(
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: statusGreen,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              'Resuelta',
+            ),
+            item(
+              const FittedBox(
+                child: Icon(Icons.cancel_rounded, color: statusRed),
+              ),
+              'Cerrada o no es competencia',
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class ExecutiveCard extends StatefulWidget {
   final String title;
   final String? source;
   final Widget child;
+
+  /// Shows a button that copies the card (title and chart) as an image.
+  final bool copyable;
   const ExecutiveCard({
     super.key,
     required this.title,
     required this.child,
     this.source,
+    this.copyable = false,
   });
+
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: border),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x0F1B2A33),
-          blurRadius: 2,
-          offset: Offset(0, 1),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+  State<ExecutiveCard> createState() => _ExecutiveCardState();
+}
+
+class _ExecutiveCardState extends State<ExecutiveCard> {
+  final capture = GlobalKey();
+  bool capturing = false;
+
+  /// Renders the card without its buttons, on a white background so the
+  /// pasted image has no transparent corners.
+  Future<Uint8List> image() async {
+    setState(() => capturing = true);
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary =
+          capture.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final picture = await boundary.toImage(pixelRatio: 2);
+      final data = await picture.toByteData(format: ui.ImageByteFormat.png);
+      picture.dispose();
+      return data!.buffer.asUint8List();
+    } finally {
+      if (mounted) setState(() => capturing = false);
+    }
+  }
+
+  Future<void> copy() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final box = context.findRenderObject() as RenderBox?;
+    // The copy starts inside the click so the browser allows the clipboard.
+    final png = image();
+    var message = 'Gráfica copiada al portapapeles.';
+    try {
+      if (!await copyPngToClipboard(png)) {
+        final name =
+            'SIESAS-${widget.title.replaceAll(RegExp(r'[^\wÁÉÍÓÚÑáéíóúñ]+'), '-')}.png';
+        final file = XFile.fromData(
+          await png,
+          name: name,
+          mimeType: 'image/png',
+        );
+        if (kIsWeb) {
+          await file.saveTo(name);
+          message = 'Tu navegador no permite copiar imágenes. Se descargó la gráfica.';
+        } else {
+          await SharePlus.instance.share(
+            ShareParams(
+              files: [file],
+              fileNameOverrides: [name],
+              sharePositionOrigin: box == null
+                  ? null
+                  : box.localToGlobal(Offset.zero) & box.size,
             ),
-            if (source != null)
-              IconButton(
-                tooltip: 'Cómo se calcula',
-                icon: const Icon(Icons.info_outline, size: 18, color: muted),
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: Text(title),
-                    content: Text(source!),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: const Text('Entendido'),
-                      ),
-                    ],
-                  ),
+          );
+          return;
+        }
+      }
+    } catch (_) {
+      message = 'No se pudo copiar la gráfica. Intenta de nuevo.';
+    }
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: RepaintBoundary(
+      key: capture,
+      child: _CardCapture(
+        capturing: capturing,
+        child: ColoredBox(
+          color: capturing ? Colors.white : Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F1B2A33),
+                  blurRadius: 2,
+                  offset: Offset(0, 1),
                 ),
-              ),
-          ],
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    CopyExclude(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.copyable)
+                            IconButton(
+                              tooltip: 'Copiar imagen de la gráfica',
+                              icon: const Icon(
+                                Icons.copy_all_outlined,
+                                size: 18,
+                                color: muted,
+                              ),
+                              onPressed: capturing ? null : copy,
+                            ),
+                          if (widget.source != null)
+                            IconButton(
+                              tooltip: 'Cómo se calcula',
+                              icon: const Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: muted,
+                              ),
+                              onPressed: () => showDialog<void>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                  title: Text(widget.title),
+                                  content: Text(widget.source!),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(c),
+                                      child: const Text('Entendido'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                widget.child,
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        child,
-      ],
+      ),
     ),
   );
+}
+
+class _CardCapture extends InheritedWidget {
+  final bool capturing;
+  const _CardCapture({required this.capturing, required super.child});
+
+  @override
+  bool updateShouldNotify(_CardCapture old) => old.capturing != capturing;
+}
+
+/// Leaves controls (view selectors, "Ver todos", buttons) out of the image
+/// copied from an [ExecutiveCard]; only the title and the data remain.
+class CopyExclude extends StatelessWidget {
+  final Widget child;
+  const CopyExclude({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_CardCapture>()?.capturing ??
+          false
+      ? const SizedBox.shrink()
+      : child;
 }
 
 class Notice extends StatelessWidget {
@@ -100,11 +294,27 @@ class StatusDaysIcon extends StatelessWidget {
   final String status;
   final Object? registeredAt;
 
+  /// The table shows the days in their own «Antigüedad» column, so the icon
+  /// there carries only the status (a bare number read like a folio).
+  final bool showDays;
+
   const StatusDaysIcon({
     super.key,
     required this.status,
     required this.registeredAt,
+    this.showDays = true,
   });
+
+  /// «Hoy», «1 día», «8 días»; «—» for closed requests, whose closing date
+  /// the database does not keep.
+  static String ageLabel(String status, Object? registeredAt) {
+    final icon = StatusDaysIcon(status: status, registeredAt: registeredAt);
+    if (icon.closed && !icon.resolved) return '—';
+    final days = icon.daysSinceRegistration;
+    if (days == null) return '—';
+    if (days == 0) return 'Hoy';
+    return days == 1 ? '1 día' : '$days días';
+  }
 
   String get normalizedStatus => status.trim().toLowerCase();
   bool get resolved => normalizedStatus.startsWith('resuelto');
@@ -131,10 +341,10 @@ class StatusDaysIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final days = daysSinceRegistration;
     const blue = Color(0xFF12A5E5);
-    const yellow = Color(0xFFF4B400);
-    const green = Color(0xFF27834A);
-    const red = Color(0xFFD32F2F);
-    final marker = days?.toString() ?? '?';
+    const yellow = statusYellow;
+    const green = statusGreen;
+    const red = statusRed;
+    final marker = showDays ? (days?.toString() ?? '?') : '';
     final description = closed
         ? resolved
               ? days == null
@@ -262,6 +472,120 @@ class LabeledField extends StatelessWidget {
         const SizedBox(height: 8),
         child,
       ],
+    ),
+  );
+}
+
+/// Wizard position: a large step number, the section and title, and one
+/// segment per step (completed, current, pending). Ink on orange keeps the
+/// number legible (≈ 6.8:1); color is never the only cue, since completed
+/// segments also show a check.
+class StepProgress extends StatelessWidget {
+  final int current, total;
+  final String section, title;
+  const StepProgress({
+    super.key,
+    required this.current,
+    required this.total,
+    required this.section,
+    required this.title,
+  });
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    liveRegion: true,
+    label: 'Paso $current de $total: $section, $title',
+    child: ExcludeSemantics(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 18),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        decoration: BoxDecoration(
+          color: blueTint,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: salud.withValues(alpha: .35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: brand,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '$current',
+                    style: const TextStyle(
+                      color: ink,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PASO $current DE $total · ${section.toUpperCase()}',
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: ink,
+                          fontSize: 20,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                for (var i = 1; i <= total; i++) ...[
+                  if (i > 1) const SizedBox(width: 6),
+                  Expanded(
+                    child: Container(
+                      height: 18,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: i < current
+                            ? salud
+                            : i == current
+                            ? brand
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: i <= current ? Colors.transparent : border,
+                        ),
+                      ),
+                      child: i < current
+                          ? const Icon(Icons.check, size: 13, color: ink)
+                          : null,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     ),
   );
 }

@@ -1,0 +1,120 @@
+﻿#0 building with "desktop-linux" instance using docker driver
+System.Management.Automation.RemoteException
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.51kB done
+#1 DONE 0.0s
+System.Management.Automation.RemoteException
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 0.3s
+System.Management.Automation.RemoteException
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+System.Management.Automation.RemoteException
+#4 [internal] load metadata for docker.io/library/python:3.12-slim
+#4 DONE 0.2s
+System.Management.Automation.RemoteException
+#5 [internal] load .dockerignore
+#5 transferring context: 711B done
+#5 DONE 0.0s
+System.Management.Automation.RemoteException
+#6 [internal] load build context
+#6 DONE 0.0s
+System.Management.Automation.RemoteException
+#7 [runtime 1/7] FROM docker.io/library/python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+#7 resolve docker.io/library/python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b 0.0s done
+#7 DONE 0.0s
+System.Management.Automation.RemoteException
+#6 [internal] load build context
+#6 transferring context: 31.35kB done
+#6 DONE 0.0s
+System.Management.Automation.RemoteException
+#8 [runtime 2/7] RUN useradd --create-home --uid 10001 sgsc
+#8 CACHED
+System.Management.Automation.RemoteException
+#9 [runtime 3/7] WORKDIR /app
+#9 CACHED
+System.Management.Automation.RemoteException
+#10 [runtime 4/7] COPY services/registro/requirements.txt /tmp/requirements.txt
+#10 CACHED
+System.Management.Automation.RemoteException
+#11 [runtime 5/7] COPY libs/sgsc_common /tmp/sgsc_common
+#11 CACHED
+System.Management.Automation.RemoteException
+#12 [runtime 6/7] RUN pip install -r /tmp/requirements.txt /tmp/sgsc_common && rm -rf /tmp/requirements.txt /tmp/sgsc_common
+#12 CACHED
+System.Management.Automation.RemoteException
+#13 [runtime 7/7] COPY services/registro/sgsc_registro ./sgsc_registro
+#13 CACHED
+System.Management.Automation.RemoteException
+#14 [test 1/5] COPY services/registro/requirements-test.txt /tmp/requirements-test.txt
+#14 DONE 0.1s
+System.Management.Automation.RemoteException
+#15 [test 2/5] RUN pip install -r /tmp/requirements-test.txt && rm /tmp/requirements-test.txt
+#15 1.127 Collecting certifi==2026.7.22 (from -r /tmp/requirements-test.txt (line 2))
+#15 1.189   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+#15 1.219 Collecting httpcore==1.0.9 (from -r /tmp/requirements-test.txt (line 3))
+#15 1.238   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#15 1.314 Collecting httpx==0.28.1 (from -r /tmp/requirements-test.txt (line 4))
+#15 1.333   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#15 1.356 Collecting iniconfig==2.3.0 (from -r /tmp/requirements-test.txt (line 5))
+#15 1.404   Downloading iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+#15 1.432 Collecting packaging==26.3 (from -r /tmp/requirements-test.txt (line 6))
+#15 1.450   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+#15 1.509 Collecting pluggy==1.6.0 (from -r /tmp/requirements-test.txt (line 7))
+#15 1.527   Downloading pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+#15 1.561 Collecting Pygments==2.21.0 (from -r /tmp/requirements-test.txt (line 8))
+#15 1.580   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+#15 1.623 Collecting pytest==9.1.1 (from -r /tmp/requirements-test.txt (line 9))
+#15 1.641   Downloading pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+#15 1.646 Requirement already satisfied: h11>=0.16 in /usr/local/lib/python3.12/site-packages (from httpcore==1.0.9->-r /tmp/requirements-test.txt (line 3)) (0.16.0)
+#15 1.646 Requirement already satisfied: anyio in /usr/local/lib/python3.12/site-packages (from httpx==0.28.1->-r /tmp/requirements-test.txt (line 4)) (4.15.1)
+#15 1.649 Requirement already satisfied: idna in /usr/local/lib/python3.12/site-packages (from httpx==0.28.1->-r /tmp/requirements-test.txt (line 4)) (3.20)
+#15 1.659 Requirement already satisfied: typing_extensions>=4.16.0 in /usr/local/lib/python3.12/site-packages (from anyio->httpx==0.28.1->-r /tmp/requirements-test.txt (line 4)) (4.16.0)
+#15 1.684 Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+#15 1.742 Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+#15 1.765 Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+#15 1.794 Downloading iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+#15 1.817 Downloading packaging-26.3-py3-none-any.whl (129 kB)
+#15 1.845 Downloading pluggy-1.6.0-py3-none-any.whl (20 kB)
+#15 1.876 Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+#15 1.982    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 12.6 MB/s eta 0:00:00
+#15 2.005 Downloading pytest-9.1.1-py3-none-any.whl (386 kB)
+#15 2.074 Installing collected packages: Pygments, pluggy, packaging, iniconfig, certifi, pytest, httpcore, httpx
+#15 2.929 Successfully installed Pygments-2.21.0 certifi-2026.7.22 httpcore-1.0.9 httpx-0.28.1 iniconfig-2.3.0 packaging-26.3 pluggy-1.6.0 pytest-9.1.1
+#15 2.929 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#15 DONE 3.0s
+System.Management.Automation.RemoteException
+#16 [test 3/5] COPY services/registro/pytest.ini ./pytest.ini
+#16 DONE 0.1s
+System.Management.Automation.RemoteException
+#17 [test 4/5] COPY services/registro/tests ./tests
+#17 DONE 0.1s
+System.Management.Automation.RemoteException
+#18 [test 5/5] RUN python -m pytest -q
+#18 1.252 ..........................                                               [100%]
+#18 1.316 =============================== warnings summary ===============================
+#18 1.316 ../usr/local/lib/python3.12/site-packages/fastapi/testclient.py:1
+#18 1.316   /usr/local/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+#18 1.316     from starlette.testclient import TestClient as TestClient  # noqa
+#18 1.316 
+#18 1.316 ../usr/local/lib/python3.12/site-packages/starlette/testclient.py:53
+#18 1.316   /usr/local/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+#18 1.316     _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+#18 1.316 
+#18 1.316 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+#18 1.316 26 passed, 2 warnings in 0.55s
+#18 DONE 1.4s
+System.Management.Automation.RemoteException
+#19 exporting to image
+#19 exporting layers
+#19 exporting layers 0.6s done
+#19 exporting manifest sha256:c68a9eecf2d2c05c35a94658408f1a07ed58500a4ada22f0d89e1b668bd39868 0.0s done
+#19 exporting config sha256:8fbd74de3930341bf9f9f8704c14110476fa9c8123d5564a32942278768eb3ac 0.0s done
+#19 exporting attestation manifest sha256:7eb2fa5a285e9f3246c3fcc5e7c31727c8b5241bb4269c95b283b9841c5a6c00 0.0s done
+#19 exporting manifest list sha256:1758cb7975af01319f990364beef5a0eaa3531d8a8c5626e560fd35f42463b6d
+#19 exporting manifest list sha256:1758cb7975af01319f990364beef5a0eaa3531d8a8c5626e560fd35f42463b6d 0.0s done
+#19 naming to moby-dangling@sha256:1758cb7975af01319f990364beef5a0eaa3531d8a8c5626e560fd35f42463b6d done
+#19 unpacking to moby-dangling@sha256:1758cb7975af01319f990364beef5a0eaa3531d8a8c5626e560fd35f42463b6d
+#19 unpacking to moby-dangling@sha256:1758cb7975af01319f990364beef5a0eaa3531d8a8c5626e560fd35f42463b6d 0.3s done
+#19 DONE 1.2s

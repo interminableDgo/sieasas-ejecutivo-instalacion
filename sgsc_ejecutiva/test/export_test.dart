@@ -34,8 +34,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.edit_outlined));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(0), '01/02/2024');
-    await tester.enterText(find.byType(TextField).at(1), '29/02/2024');
+    // Date fields of the period editor, not the search box of the table.
+    final periodFields = find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.labelText != 'Buscar solicitud',
+    );
+    await tester.enterText(periodFields.at(0), '01/02/2024');
+    await tester.enterText(periodFields.at(1), '29/02/2024');
     await tester.tap(find.text('Aplicar periodo'));
     await tester.pumpAndSettle();
     expect(find.text('2024-02-01 al 2024-02-29'), findsOneWidget);
@@ -46,7 +50,35 @@ void main() {
       expect(uri.queryParameters['fecha_inicio'], '2024-02-01');
       expect(uri.queryParameters['fecha_fin'], '2024-02-29');
     }
-    await tester.tap(find.text('Exportar reporte'));
+    final requestCount = backend.requests.length;
+    await tester.scrollUntilVisible(
+      find.text('Apoyos solicitados'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    // Centred, so the chip is clear of the pinned bar and the export bar.
+    await Scrollable.ensureVisible(
+      tester.element(find.widgetWithText(ChoiceChip, 'Barras').first),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Barras').first);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Clasificación por grupo vulnerable'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    // Centred, so the chip is clear of the pinned bar and the export bar.
+    await Scrollable.ensureVisible(
+      tester.element(find.widgetWithText(ChoiceChip, 'Treemap').last),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Treemap').last);
+    await tester.pumpAndSettle();
+    expect(backend.requests.length, requestCount);
+    await tester.tap(find.byKey(const ValueKey('export-button')));
     await tester.pumpAndSettle();
     expect(find.textContaining('2024-02-01 al 2024-02-29'), findsOneWidget);
     expect(
@@ -64,6 +96,8 @@ void main() {
       );
       expect(uri.queryParameters['fecha_inicio'], '2024-02-01');
       expect(uri.queryParameters['fecha_fin'], '2024-02-29');
+      expect(uri.queryParameters['chart_apoyos'], 'bars');
+      expect(uri.queryParameters['chart_grupos'], 'treemap');
       expect(
         find.textContaining('El servidor no pudo generar el archivo.'),
         findsOneWidget,

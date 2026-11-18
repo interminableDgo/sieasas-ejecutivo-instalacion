@@ -26,6 +26,8 @@ class ExecutiveApi {
     Map<String, dynamic>? body,
     // Values are a String or an Iterable<String> (repeated ?key=a&key=b).
     Map<String, Object> query = const {},
+    Duration timeout = const Duration(seconds: 30),
+    String timeoutMessage = 'La conexión tardó demasiado. Intenta nuevamente.',
   }) async {
     final uri = Uri.parse('$baseUrl$path')
         .replace(queryParameters: query.isEmpty ? null : query);
@@ -39,9 +41,9 @@ class ExecutiveApi {
           await (body == null
                   ? client.get(uri, headers: headers)
                   : client.post(uri, headers: headers, body: jsonEncode(body)))
-              .timeout(const Duration(seconds: 30));
+              .timeout(timeout);
     } on TimeoutException {
-      throw ApiException('La conexión tardó demasiado. Intenta nuevamente.');
+      throw ApiException(timeoutMessage);
     } on http.ClientException {
       throw ApiException(
         'No se pudo conectar. Revisa tu conexión e intenta nuevamente.',
@@ -73,7 +75,14 @@ class ExecutiveApi {
   ) async =>
       jsonDecode(utf8.decode((await request(path, body: body)).bodyBytes))
           as Map<String, dynamic>;
+  // A report gathers every indicator and builds a file, so it gets more time
+  // than a screen query.
   Future<Uint8List> export(String format, Map<String, Object> filters) async =>
-      (await request('/ejecutivo/exportar/$format', query: filters)).bodyBytes;
+      (await request(
+        '/ejecutivo/exportar/$format',
+        query: filters,
+        timeout: const Duration(minutes: 2),
+        timeoutMessage: 'El reporte tardó demasiado en generarse. Revisa tu conexión e intenta nuevamente.',
+      )).bodyBytes;
   void dispose() => client.close();
 }

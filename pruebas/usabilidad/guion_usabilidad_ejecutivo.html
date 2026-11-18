@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guion · Prueba de usabilidad SIEASAS</title>
+<style>
+  @page { size: Letter; margin: 18mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.42; color: #000; background: #fff; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 2px; }
+  .sub { margin: 0 0 14px; font-size: 11pt; }
+  h2 { font-size: 13pt; margin: 20px 0 8px; }
+  h3 { font-size: 11.5pt; margin: 14px 0 6px; }
+  p { margin: 5px 0; }
+  ul { margin: 4px 0 6px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10pt; }
+  th, td { border: 1px solid #000; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { font-weight: bold; }
+  .say { font-style: italic; margin: 7px 0 7px 16px; }
+  .task { margin: 14px 0; break-inside: avoid-page; }
+  .task h3 { margin-top: 0; }
+  .meta { font-size: 10pt; font-weight: normal; }
+  .ref { margin: 6px 0; }
+  .warn { margin: 6px 0; }
+  .blank { display: inline-block; min-width: 230px; border-bottom: 1px solid #000; }
+  .page-break { break-before: page; }
+  .log td { height: 44px; }
+  .small { font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<h1>Guion · Prueba de usabilidad</h1>
+<p class="sub">SIEASAS · Panel Ejecutivo · Duración máxima: 20 minutos por participante</p>
+
+<p class="small"><b>Secciones:</b> Contexto para el moderador · Introducción · Preguntas pre-prueba · Tareas · Preguntas post-prueba y SUS · Conclusiones · Anexo: hoja de registro</p>
+
+<h2>Contexto para el moderador</h2>
+<p>La prueba evalúa la experiencia del rol Ejecutivo en el Sistema Integral Estatal de Atención en Salud y Asistencia Social (SIEASAS), desarrollado para la Secretaría de Salud del Estado de Nuevo León. Es una prueba <b>moderada y basada en tareas</b>: se plantean situaciones reales de trabajo y se observa cómo el participante usa el sistema para resolverlas.</p>
+
+<h3>Qué se evalúa</h3>
+<table>
+  <tr><th style="width:24%">Tarea</th><th>Qué mide y para qué</th></tr>
+  <tr><td>1. Entender el panel</td><td>Si el participante interpreta los indicadores sin ayuda, para saber si el panel da un panorama rápido y confiable.</td></tr>
+  <tr><td>2. Encontrar una solicitud</td><td>Si descubre y usa el buscador para llegar a una solicitud concreta e interpretar su estado.</td></tr>
+  <tr><td>3. Filtrar</td><td>Si puede acotar el panel a un municipio y reconoce que el filtro está aplicado.</td></tr>
+  <tr><td>4. Obtener el reporte</td><td>Si encuentra la exportación por sí mismo (frente a copiar o capturar pantalla) y espera que conserve el filtro.</td></tr>
+</table>
+
+<h3>Materiales</h3>
+<ul>
+  <li><b>Moderador</b> (lee las instrucciones, no influye en las decisiones) y, si es posible, <b>observador</b> (registra tiempos, errores y comentarios).</li>
+  <li><b>Laptop con Chrome o Edge</b>, con los servicios iniciados mediante <code>iniciar.ps1</code> y el panel abierto en <code>http://127.0.0.1:5173</code>.</li>
+  <li><b>Conexión a internet</b> (la base de datos MySQL está en la nube). Llevar hotspot del celular por si la red de la institución bloquea la conexión.</li>
+  <li>Datos sintéticos precargados (sin información real de ciudadanos), iguales para todos los participantes.</li>
+  <li>Grabación de pantalla y audio (con autorización del participante).</li>
+  <li>Este guion y la hoja de registro (impresos o digitales).</li>
+  <li>Formulario SEQ (lo llena el moderador/observador después de cada tarea): <span class="blank">&nbsp;</span></li>
+  <li>Formulario SUS (lo llena el participante al final): <span class="blank">&nbsp;</span></li>
+  <li>Usuario de prueba: <span class="blank">&nbsp;</span> &nbsp; Contraseña: <span class="blank">&nbsp;</span></li>
+</ul>
+
+<h3>Participantes</h3>
+<p>De 5 a 8 personas que elaboren, consulten o usen estadísticas y reportes para tomar decisiones (idealmente de la Dirección de Planeación y Administración o áreas afines), con experiencia consultando solicitudes (hoy principalmente en Excel) y que no hayan participado en el diseño de SIEASAS. Si no es posible, se admiten perfiles administrativos o de análisis de información, dejando constancia en la hoja de registro.</p>
+
+<h3>Duración (máximo 20 minutos)</h3>
+<table>
+  <tr><th style="width:16%">Tiempo</th><th>Actividad</th></tr>
+  <tr><td>2 min</td><td>Introducción y preguntas pre-prueba</td></tr>
+  <tr><td>3 min</td><td>Tarea 1: Entender el panel</td></tr>
+  <tr><td>3 min</td><td>Tarea 2: Encontrar una solicitud</td></tr>
+  <tr><td>3 min</td><td>Tarea 3: Filtrar</td></tr>
+  <tr><td>3 min</td><td>Tarea 4: Obtener el reporte</td></tr>
+  <tr><td>1.5 min</td><td>SEQ después de cada tarea (unos 20 segundos cada uno)</td></tr>
+  <tr><td>1.5 min</td><td>Preguntas post-prueba (solo 3)</td></tr>
+  <tr><td>2.5 min</td><td>Cuestionario SUS y cierre</td></tr>
+  <tr><th>19.5 min</th><th>Total</th></tr>
+</table>
+<div class="warn"><b>Regla de corte:</b> si una tarea llega a su tiempo límite, se detiene amablemente, se registra como «no completada» (o «con ayuda» si se le orientó) y se pasa a la siguiente.</div>
+
+<h3>Métricas</h3>
+<ul>
+  <li>Éxito de la tarea: sin ayuda / con ayuda / no completada.</li>
+  <li>Tiempo en la tarea y número de errores o desvíos.</li>
+  <li>SEQ (1 a 7) al terminar cada tarea.</li>
+  <li>SUS (0 a 100) al final de la sesión.</li>
+  <li>Comentarios del Think Aloud.</li>
+</ul>
+
+<h3>Antes de cada participante</h3>
+<ul>
+  <li>Recargar la página: sin filtros, sin búsqueda, ámbito estatal y gráficas en su vista inicial (Dona).</li>
+  <li>Borrar de la carpeta Descargas los reportes del participante anterior.</li>
+</ul>
+
+<h2 class="page-break">Introducción <span class="meta">(1 minuto)</span></h2>
+<div class="say">Hola, (nombre). Muchas gracias por participar. Mi nombre es (moderador).<br><br>
+Primero te haré un par de preguntas sobre tu trabajo. Después te pediré que uses el panel ejecutivo de SIEASAS para resolver algunas situaciones, una por una. Mientras lo haces, piensa en voz alta: dime qué haces, qué buscas, qué esperas encontrar y qué te parece claro o confuso.<br><br>
+No estamos evaluando tus habilidades, sino el sistema; no hay respuestas correctas ni incorrectas. Los datos que verás son de prueba y no corresponden a personas reales.<br><br>
+¿Tienes alguna pregunta? ¿Nos autorizas a grabar la pantalla y el audio? La grabación solo se usará para analizar esta prueba y no se compartirá fuera del equipo.</div>
+
+<h2>Preguntas pre-prueba <span class="meta">(1 minuto)</span></h2>
+<ul>
+  <li>¿A qué te dedicas y qué papel tienes en el seguimiento de solicitudes o peticiones?</li>
+  <li>¿Cómo consultas hoy las estadísticas o reportes que necesitas para tomar decisiones?</li>
+</ul>
+
+<h2>Tareas</h2>
+<p>Durante todas las tareas el participante piensa en voz alta. Si se queda callado, usar preguntas neutrales: <i>«¿Qué estás pensando?»</i>, <i>«¿Qué esperabas que pasara?»</i>, <i>«¿Qué significa para ti esto?»</i>. Nunca mencionar nombres de botones ni secciones.</p>
+
+<div class="task">
+  <h3>Tarea 1 · Entender el panel <span class="meta">(3 minutos)</span></h3>
+  <div class="say">Tu director te pide un panorama rápido: ¿cuántas solicitudes hay y qué municipio tiene más?</div>
+  <div class="ref"><b>Respuesta de referencia:</b> 553 solicitudes (224 activas, 195 resueltas); el municipio con más es Hidalgo, con 23.<br>
+  <span class="small">Si antes de la prueba se eliminan los 4 registros de prueba (#554 a #557), las cifras son 549 y 220 activas.</span></div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Tiempo y primer elemento al que dirige la atención.</li>
+    <li>Si interpreta bien el total y su desglose («activas (incluye pendientes)», resueltas, etc.).</li>
+    <li>Si usa el ícono ⓘ («Cómo se calcula»), «Ver todos» o cambia el tipo de gráfica (Dona / Barras / Composición / Treemap).</li>
+    <li>Si distingue el total de las cifras «mostradas» en la gráfica de apoyos y entiende «Fuera de la gráfica».</li>
+    <li>Si encuentra el municipio con más solicitudes en el mapa o en la lista por municipio.</li>
+  </ul>
+  <p class="small"><b>Nota:</b> la tendencia baja después de septiembre de 2026 porque ahí terminan los datos sintéticos. Si el participante lo comenta, registrar su interpretación sin corregirla.</p>
+  <p><b>Al terminar:</b> aplicar SEQ.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 2 · Encontrar una solicitud <span class="meta">(3 minutos)</span></h3>
+  <div class="say">¿En qué estado está la solicitud de Traslados más reciente de Arturo Medina Guerra?</div>
+  <div class="ref"><b>Respuesta de referencia:</b> Solicitud #546, registrada el 13/09/2026 en Villaldama, estado <b>Resuelto</b>.<br>
+  <span class="small">Arturo Medina Guerra tiene 18 solicitudes. Al buscar «arturo medina traslados» aparecen 3:</span> <span class="small"> #546 Traslados (Resuelto, 13/09/2026), #530 Ambulancias/Traslados (En proceso, 27/08/2026) y #184 Traslados (Inicio, 22/02/2025).</span></div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si descubre el buscador sin ayuda o recorre la tabla página por página.</li>
+    <li>Si usa las sugerencias que aparecen al escribir o afina con más palabras.</li>
+    <li>Si identifica cuál es la más reciente (fecha de registro).</li>
+    <li>Cómo interpreta el ícono de estado (forma, color y número) sin leyenda. El número indica los días desde el registro.</li>
+    <li>Si abre el detalle de la solicitud. <i>Nota: la pantalla de detalle no muestra el estatus.</i></li>
+    <li>Si espera que la búsqueda cambie también las gráficas (solo afecta a la tabla).</li>
+  </ul>
+  <p><b>Plan B:</b> si se atora a la mitad del tiempo, indicar: <i>«Es la solicitud #546»</i> y registrar como «con ayuda».</p>
+  <p><b>Al terminar:</b> aplicar SEQ. Después, el moderador <b>limpia el buscador</b> (×) antes de la tarea 3.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 3 · Filtrar <span class="meta">(3 minutos)</span></h3>
+  <div class="say">¿Cuántas solicitudes tiene el municipio de Marín?</div>
+  <div class="ref"><b>Respuesta de referencia:</b> 13 solicitudes (5 activas, 6 resueltas).</div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Camino que usa: botón «Filtros», tocar Marín en el mapa o tocarlo en «Solicitudes por municipio».</li>
+    <li>Si reconoce el filtro aplicado: chip «Municipio: Marín» y botón «Filtros (1)».</li>
+    <li>Cómo reacciona al indicador «Actualizando…» (espera, repite la acción, duda).</li>
+    <li>Si comprueba que los indicadores cambiaron.</li>
+  </ul>
+  <p><b>Al terminar:</b> aplicar SEQ. <b>No quitar el filtro</b>: la tarea 4 parte de él.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 4 · Obtener el reporte <span class="meta">(3 minutos)</span></h3>
+  <div class="say">Tu director quiere un documento con toda la información de Marín para revisarlo en la reunión; consíguelo.</div>
+  <div class="ref"><b>Éxito:</b> obtiene el reporte en PDF o Excel con el filtro «Municipio: Marín» aplicado.</div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si encuentra «Exportar reporte» (barra inferior) y en cuánto tiempo.</li>
+    <li>Si antes intenta copiar una gráfica (botón de copiar de la tarjeta) o hacer captura de pantalla.</li>
+    <li>Qué formato elige (PDF o Excel) y qué espera que contenga antes de descargarlo.</li>
+    <li>Si nota que el reporte conserva el filtro de Marín (la ventana de exportación lo indica).</li>
+    <li>Si abre o ubica el archivo descargado y si el contenido coincide con lo que esperaba. El reporte es agregado: no incluye nombres ni registros individuales.</li>
+  </ul>
+  <p><b>Al terminar:</b> aplicar SEQ.</p>
+</div>
+
+<h2>Preguntas post-prueba <span class="meta">(1.5 minutos · solo 3 preguntas)</span></h2>
+<ul>
+  <li>En general, ¿qué impresión te dejó el panel ejecutivo?</li>
+  <li>¿Hubo algún momento en el que te sintieras confundido o inseguro sobre los datos? ¿Por qué?</li>
+  <li>Noté que en la tarea ______ tuviste algunas dificultades. ¿Qué estabas pensando en ese momento?</li>
+</ul>
+<p><b>Aplicar SUS</b> (el participante lo llena en la misma laptop o en su celular).</p>
+
+<h2>Conclusiones <span class="meta">(30 segundos)</span></h2>
+<div class="say">Muchas gracias por participar. ¿Quisieras agregar algo antes de terminar? Tu participación será de gran utilidad para mejorar el sistema.</div>
+<p><b>Después de la sesión:</b> quitar el filtro de Marín, recargar el panel y borrar los reportes descargados.</p>
+
+<h2 class="page-break">Anexo · Hoja de registro por participante</h2>
+<p>Participante: <span class="blank">&nbsp;</span> &nbsp; Perfil/rol: <span class="blank">&nbsp;</span></p>
+<p>Fecha: <span class="blank">&nbsp;</span> &nbsp; Moderador / observador: <span class="blank">&nbsp;</span></p>
+<table class="log">
+  <tr><th style="width:20%">Tarea</th><th style="width:10%">Tiempo</th><th style="width:20%">Éxito<br><span class="small">sin ayuda / con ayuda / no completó</span></th><th style="width:15%">Errores o desvíos</th><th style="width:8%">SEQ (1–7)</th><th>Observaciones</th></tr>
+  <tr><td>1. Entender el panel</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>2. Encontrar una solicitud</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>3. Filtrar</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>4. Obtener el reporte</td><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+<p>Tarea 3 · camino usado: ☐ Filtros &nbsp; ☐ Mapa &nbsp; ☐ Lista por municipio</p>
+<p>Tarea 4 · ☐ Exportó directo &nbsp; ☐ Intentó copiar primero &nbsp; ☐ Captura de pantalla &nbsp; · Formato: ☐ PDF &nbsp; ☐ Excel</p>
+<p>SUS (0–100): <span class="blank" style="min-width:90px">&nbsp;</span></p>
+
+<h3>Cálculo del SUS</h3>
+<p class="small">Preguntas impares: (respuesta − 1). Preguntas pares: (5 − respuesta). Sumar los 10 resultados y multiplicar por 2.5. Un puntaje mayor a 68 se considera por encima del promedio. El formulario en línea lo calcula automáticamente.</p>
+
+</body>
+</html>

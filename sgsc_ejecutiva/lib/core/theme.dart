@@ -7,6 +7,7 @@ const paper = Color(0xFFF3F3F0);
 const border = Color(0xFFE3E3DE);
 const muted = Color(0xFF5B6B74);
 const blueTint = Color(0xFFE7F6FD);
+const brandTint = Color(0xFFFFF1E3);
 
 /// Widest layout the app uses; wider windows are treated as a phone.
 const phoneMaxWidth = 440.0;

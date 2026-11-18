@@ -21,7 +21,7 @@ Abre el siguiente enlace para elegir una nueva:
 
 {link}
 
-El enlace es válido durante 30 minutos y sólo se puede utilizar una vez.
+El enlace es válido durante 30 minutos y solo se puede utilizar una vez.
 
 Si no solicitaste este cambio, ignora este correo. Tu contraseña permanecerá igual.
 

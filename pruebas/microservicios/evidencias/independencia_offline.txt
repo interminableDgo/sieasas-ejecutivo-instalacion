@@ -1,0 +1,37 @@
+﻿OK    indicadores detenido: /ejecutivo/dashboard -> 503 (esperado 503)
+OK    indicadores detenido: detalle sigue respondiendo 401
+OK    indicadores detenido: registro sigue respondiendo 401
+OK    indicadores detenido: reportes sigue respondiendo 401
+OK    detalle detenido: indicadores sigue respondiendo 401
+OK    detalle detenido: /ejecutivo/solicitudes -> 503 (esperado 503)
+OK    detalle detenido: registro sigue respondiendo 401
+OK    detalle detenido: reportes sigue respondiendo 401
+OK    registro detenido: indicadores sigue respondiendo 401
+OK    registro detenido: detalle sigue respondiendo 401
+OK    registro detenido: /ejecutivo/colonias?municipio_id=1 -> 503 (esperado 503)
+OK    registro detenido: reportes sigue respondiendo 401
+OK    reportes detenido: indicadores sigue respondiendo 401
+OK    reportes detenido: detalle sigue respondiendo 401
+OK    reportes detenido: registro sigue respondiendo 401
+OK    reportes detenido: /ejecutivo/exportar/pdf -> 503 (esperado 503)
+OK    reconstruir detalle no reinicia registro
+OK    reconstruir detalle no reinicia reportes
+OK    reconstruir detalle no reinicia indicadores
+OK    reconstruir detalle no reinicia nucleo
+OK    reconstruir detalle no reinicia gateway
+FALLA nucleo no publica puertos
+OK    la imagen sgsc-nucleo no contiene .env ni certificados: 
+FALLA indicadores no publica puertos
+OK    la imagen sgsc-indicadores no contiene .env ni certificados: 
+FALLA detalle no publica puertos
+OK    la imagen sgsc-detalle no contiene .env ni certificados: 
+FALLA registro no publica puertos
+OK    la imagen sgsc-registro no contiene .env ni certificados: 
+FALLA reportes no publica puertos
+OK    la imagen sgsc-reportes no contiene .env ni certificados: 
+OK    indicadores no recibe secretos del nÃºcleo ()
+OK    detalle no recibe secretos del nÃºcleo ()
+OK    registro no recibe secretos del nÃºcleo ()
+OK    reportes no recibe secretos del nÃºcleo ()
+
+Fallas: 5

@@ -85,3 +85,35 @@ Los expedientes de demostración incluidos en el SQL original se conservaron. Lo
 ### Retorno
 
 La base `sgsc_salud` permanece intacta. Para volver también hay que restaurar el código previo y su configuración: el backend actual consulta las tablas SSNL directamente. Se guardó un respaldo privado completo de la base anterior y una copia privada del código/configuración antes del cambio. No publicar esos respaldos: contienen datos y secretos locales.
+
+## Ejecución con Docker (gateway y microservicios)
+
+Arquitectura de la tesis (2.8.4, 3.9 y Figura 53): App Ejecutiva → API Gateway Nginx → cuatro microservicios FastAPI, más el núcleo (`app/`, sin cambios) para `/auth/*`. La ejecución local con `iniciar.ps1` y el despliegue de Render siguen usando `app/` sin cambios.
+
+| Servicio | Carpeta | Rutas |
+|---|---|---|
+| Indicadores y Filtros | `services/indicadores` | `GET /ejecutivo/dashboard`, `/comparacion`, `/catalogos` |
+| Detalle de Indicadores | `services/detalle` | `GET /ejecutivo/solicitudes`, `/solicitudes/sugerencias`, `/solicitudes/{sid}` |
+| Registro Ejecutivo | `services/registro` | `POST /ejecutivo/solicitudes`, `GET /personas`, `/colonias`, `/municipios-nacimiento` |
+| Reportes y Exportación | `services/reportes` | `GET /ejecutivo/exportar/{xlsx\|pdf}` |
+| Núcleo | `app/` | `/auth/*`, `/health`, `/health/db` |
+
+- Cada servicio tiene su aplicación FastAPI, `requirements.txt`, `Dockerfile` (etapas `runtime` y `test`) y pruebas. Ninguno importa a otro ni lo llama por HTTP; comparten solo la librería `libs/sgsc_common` (conexión, validación de sesión de solo lectura y contrato de filtros y agregados).
+- Reportes calcula sus agregados con la misma función que Indicadores, por lo que exporta aunque Indicadores esté detenido.
+- Escrituras en MySQL: solo Registro (`Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_SolicitudesApoyo`, `ejecutivo_registro`) y el núcleo. Los demás solo leen.
+- Solo el gateway publica un puerto (`127.0.0.1:8080`). `.env` y `ca.pem` nunca entran a las imágenes: las variables llegan por Compose y `ca.pem` se monta en `/run/secrets/db_ca`. Los microservicios solo reciben las variables de MySQL y CORS.
+- El gateway no publica `/ciudadano/*` (fuera del alcance) ni `/docs`.
+
+Desde la raíz del repositorio, con Docker Desktop (WSL 2) disponible:
+
+```powershell
+cd sgsc_ejecutiva; flutter build web --dart-define=API_BASE_URL=http://localhost:8080; cd ..
+docker compose --env-file backend/.env up -d --build
+docker compose --env-file backend/.env ps                                  # todos healthy
+docker compose --env-file backend/.env up -d --no-deps --build reportes    # actualizar un solo servicio
+docker build -f backend/services/detalle/Dockerfile --target test backend  # pruebas dentro de la imagen
+```
+
+No ejecutes `docker compose config` sin `--quiet`: imprime los valores de `backend/.env`. La compilación web para el gateway reemplaza la de `iniciar.ps1` (que apunta a `http://127.0.0.1:8000`); usa `FLUTTER_WEB_DIR` para montar otra carpeta.
+
+Pruebas sin Docker ni base de datos: `pruebas/microservicios/ejecutar_pruebas_locales.ps1`. Pruebas con contenedores: ver `pruebas/microservicios/README.md`.

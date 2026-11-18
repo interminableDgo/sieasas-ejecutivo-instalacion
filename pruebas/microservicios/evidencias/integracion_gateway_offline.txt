@@ -1,0 +1,22 @@
+﻿...............Fsssssssssss                                              [100%]
+================================== FAILURES ===================================
+_________________________________ test_health _________________________________
+
+client = <httpx.Client object at 0x00000285B7F3C2F0>
+
+    def test_health(client):
+        assert client.get('/nginx-health').status_code == 200
+        assert client.get('/health').json() == {'status': 'ok'}
+        for service in ['indicadores', 'detalle', 'registro', 'reportes']:
+            response = client.get(f'/health/{service}')
+>           assert response.status_code == 200, response.text
+E           AssertionError: {"detail":"No se pudo conectar a MySQL."}
+E           assert 503 == 200
+E            +  where 503 = <Response [503 Service Unavailable]>.status_code
+
+pruebas\microservicios\integracion\test_gateway.py:63: AssertionError
+=========================== short test summary info ===========================
+FAILED pruebas/microservicios/integracion/test_gateway.py::test_health - Asse...
+SKIPPED [10] pruebas\microservicios\integracion\test_gateway.py:67: Define SGSC_TEST_TOKEN con una sesión válida.
+SKIPPED [1] pruebas\microservicios\integracion\test_gateway.py:77: Define SGSC_TEST_TOKEN con una sesión válida.
+1 failed, 15 passed, 11 skipped in 2.45s

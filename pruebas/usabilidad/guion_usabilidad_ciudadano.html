@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guion · Prueba de usabilidad SIEASAS Ciudadano</title>
+<style>
+  @page { size: Letter; margin: 18mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.42; color: #000; background: #fff; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 2px; }
+  .sub { margin: 0 0 14px; font-size: 11pt; }
+  h2 { font-size: 13pt; margin: 20px 0 8px; }
+  h3 { font-size: 11.5pt; margin: 14px 0 6px; }
+  p { margin: 5px 0; }
+  ul { margin: 4px 0 6px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10pt; }
+  th, td { border: 1px solid #000; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { font-weight: bold; }
+  .say { font-style: italic; margin: 7px 0 7px 16px; }
+  .task { margin: 14px 0; break-inside: avoid-page; }
+  .task h3 { margin-top: 0; }
+  .meta { font-size: 10pt; font-weight: normal; }
+  .ref { margin: 6px 0; }
+  .warn { margin: 6px 0; }
+  .blank { display: inline-block; min-width: 230px; border-bottom: 1px solid #000; }
+  .page-break { break-before: page; }
+  .log td { height: 44px; }
+  .small { font-size: 9.5pt; }
+  .card { border: 2px solid #000; padding: 10px 14px; margin: 10px 0; break-inside: avoid-page; }
+  .card h3 { margin-top: 0; }
+  .card table { font-size: 11pt; }
+</style>
+</head>
+<body>
+
+<h1>Guion · Prueba de usabilidad</h1>
+<p class="sub">SIEASAS · App del Ciudadano · Duración máxima: 20 minutos por participante</p>
+
+<p class="small"><b>Secciones:</b> Contexto para el moderador · Introducción · Preguntas pre-prueba · Tareas · Preguntas post-prueba y SUS · Conclusiones · Anexo A: tarjeta de datos de apoyo · Anexo B: hoja de registro</p>
+
+<h2>Contexto para el moderador</h2>
+<p>La prueba evalúa la experiencia del rol Ciudadano en el Sistema Integral Estatal de Atención en Salud y Asistencia Social (SIEASAS), desarrollado para la Secretaría de Salud del Estado de Nuevo León. Es una prueba <b>moderada y basada en tareas</b>: se plantean situaciones reales que vive una persona que necesita un apoyo y se observa cómo usa la app para resolverlas.</p>
+
+<h3>Qué se evalúa</h3>
+<table>
+  <tr><th style="width:28%">Tarea</th><th>Qué mide y para qué</th></tr>
+  <tr><td>1. Crear cuenta y completar perfil</td><td>Si el participante se registra y captura sus datos (CURP, contacto y domicilio) sin ayuda, para saber si el primer contacto con la app es claro y no lo hace abandonar.</td></tr>
+  <tr><td>2. Solicitar apoyo para un familiar</td><td>Si descubre que puede pedir el apoyo para otra persona y completa los 6 pasos hasta obtener su folio.</td></tr>
+  <tr><td>3. Actualizar datos de contacto</td><td>Si encuentra dónde están sus datos personales (el perfil) y logra cambiarlos.</td></tr>
+  <tr><td>4. Consultar el avance</td><td>Si entra a otra cuenta, encuentra una solicitud ya registrada e interpreta su estatus y su historial.</td></tr>
+</table>
+
+<h3>Materiales</h3>
+<ul>
+  <li><b>Moderador</b> (lee las instrucciones, no influye en las decisiones) y, si es posible, <b>observador</b> (registra tiempos, errores y comentarios).</li>
+  <li><b>Celular Android con la app SIEASAS Ciudadano instalada</b> (APK), o iPhone con la versión web. Alternativa: laptop con Chrome en vista de celular.</li>
+  <li><b>Internet (Wi-Fi o datos):</b> la app está conectada al servidor y a la base de datos de SIEASAS. Las cuentas y solicitudes se guardan ahí, y las solicitudes aparecen también en el módulo Ejecutivo.</li>
+</ul>
+<div class="warn"><b>Cuentas para el moderador</b> (no se entregan al participante)
+<table>
+  <tr><th style="width:24%">Cuenta</th><th style="width:20%">Tareas</th><th>Acceso</th></tr>
+  <tr><td>Cuenta del participante</td><td>1, 2 y 3</td><td>La crea el participante en la tarea 1 con su correo y una contraseña nueva. Empieza <b>vacía</b>, sin solicitudes. Cada participante necesita un correo distinto: si ya existe una cuenta con ese correo, la app lo indica.</td></tr>
+  <tr><td>Cuenta demo (María Rodríguez Gómez)</td><td>4</td><td>Correo: <b>demo@sieasas.mx</b> · Contraseña: <b>SieasasDemo2026</b><br><span class="small">Ya tiene el perfil completo y 5 solicitudes anteriores en distintos estatus. La comparten todos los participantes y en la tarea solo se consulta: <b>no modificar sus datos</b>. Estos datos vienen en la tarjeta (Anexo A).</span></td></tr>
+</table>
+<b>Cambio de cuenta:</b> es parte de la tarea 4; lo hace el participante (cerrar sesión desde el ícono de perfil e iniciar sesión con la cuenta de María). Si no lo logra, el moderador lo hace por él y lo registra como «con ayuda».
+</div>
+<ul>
+  <li><b>Tarjeta de datos de apoyo</b> (Anexo A), impresa. En la tarea 1 el participante crea la cuenta <b>con sus propios datos</b>; la tarjeta solo se usa si no recuerda o no quiere dar alguno (por ejemplo, su CURP). Los datos del familiar (tarea 2) y el celular nuevo (tarea 3) siempre se toman de la tarjeta.</li>
+  <li><b>Privacidad:</b> los datos que captura el participante se guardan en la base de datos del proyecto (no en la de la institución) y <b>se eliminan al terminar el periodo de pruebas</b>. Anotar en la hoja de registro el correo con que creó su cuenta para poder borrarla. Si se graba la pantalla, no difundir la grabación y difuminar la CURP y el domicilio si se usan fragmentos en el reporte.</li>
+  <li>Grabación de pantalla y audio (con autorización del participante).</li>
+  <li>Este guion y la hoja de registro (impresos o digitales).</li>
+  <li>Formulario SEQ (lo llena el moderador/observador después de cada tarea): <span class="blank">&nbsp;</span></li>
+  <li>Formulario SUS (lo llena el participante al final): <span class="blank">&nbsp;</span></li>
+</ul>
+
+<h3>Participantes</h3>
+<p>De 5 a 8 personas adultas que hayan solicitado, o puedan llegar a solicitar, un apoyo de salud o asistencia social para sí mismas o para un familiar (por ejemplo, pacientes o familiares en sala de espera) y que no hayan participado en el diseño de SIEASAS. Procurar variedad de edades, con al menos dos personas de 50 años o más. Si no es posible, se admiten otros perfiles, dejando constancia en la hoja de registro.</p>
+
+<h3>Duración (máximo 20 minutos)</h3>
+<table>
+  <tr><th style="width:16%">Tiempo</th><th>Actividad</th></tr>
+  <tr><td>2 min</td><td>Introducción y preguntas pre-prueba</td></tr>
+  <tr><td>4 min</td><td>Tarea 1: Crear cuenta y completar perfil</td></tr>
+  <tr><td>4 min</td><td>Tarea 2: Solicitar apoyo para un familiar</td></tr>
+  <tr><td>2.5 min</td><td>Tarea 3: Actualizar datos de contacto</td></tr>
+  <tr><td>3 min</td><td>Tarea 4: Cambiar a la cuenta de María y consultar el avance</td></tr>
+  <tr><td>1.5 min</td><td>SEQ después de cada tarea (unos 20 segundos cada uno)</td></tr>
+  <tr><td>1 min</td><td>Preguntas post-prueba (solo 3)</td></tr>
+  <tr><td>2 min</td><td>Cuestionario SUS y cierre</td></tr>
+  <tr><th>20 min</th><th>Total</th></tr>
+</table>
+<div class="warn"><b>Regla de corte:</b> si una tarea llega a su tiempo límite, se detiene amablemente, se registra como «no completada» (o «con ayuda» si se le orientó) y se pasa a la siguiente. Si la tarea 1 no se completa, el moderador termina el registro (con los datos del participante o con los de la tarjeta) antes de la tarea 2.</div>
+
+<h3>Métricas</h3>
+<ul>
+  <li>Éxito de la tarea: sin ayuda / con ayuda / no completada.</li>
+  <li>Tiempo en la tarea y número de errores o desvíos (incluidos los mensajes de error que le aparecen).</li>
+  <li>SEQ (1 a 7) al terminar cada tarea.</li>
+  <li>SUS (0 a 100) al final de la sesión.</li>
+  <li>Comentarios del Think Aloud.</li>
+</ul>
+
+<h3>Antes de cada participante</h3>
+<ul>
+  <li>Revisar que el celular tenga internet.</li>
+  <li><b>Abrir la app unos minutos antes:</b> el servidor gratuito se «duerme» si nadie lo usa y la primera vez puede tardar hasta 1 minuto en responder. Después responde normal.</li>
+  <li>Dejar la app en la pantalla «Iniciar sesión». Si quedó abierta la sesión del participante anterior, cerrarla (ícono de perfil → «Cerrar sesión»).</li>
+  <li>Tener a la mano una tarjeta de datos (Anexo A) limpia.</li>
+</ul>
+
+<h2 class="page-break">Introducción <span class="meta">(1 minuto)</span></h2>
+<div class="say">Hola, (nombre). Muchas gracias por participar. Mi nombre es (moderador).<br><br>
+Primero te haré un par de preguntas. Después te pediré que uses en este celular la app de SIEASAS, con la que una persona puede pedir apoyos de salud y asistencia social, para resolver algunas situaciones, una por una. Mientras lo haces, piensa en voz alta: dime qué haces, qué buscas, qué esperas encontrar y qué te parece claro o confuso.<br><br>
+No estamos evaluando tus habilidades, sino la app; no hay respuestas correctas ni incorrectas. Te pediremos crear una cuenta con tus propios datos, como lo harías de verdad. Lo que captures se guarda en la base de datos del proyecto, solo para esta prueba, y lo borramos al terminar el periodo de pruebas; no se envía a la Secretaría. Si no recuerdas algún dato o prefieres no darlo, usa el de esta tarjeta. Más adelante te pediré usar otra cuenta que ya tiene solicitudes. Para la contraseña, inventa una nueva; no uses una que ya utilices en otro lado.<br><br>
+¿Tienes alguna pregunta? ¿Nos autorizas a grabar la pantalla y el audio? La grabación solo se usará para analizar esta prueba y no se compartirá fuera del equipo.</div>
+
+<h2>Preguntas pre-prueba <span class="meta">(1 minuto)</span></h2>
+<ul>
+  <li>¿Alguna vez has pedido un apoyo de salud o de asistencia social, para ti o para un familiar? ¿Cómo lo hiciste?</li>
+  <li>¿Sueles hacer trámites desde tu celular? ¿Cuáles?</li>
+</ul>
+
+<h2>Tareas</h2>
+<p>Durante todas las tareas el participante piensa en voz alta. Si se queda callado, usar preguntas neutrales: <i>«¿Qué estás pensando?»</i>, <i>«¿Qué esperabas que pasara?»</i>, <i>«¿Qué significa para ti esto?»</i>. Nunca mencionar nombres de botones ni secciones.</p>
+
+<div class="task">
+  <h3>Tarea 1 · Crear cuenta y completar perfil <span class="meta">(4 minutos)</span></h3>
+  <div class="say">Es la primera vez que usas la app. Crea tu cuenta con tus datos y déjalos listos para poder pedir apoyos.</div>
+  <div class="ref"><b>Éxito:</b> crea la cuenta y guarda sus datos en los 3 pasos (Datos personales → Contacto → Domicilio); la pantalla de inicio lo saluda por su nombre («Hola, …»).<br>
+  <span class="small">Al crear la cuenta la app pide completar los datos de inmediato. Al terminar, la pantalla de inicio aparece <b>sin solicitudes</b> («Registrar primera solicitud»): es lo correcto para una cuenta nueva.<br>Si usa datos de la tarjeta, registrar cuáles en la hoja de registro.</span></div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si encuentra «Crear cuenta» o intenta primero «Iniciar sesión» con una cuenta que no existe.</li>
+    <li>Cómo reacciona a los requisitos de contraseña (mínimo 15 caracteres) y si la confirma bien a la primera.</li>
+    <li>Si marca la casilla del aviso de privacidad sin que se le indique, y si abre el aviso.</li>
+    <li>Cómo captura la CURP: si la copia bien, si aparece el error de dígito verificador y si usa «Consultar CURP».</li>
+    <li>Si entiende que el correo del paso de Contacto es opcional y si elige un medio de contacto preferido.</li>
+    <li>Si encuentra su municipio en la lista y marca la casilla «Confirmo que mis datos son verídicos».</li>
+  </ul>
+  <p><b>Plan B:</b> si a la mitad del tiempo no ha creado la cuenta, señalar la parte inferior de la pantalla («¿Ves alguna opción para registrarte?») y registrar como «con ayuda».</p>
+  <p><b>Al terminar:</b> aplicar SEQ.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 2 · Solicitar apoyo para un familiar <span class="meta">(4 minutos)</span></h3>
+  <div class="say">Imagina que tu papá, José, vive contigo, ya no puede caminar bien y necesita una andadera. Pídela por él con la app. Sus datos vienen en la tarjeta.</div>
+  <div class="ref"><b>Éxito:</b> envía la solicitud con beneficiario «Otra persona» (José Rodríguez López) y tipo de apoyo «Andadera o bastón», y llega a la pantalla «Tu petición fue recibida con éxito» con su folio.</div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si elige «Otra persona» o la deja en «Para mí» (y si lo nota después en la revisión).</li>
+    <li>Cómo llena la relación con el beneficiario y la CURP del papá.</li>
+    <li>Paso de Salud: si entiende «Tipo de seguridad social», «Cuidar tu Salud», «Unidad médica de referencia» (opcional; viene en la tarjeta) y «Grupos vulnerables».</li>
+    <li>Paso de Petición: qué escribe en asunto y descripción, y si elige sin problema la fecha en que se necesita (en la tarjeta: dentro de una semana).</li>
+    <li>Si intenta adjuntar un documento (es opcional) o continúa sin él.</li>
+    <li>Si revisa el resumen antes de enviar y si usa «Editar» para corregir algo.</li>
+    <li>Si marca la casilla «Declaro que la información es verídica» al primer intento (todo el recuadro se puede tocar).</li>
+    <li>Si entiende qué es el folio y si intenta guardarlo (copiar o anotar).</li>
+  </ul>
+  <p><b>Plan B:</b> si se atora en un paso más de 1 minuto, preguntar: <i>«¿Qué crees que te está pidiendo esta pantalla?»</i>. Si sigue atorado, indicarle qué falta y registrar como «con ayuda».</p>
+  <p><b>Al terminar:</b> aplicar SEQ. Dejar al participante en la pantalla de inicio de su cuenta.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 3 · Actualizar datos de contacto <span class="meta">(2.5 minutos)</span></h3>
+  <div class="say">Cambiaste de número de celular. Actualízalo en la app para que te puedan localizar. Tu número nuevo viene en la tarjeta.</div>
+  <div class="ref"><b>Éxito:</b> en «Mi perfil» → Contacto → Editar, cambia su celular a 81 8765 4321 y guarda; aparece «Cambios guardados correctamente» y el perfil muestra el número nuevo.</div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si encuentra el ícono de perfil (silueta de persona, arriba a la derecha, sin texto) y en cuánto tiempo.</li>
+    <li>Qué intenta antes: buscar en «Mis peticiones», en una solicitud o en «Nueva solicitud».</li>
+    <li>Si entiende que el cambio aplica a sus datos (no a una solicitud ya enviada).</li>
+    <li>Si nota el mensaje de confirmación y comprueba el número nuevo en el perfil.</li>
+  </ul>
+  <p><b>Plan B:</b> si a la mitad del tiempo no ha encontrado el perfil, preguntar: <i>«¿Dónde esperarías encontrar tus datos personales?»</i>. Si sigue sin encontrarlo, señalar la parte superior de la pantalla y registrar como «con ayuda».</p>
+  <p><b>Al terminar:</b> aplicar SEQ. Dejar al participante en la pantalla de inicio de su cuenta.</p>
+</div>
+
+<div class="task">
+  <h3>Tarea 4 · Consultar el avance <span class="meta">(3 minutos)</span></h3>
+  <div class="say">Ahora vas a usar la cuenta de María, una persona que ya usa la app y tiene varias solicitudes. Sal de tu cuenta y entra a la de María; su correo y contraseña vienen en la tarjeta. Imagina que eres ella: hace unas semanas pediste una silla de ruedas para ti. ¿En qué va esa solicitud y qué está pasando con ella?</div>
+  <div class="ref"><b>Éxito:</b> cierra su sesión (ícono de perfil → «Cerrar sesión» → confirmar), inicia sesión con demo@sieasas.mx / SieasasDemo2026 y da la respuesta de referencia.<br><b>Respuesta de referencia:</b> «Solicitud de silla de ruedas», estatus <b>En revisión</b>: «Un enlace social está revisando tu solicitud». La entrega está pendiente.<br>
+  <span class="small">Es una de las 5 solicitudes de la cuenta demo: aparece en la pantalla de inicio y en «Mis peticiones». El folio tiene la forma «Solicitud #560» (el número puede variar).</span></div>
+  <p><b>Registrar:</b></p>
+  <ul>
+    <li>Si encuentra cómo cerrar sesión (está dentro del perfil) y si inicia sesión a la primera.</li>
+    <li>Si la abre desde la pantalla de inicio, desde «Ver todas» o usa el buscador.</li>
+    <li>Si interpreta el estatus («En revisión») y la línea de tiempo del historial (Recibida → En revisión → Atendida pendiente).</li>
+    <li>Si nota la tarjeta «¿Necesitas ayuda con esta solicitud?» y qué espera encontrar ahí. <i>Nota: todavía no tiene un teléfono de contacto real.</i></li>
+  </ul>
+  <p><b>Pregunta extra (solo si sobra tiempo):</b> <i>«¿Y tu solicitud de apoyo funerario? ¿Te lo dieron?»</i><br>
+  <span class="small">Referencia: estatus <b>No es competencia</b>: «La solicitud corresponde a otra dependencia; se te orientará sobre dónde presentarla». Registrar si entiende que no se le negó el apoyo, sino que le toca a otra dependencia.</span></p>
+  <p><b>Al terminar:</b> aplicar SEQ y <b>cerrar la sesión de María</b>.</p>
+</div>
+
+<h2>Preguntas post-prueba <span class="meta">(1 minuto · solo 3 preguntas)</span></h2>
+<ul>
+  <li>En general, ¿qué impresión te dejó la app? ¿La usarías para pedir un apoyo?</li>
+  <li>¿Hubo algún momento en el que te sintieras confundido o inseguro sobre lo que te pedía la app? ¿Por qué?</li>
+  <li>Noté que en la tarea ______ tuviste algunas dificultades. ¿Qué estabas pensando en ese momento?</li>
+</ul>
+<p><b>Aplicar SUS</b> (el participante lo llena en su celular o en papel).</p>
+
+<h2>Conclusiones <span class="meta">(30 segundos)</span></h2>
+<div class="say">Muchas gracias por participar. ¿Quisieras agregar algo antes de terminar? Tu participación será de gran utilidad para mejorar la app.</div>
+<p><b>Después de la sesión:</b> recoger la tarjeta, revisar que no quede ninguna sesión abierta y anotar el correo de la cuenta del participante. Al terminar el periodo de pruebas, las cuentas de los participantes se eliminan de la base de datos junto con sus solicitudes (<code>python manage.py ciudadano-borrar --correo &lt;correo&gt;</code>).</p>
+
+<h2 class="page-break">Anexo A · Tarjeta de datos de apoyo</h2>
+<p class="small">Imprimir y entregar al participante al inicio. Todos los datos son ficticios. En la tarea 1 usa tus propios datos; usa los de esta tarjeta solo si no recuerdas alguno o prefieres no darlo.</p>
+<div class="card">
+  <h3>Datos de respaldo (solo si los necesitas)</h3>
+  <table>
+    <tr><th style="width:38%">Correo</th><td>participante<b>N</b>@prueba-sieasas.mx<br><span class="small">Cambia <b>N</b> por tu número de participante (por ejemplo, participante3@prueba-sieasas.mx).</span></td></tr>
+    <tr><th>Contraseña</th><td>SieasasPrueba2026</td></tr>
+    <tr><th>Nombre</th><td>María Rodríguez Gómez</td></tr>
+    <tr><th>CURP</th><td>ROGM900101MNLDRR05</td></tr>
+    <tr><th>Celular</th><td>81 1234 5678</td></tr>
+    <tr><th>Domicilio</th><td>Calle Juárez 123, Col. Centro, C.P. 64000, Monterrey, Nuevo León</td></tr>
+    <tr><th>Seguridad social</th><td>IMSS · No tiene tarjeta Cuidar tu Salud</td></tr>
+  </table>
+  <h3>Tu papá</h3>
+  <table>
+    <tr><th style="width:38%">Nombre</th><td>José Rodríguez López</td></tr>
+    <tr><th>CURP</th><td>ROLJ580315HNLDPS09</td></tr>
+    <tr><th>Edad</th><td>68 años · Adulto mayor</td></tr>
+    <tr><th>Seguridad social</th><td>IMSS · No tiene tarjeta Cuidar tu Salud</td></tr>
+    <tr><th>Unidad médica de referencia</th><td>Unidad de Medicina Familiar No. 15 del IMSS, Monterrey</td></tr>
+    <tr><th>Vive contigo</th><td>Sí, en tu mismo domicilio</td></tr>
+  </table>
+  <h3>Para la tarea 2 · Lo que necesita tu papá</h3>
+  <table>
+    <tr><th style="width:38%">Apoyo</th><td>Una andadera</td></tr>
+    <tr><th>Fecha de la solicitud</th><td>Hoy (la app la registra sola al enviar)</td></tr>
+    <tr><th>Fecha en que la necesita</th><td>Dentro de una semana (7 días después de hoy)</td></tr>
+  </table>
+  <h3>Para la tarea 3</h3>
+  <table>
+    <tr><th style="width:38%">Tu celular nuevo</th><td>81 8765 4321</td></tr>
+  </table>
+  <h3>Para la tarea 4 · Cuenta de María</h3>
+  <table>
+    <tr><th style="width:38%">Correo</th><td>demo@sieasas.mx</td></tr>
+    <tr><th>Contraseña</th><td>SieasasDemo2026</td></tr>
+  </table>
+</div>
+
+<h2 class="page-break">Anexo B · Hoja de registro por participante</h2>
+<p>Participante: <span class="blank">&nbsp;</span> &nbsp; Edad / perfil: <span class="blank">&nbsp;</span></p>
+<p>Correo con el que creó su cuenta (para borrarla al final): <span class="blank" style="min-width:220px">&nbsp;</span></p>
+<p>Fecha: <span class="blank">&nbsp;</span> &nbsp; Moderador / observador: <span class="blank">&nbsp;</span></p>
+<table class="log">
+  <tr><th style="width:22%">Tarea</th><th style="width:10%">Tiempo</th><th style="width:20%">Éxito<br><span class="small">sin ayuda / con ayuda / no completó</span></th><th style="width:15%">Errores o desvíos</th><th style="width:8%">SEQ (1–7)</th><th>Observaciones</th></tr>
+  <tr><td>1. Crear cuenta y completar perfil</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>2. Solicitar apoyo para un familiar</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>3. Actualizar datos de contacto</td><td></td><td></td><td></td><td></td><td></td></tr>
+  <tr><td>4. Consultar el avance</td><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+<p>Tarea 1 · Datos usados: ☐ Propios &nbsp; ☐ Tarjeta (¿cuáles?) <span class="blank" style="min-width:120px">&nbsp;</span><br>Tarea 1 · ☐ Intentó iniciar sesión primero &nbsp; ☐ Error en la CURP &nbsp; ☐ Usó «Consultar CURP» &nbsp; ☐ Abrió el aviso de privacidad</p>
+<p>Tarea 2 · ☐ Eligió «Otra persona» sin ayuda &nbsp; ☐ Usó «Editar» en la revisión &nbsp; ☐ Falló la casilla de veracidad &nbsp; ☐ Anotó o copió el folio</p>
+<p>Tarea 3 · ☐ Encontró el ícono de perfil directo &nbsp; ☐ Buscó primero en solicitudes &nbsp; ☐ Comprobó el número nuevo</p>
+<p>Tarea 4 · ☐ Cerró sesión sin ayuda &nbsp; ☐ Inició sesión con María a la primera<br>Tarea 4 · camino usado: ☐ Pantalla de inicio &nbsp; ☐ Ver todas &nbsp; ☐ Buscador &nbsp; · Pregunta extra: ☐ Entendió «No es competencia» &nbsp; ☐ No se aplicó</p>
+<p>SUS (0–100): <span class="blank" style="min-width:90px">&nbsp;</span></p>
+
+<h3>Cálculo del SUS</h3>
+<p class="small">Preguntas impares: (respuesta − 1). Preguntas pares: (5 − respuesta). Sumar los 10 resultados y multiplicar por 2.5. Un puntaje mayor a 68 se considera por encima del promedio. El formulario en línea lo calcula automáticamente.</p>
+
+</body>
+</html>

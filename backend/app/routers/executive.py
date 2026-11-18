@@ -16,37 +16,58 @@ router=APIRouter(prefix='/ejecutivo',tags=['Ejecutivo'])
 CATALOGS = {'apoyos':'Cat_TipoApoyo','dependencias':'Cat_Dependencias','grupos':'Cat_GruposVulnerables',
  'estatus':'Cat_StatusAtencion','canales':'Cat_CanalesRecepcion','origenes':'Cat_EnviadoPor',
  'unidades':'Cat_UnidadesTratantes','parentescos':'Cat_Parentescos','generos':'Cat_Generos',
- 'seguridad_social':'Cat_SeguridadSocial','partidos':'Cat_PartidosPoliticos'}
+ 'seguridad_social':'Cat_SeguridadSocial','partidos':'Cat_PartidosPoliticos',
+ 'con_quien_vive':'Cat_ConQuienVive','ocupaciones':'Cat_Ocupaciones','fuentes_ingreso':'Cat_FuentesIngreso',
+ 'areas_estudio':'Cat_AreasEstudio'}
 
 @router.get('/catalogos')
 def catalogs(user=Depends(current_user),db:Session=Depends(get_db)):
     result={key:svc.query_rows(db,f'SELECT id,descripcion AS nombre FROM `{table}` WHERE is_active=1 ORDER BY descripcion',{})
       for key,table in CATALOGS.items()}
-    result['municipios']=svc.query_rows(db,'SELECT id,nom_mun AS nombre,cvegeo AS clave_inegi FROM INEGI_Cat_Municipios WHERE entidad_id=:eid ORDER BY nom_mun',{'eid':user['entidad_id']})
+    # cve_mun 999 («No especificado») solo se usa como municipio de nacimiento desde la app del Ciudadano.
+    result['municipios']=svc.query_rows(db,"SELECT id,nom_mun AS nombre,cvegeo AS clave_inegi FROM INEGI_Cat_Municipios WHERE entidad_id=:eid AND cve_mun<>'999' ORDER BY nom_mun",{'eid':user['entidad_id']})
     result['entidades']=svc.query_rows(db,'SELECT id,nom_ent AS nombre FROM INEGI_Cat_Entidades ORDER BY nom_ent',{})
     return result
 
 
 @router.get('/municipios-nacimiento')
 def birth_municipalities(entidad_id:int=Query(gt=0),user=Depends(current_user),db:Session=Depends(get_db)):
-    return {'items':svc.query_rows(db,'SELECT id,nom_mun AS nombre FROM INEGI_Cat_Municipios WHERE entidad_id=:eid ORDER BY nom_mun',{'eid':entidad_id})}
+    return {'items':svc.query_rows(db,"SELECT id,nom_mun AS nombre FROM INEGI_Cat_Municipios WHERE entidad_id=:eid AND cve_mun<>'999' ORDER BY nom_mun",{'eid':entidad_id})}
+
+
+@router.get('/colonias')
+def colonies(municipio_id:int=Query(gt=0),user=Depends(current_user),db:Session=Depends(get_db)):
+    # Solo municipios del estado autorizado; el código postal sale del catálogo, no de la captura.
+    return {'items':svc.query_rows(db,'''SELECT c.id,c.nombre,c.codigo_postal FROM Cat_Colonias c
+      JOIN INEGI_Cat_Municipios m ON m.id=c.municipio_id
+      WHERE c.municipio_id=:mid AND m.entidad_id=:eid AND c.is_active=1 ORDER BY c.nombre,c.codigo_postal''',
+      {'mid':municipio_id,'eid':user['entidad_id']})}
 
 
 @router.get('/personas')
 def people(tipo:Literal['beneficiario','solicitante'],q:str=Query('',max_length=150),
     user=Depends(current_user),db:Session=Depends(get_db)):
+    # Every word must appear in the name, in any order ("martinez maria");
+    # the collation ignores accents and capitals. People with the same name
+    # are told apart by CURP or phone, birth date, municipality and requests.
     if tipo=='beneficiario':
-        sql="""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre
+        found,params=svc.matches([svc.BENEFICIARY],svc.search_terms(q),'p')
+        sql=f"""SELECT b.ben_id AS id, CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname,' · #',b.ben_id) AS nombre,
+          NULLIF(b.ben_gen_curp,'') AS curp, b.ben_gen_birthdate AS fecha_nacimiento, m.nom_mun AS municipio,
+          (SELECT COUNT(*) FROM Tbl_SolicitudesApoyo sa WHERE sa.solapoyo_beneficiarioid=b.ben_id) AS solicitudes
           FROM Tbl_Beneficiarios b JOIN INEGI_Cat_Municipios m ON m.id=b.ben_dom_municipio AND m.entidad_id=b.ben_dom_entidad
           WHERE b.is_active=1 AND b.ben_dom_entidad=:eid
-          AND (CONCAT(b.ben_gen_name,' ',b.ben_gen_lastname) LIKE :q OR b.ben_gen_curp=:exact)
+          AND ((TRUE{found}) OR b.ben_gen_curp=:exact)
           ORDER BY b.ben_gen_name,b.ben_id LIMIT 30"""
     else:
-        sql="""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre
+        found,params=svc.matches([svc.APPLICANT],svc.search_terms(q),'p')
+        sql=f"""SELECT s.sol_id AS id, CONCAT(s.sol_nombres,' ',s.sol_apellidos,' · #',s.sol_id) AS nombre,
+          NULLIF(s.sol_telefono,'') AS telefono, s.sol_fecha_nacimiento AS fecha_nacimiento, m.nom_mun AS municipio,
+          (SELECT COUNT(*) FROM Tbl_SolicitudesApoyo sa WHERE sa.solapoyo_solicitanteid=s.sol_id) AS solicitudes
           FROM Tbl_Solicitantes s JOIN INEGI_Cat_Municipios m ON m.id=s.sol_municipioid AND m.entidad_id=s.sol_estadoid
           WHERE s.is_active=1 AND s.sol_estadoid=:eid
-          AND CONCAT(s.sol_nombres,' ',s.sol_apellidos) LIKE :q ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
-    return {'items':svc.query_rows(db,sql,{'eid':user['entidad_id'],'q':'%'+q.strip()+'%','exact':q.strip()})}
+          AND ((TRUE{found}) OR s.sol_telefono=:exact) ORDER BY s.sol_nombres,s.sol_id LIMIT 30"""
+    return {'items':svc.query_rows(db,sql,{**params,'eid':user['entidad_id'],'exact':q.strip()})}
 
 
 @router.get('/dashboard')
@@ -55,14 +76,26 @@ def dashboard(selected=Depends(svc.filters),user=Depends(current_user),db:Sessio
 
 
 @router.get('/comparacion')
-def comparison(a_inicio:date, a_fin:date, b_inicio:date, b_fin:date,
+def comparison(inicio:list[date]=Query(...),fin:list[date]=Query(...),
     selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db)):
-    return svc.compare_periods(db,user,selected,a_inicio,a_fin,b_inicio,b_fin)
+    # Repeated pairs, in order: ?inicio=2026-01-01&fin=2026-01-31&inicio=2026-02-01&fin=2026-02-28
+    if len(inicio)!=len(fin):
+        raise HTTPException(422,'Cada periodo necesita fecha inicial y final.')
+    return svc.compare_periods(db,user,selected,list(zip(inicio,fin)))
 
 
 @router.get('/solicitudes')
-def requests(selected=Depends(svc.filters),page:int=Query(0,ge=0),user=Depends(current_user),db:Session=Depends(get_db)):
-    return svc.list_rows(db,user,selected,10,page*10)
+def requests(selected=Depends(svc.filters),page:int=Query(0,ge=0),q:str|None=Query(None,max_length=80),
+    orden:Literal[tuple(svc.SORT_COLUMNS)]='fecha',direccion:Literal['asc','desc']='desc',
+    user=Depends(current_user),db:Session=Depends(get_db)):
+    return svc.list_rows(db,user,selected,10,page*10,q,orden,direccion=='asc')
+
+
+# Declared before /solicitudes/{sid} so "sugerencias" is not read as an id.
+@router.get('/solicitudes/sugerencias')
+def request_suggestions(q:str=Query(...,min_length=1,max_length=80),selected=Depends(svc.filters),
+    user=Depends(current_user),db:Session=Depends(get_db)):
+    return svc.suggestions(db,user,selected,q)
 
 
 @router.get('/solicitudes/{sid}')
@@ -88,10 +121,13 @@ def create_request(data:NewRequest,user=Depends(current_user),db:Session=Depends
 
 
 @router.get('/exportar/{format}')
-def export(format:Literal['xlsx','pdf'],selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db)):
+def export(format:Literal['xlsx','pdf'],selected=Depends(svc.filters),user=Depends(current_user),db:Session=Depends(get_db),
+    chart_apoyos:Literal['donut','bars','stacked','treemap']='donut',
+    chart_grupos:Literal['donut','bars','stacked','treemap']='donut'):
     # Only aggregate queries: no request rows or personal fields enter the renderer.
     summary = svc.dashboard(db, user, selected, full_history=True)
     report = build_report(summary, user, selected, catalogs(user, db))
+    report['chart_types'] = {'apoyos': chart_apoyos, 'grupos': chart_grupos}
     content = render_xlsx(report) if format == 'xlsx' else render_pdf(report)
     mime = ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             if format == 'xlsx' else 'application/pdf')

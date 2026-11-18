@@ -1,0 +1,6 @@
+﻿/health                200 {"status":"ok"}
+/health/db             200 {"status":"ok","database":"connected"}
+/health/indicadores    200 {"status":"ok","service":"indicadores","database":"connected"}
+/health/detalle        200 {"status":"ok","service":"detalle","database":"connected"}
+/health/registro       200 {"status":"ok","service":"registro","database":"connected"}
+/health/reportes       200 {"status":"ok","service":"reportes","database":"connected"}

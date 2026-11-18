@@ -1,0 +1,193 @@
+{
+ "resultados": [
+  {
+   "escenario": "E03 Filtro por municipio",
+   "esperado": "Hidalgo: total del selector = API tablero = pantalla = API listado",
+   "obtenido": "selector=23, API=23, pantalla=23, listado=23",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 242
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 432
+    }
+   ]
+  },
+  {
+   "escenario": "E06 Comparación de periodos",
+   "esperado": "≥2 periodos; variación = diferencia entre periodos consecutivos; conserva el filtro de municipio",
+   "obtenido": "meses: 3 periodos; años: 3 periodos, totales=[4, 13, 6], variaciones correctas=True, municipio conservado=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/comparacion",
+     "parametros": [
+      "fin",
+      "inicio",
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 197
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/comparacion",
+     "parametros": [
+      "fin",
+      "inicio",
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 196
+    }
+   ]
+  },
+  {
+   "escenario": "E12 Cierre de sesión y revocación",
+   "esperado": "logout",
+   "obtenido": "omitida en esta corrida de depuración",
+   "estado": "OMITIDA",
+   "peticiones": []
+  }
+ ],
+ "paridad_monolito": [
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/comparacion",
+   "parametros": [
+    "fin",
+    "inicio",
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/comparacion",
+   "parametros": [
+    "fin",
+    "inicio",
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  }
+ ],
+ "consola_navegador": [],
+ "peticiones_api": [
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 474
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 242
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 432
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/comparacion",
+   "parametros": [
+    "fin",
+    "inicio",
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 197
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/comparacion",
+   "parametros": [
+    "fin",
+    "inicio",
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 196
+  }
+ ]
+}

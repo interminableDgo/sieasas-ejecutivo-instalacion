@@ -1,4 +1,5 @@
 """Queries against the original SSNL tables; API aliases are presentation only."""
+import re
 from datetime import date
 from fastapi import HTTPException, Query
 from sqlalchemy import text
@@ -12,6 +13,9 @@ JOINS = ''' FROM Tbl_SolicitudesApoyo sa
  JOIN Cat_StatusAtencion es ON es.id=sa.solapoyo_statusid'''
 RESOLVED = "es.descripcion IN ('Resuelto','Resuelto con observación')"
 ACTIVE = "es.descripcion NOT IN ('Resuelto','Resuelto con observación','Cerrado / Cancelado','No es competencia')"
+# The rest of the total, so activas + resueltas + these always add up.
+NOT_COMPETENT = "es.descripcion='No es competencia'"
+CANCELLED = "es.descripcion='Cerrado / Cancelado'"
 FILTER_COLUMNS = {'municipio_id':'m.id', 'tipo_apoyo_id':'sa.solapoyo_tipoapoyoid',
  'dependencia_id':'sa.solapoyo_enviadopor_dependenciaid',
  'grupo_vulnerable_id':'b.ben_misc_grupovulnerable_id', 'estatus_id':'sa.solapoyo_statusid'}
@@ -109,7 +113,8 @@ def month_series(rows, today=None, *, start_date=None, end_date=None):
 def dashboard(db, user, selected, *, full_history=False):
     where, params = where_clause(user, selected)
     totals = query_rows(db, f'''SELECT COUNT(*) AS total, COALESCE(SUM({RESOLVED}),0) AS resueltas,
-      COALESCE(SUM({ACTIVE}),0) AS activas {JOINS} {where}''', params)[0]
+      COALESCE(SUM({ACTIVE}),0) AS activas, COALESCE(SUM({NOT_COMPETENT}),0) AS no_competencia,
+      COALESCE(SUM({CANCELLED}),0) AS canceladas {JOINS} {where}''', params)[0]
     # Both series use registration cohorts, never an invented closure date.
     series=query_rows(db, f'''SELECT DATE_FORMAT(sa.created,'%Y-%m') AS mes,
       COUNT(*) AS recibidas, COALESCE(SUM({RESOLVED}),0) AS resueltas
@@ -123,21 +128,38 @@ def dashboard(db, user, selected, *, full_history=False):
     ), 'datos_demo': 0}
 
 
-def compare_periods(db, user, selected, a_inicio, a_fin, b_inicio, b_fin):
-    if a_inicio > a_fin or b_inicio > b_fin:
+MAX_PERIODS = 12
+PERIOD_KEYS = {'total': 'TRUE', 'activas': ACTIVE, 'resueltas': RESOLVED}
+
+
+def variation(a, b):
+    return {'diferencia': b-a, 'porcentaje': round((b-a)*100/a, 1) if a else (0 if b == 0 else None)}
+
+
+def compare_periods(db, user, selected, periods):
+    """Counts for 2 to 12 periods in a single query. Each period after the
+    first carries its change against the one before it, in the order given."""
+    if not 2 <= len(periods) <= MAX_PERIODS:
+        raise HTTPException(422, f'Elige de 2 a {MAX_PERIODS} periodos.')
+    if any(start > end for start, end in periods):
         raise HTTPException(422, 'La fecha inicial debe ser anterior a la final.')
-    periods = []
-    for start, end in [(a_inicio, a_fin), (b_inicio, b_fin)]:
-        where, params = where_clause(user, {**selected, 'fecha_inicio': start, 'fecha_fin': end})
-        values = query_rows(db, f'''SELECT COUNT(*) AS total,
-          COALESCE(SUM({ACTIVE}),0) AS activas,
-          COALESCE(SUM({RESOLVED}),0) AS resueltas, 0 AS datos_demo '''+JOINS+where, params)[0]
-        periods.append({'inicio': start, 'fin': end, **{k:int(v) for k,v in values.items()}})
-    changes = {}
-    for key in ['total', 'activas', 'resueltas']:
-        a, b = periods[0][key], periods[1][key]
-        changes[key] = {'diferencia': b-a, 'porcentaje': round((b-a)*100/a, 1) if a else (0 if b == 0 else None)}
-    return {'a': periods[0], 'b': periods[1], 'variacion': changes}
+    # The dates chosen here replace the general date range.
+    scope = {k: v for k, v in selected.items() if k not in ('fecha_inicio', 'fecha_fin')}
+    where, params = where_clause(user, scope)
+    columns, ranges = [], []
+    for i, (start, end) in enumerate(periods):
+        params[f'pi{i}'], params[f'pf{i}'] = start, end
+        inside = f'(sa.created>=:pi{i} AND sa.created<DATE_ADD(:pf{i}, INTERVAL 1 DAY))'
+        ranges.append(inside)
+        columns += [f'COALESCE(SUM({inside} AND {rule}),0) AS {key}_{i}' for key, rule in PERIOD_KEYS.items()]
+    row = query_rows(db, 'SELECT ' + ', '.join(columns) + JOINS + where
+                     + ' AND (' + ' OR '.join(ranges) + ')', params)[0]
+    result = []
+    for i, (start, end) in enumerate(periods):
+        values = {key: int(row[f'{key}_{i}'] or 0) for key in PERIOD_KEYS}
+        change = {key: variation(result[-1][key], values[key]) for key in PERIOD_KEYS} if result else None
+        result.append({'inicio': start, 'fin': end, **values, 'variacion': change})
+    return {'periodos': result}
 
 
 ROW_SELECT = '''SELECT sa.solapoyo_id AS solicitud_id, CONCAT('Solicitud #',sa.solapoyo_id) AS folio,
@@ -146,9 +168,113 @@ ROW_SELECT = '''SELECT sa.solapoyo_id AS solicitud_id, CONCAT('Solicitud #',sa.s
  es.descripcion AS estatus, COALESCE(g.descripcion,'Sin información') AS grupo_vulnerable'''
 
 
-def list_rows(db,user,selected,limit=10,offset=0):
-    where, params=where_clause(user,selected)
-    total=db.execute(text('SELECT COUNT(*) '+JOINS+where),params).scalar_one()
-    rows=query_rows(db, ROW_SELECT+JOINS+where+' ORDER BY sa.created DESC, sa.solapoyo_id DESC LIMIT :limit OFFSET :offset',
+# The table also shows who is involved, so a search by name has visible results.
+PEOPLE_SELECT = ''', CONCAT_WS(' ',b.ben_gen_name,b.ben_gen_lastname) AS beneficiario,
+ CONCAT_WS(' ',s.sol_nombres,s.sol_apellidos) AS solicitante'''
+PEOPLE_JOIN = ' LEFT JOIN Tbl_Solicitantes s ON s.sol_id=sa.solapoyo_solicitanteid'
+BENEFICIARY = "CONCAT_WS(' ',b.ben_gen_name,b.ben_gen_lastname)"
+APPLICANT = "CONCAT_WS(' ',s.sol_nombres,s.sol_apellidos)"
+# 05/10/2026, 5/10/2026 and 2026-10-05 all find the same registration date.
+DATES = ["DATE_FORMAT(sa.created,'%d/%m/%Y')", "DATE_FORMAT(sa.created,'%e/%c/%Y')",
+ "DATE_FORMAT(sa.created,'%Y-%m-%d')"]
+MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+ 'septiembre','octubre','noviembre','diciembre']
+MAX_SEARCH_TERMS = 6
+
+
+def looks_like_date(term):
+    """Only date-shaped words search the date, so a number such as 026 does
+    not match every request registered in 2026."""
+    return bool(re.fullmatch(r'[\d/-]+', term)) and ('/' in term or '-' in term or len(term) == 4)
+
+
+def search_terms(q):
+    return (q or '').split()[:MAX_SEARCH_TERMS]
+
+
+def folio_number(term):
+    """'14' or '#14' names Solicitud #14."""
+    digits = term.removeprefix('#')
+    return int(digits) if digits.isdigit() and len(digits) <= 9 else None
+
+
+def matches(columns, terms, prefix, *, months=False, folio=False):
+    """Every word must appear in one of the columns. Names use the
+    utf8mb4_unicode_ci collation, so accents and capitals do not matter."""
+    clauses, params = [], {}
+    for i, term in enumerate(terms):
+        name = f'{prefix}{i}'
+        like = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        params[name] = f'%{like}%'
+        options = [f'{column} LIKE :{name}' for column in columns
+                   if column not in DATES or looks_like_date(term)]
+        if months and len(term) >= 3:
+            plain = term.lower().translate(str.maketrans('áéíóú', 'aeiou'))
+            for number, month in enumerate(MONTHS, 1):
+                if month.startswith(plain):
+                    options.append(f'MONTH(sa.created)={number}')
+        if folio and folio_number(term) is not None:
+            params[name + '_folio'] = folio_number(term)
+            options.append(f'sa.solapoyo_id=:{name}_folio')
+        clauses.append('(' + (' OR '.join(options) or 'FALSE') + ')')
+    return ''.join(' AND ' + c for c in clauses), params
+
+
+# Besides the people and the date, the type of support, the status and the
+# folio tell apart two requests of the same person ("jorge vacuna", "jorge 14").
+REQUEST_SEARCH = [BENEFICIARY, APPLICANT, *DATES, 'ta.descripcion', 'es.descripcion']
+
+
+def search_scope(user, selected, q):
+    where, params = where_clause(user, selected)
+    search, extra = matches(REQUEST_SEARCH, search_terms(q), 'q', months=True, folio=True)
+    return JOINS + PEOPLE_JOIN + where + search, {**params, **extra}
+
+
+# Columns the table can be sorted by. Only these fixed expressions reach SQL.
+SORT_COLUMNS = {'estatus': 'es.descripcion', 'solicitud': 'sa.solapoyo_id', 'fecha': 'sa.created',
+ 'beneficiario': BENEFICIARY, 'solicitante': APPLICANT, 'municipio': 'm.nom_mun',
+ 'tipo_apoyo': 'ta.descripcion', 'remitente': "COALESCE(d.descripcion,'Sin dependencia remitente')"}
+
+
+def list_rows(db,user,selected,limit=10,offset=0,q=None,sort='fecha',ascending=False):
+    scope, params=search_scope(user,selected,q)
+    total=db.execute(text('SELECT COUNT(*) '+scope),params).scalar_one()
+    # The newest first breaks ties, so pages never repeat or skip a row.
+    order=f"{SORT_COLUMNS[sort]} {'ASC' if ascending else 'DESC'}, sa.created DESC, sa.solapoyo_id DESC"
+    rows=query_rows(db, ROW_SELECT+PEOPLE_SELECT+scope
+      +f' ORDER BY {order} LIMIT :limit OFFSET :offset',
       {**params,'limit':limit,'offset':offset})
     return {'total':total, 'items':rows}
+
+
+def suggestions(db,user,selected,q,limit=5,people_limit=3):
+    """What the search box offers while typing: the most recent matching
+    requests (so one can be opened directly), the people involved with how
+    many requests each has, and the total, never a long list."""
+    terms = search_terms(q)
+    if not terms:
+        return {'total': 0, 'solicitudes': [], 'personas': []}
+    scope, params = search_scope(user, selected, q)
+    total = db.execute(text('SELECT COUNT(*) ' + scope), params).scalar_one()
+    requests = query_rows(db, ROW_SELECT + PEOPLE_SELECT + scope
+      + ' ORDER BY sa.created DESC, sa.solapoyo_id DESC LIMIT :limit', {**params, 'limit': limit})
+    base_where, base_params = where_clause(user, selected)
+    people, seen = [], set()
+    for kind, column in [('Beneficiario', BENEFICIARY), ('Solicitante', APPLICANT)]:
+        # Every word must be in this person's name or in a detail of the same
+        # request (type, status, date, folio), never in the other person's
+        # name: "jorge serangue" offers Jorge Seranguelli, not Jorge Pérez.
+        # At least one word must be in the name, so a date alone offers nobody.
+        own, extra = matches([column, *DATES, 'ta.descripcion', 'es.descripcion'], terms, 'n', months=True, folio=True)
+        any_name = ' OR '.join(f'{column} LIKE :n{i}' for i in range(len(terms)))
+        for row in query_rows(db, f"SELECT {column} AS nombre, '{kind}' AS tipo {scope}{own} AND ({any_name})"
+            f' GROUP BY {column} ORDER BY MAX(sa.created) DESC LIMIT {people_limit}', {**params, **extra}):
+            if row['nombre'] in seen:
+                continue
+            seen.add(row['nombre'])
+            # All requests of the person within the filters, not only the matching ones.
+            row['total'] = db.execute(text(f'SELECT COUNT(*) {JOINS}{PEOPLE_JOIN}{base_where} AND {column}=:person'),
+              {**base_params, 'person': row['nombre']}).scalar_one()
+            people.append(row)
+    return {'total': total, 'solicitudes': requests, 'personas': people[:people_limit]}

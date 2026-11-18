@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import health, auth, executive
+from app.routers import health, auth, executive, ciudadano
 
 app = FastAPI(
     title="SGSC Salud API",
@@ -20,6 +20,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[s.strip() for s in os.getenv('CORS_ORIGINS','http://localhost:5173,http://127.0.0.1:5173').split(',') if s.strip()],
+    # La versión web del Ciudadano se publica en Netlify (cualquier subdominio *.netlify.app).
+    # El API usa tokens Bearer, no cookies, por lo que permitir ese origen no expone sesiones.
+    allow_origin_regex=os.getenv('CORS_ORIGIN_REGEX', r'https://[a-z0-9-]+\.netlify\.app'),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,6 +31,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(executive.router)
+app.include_router(ciudadano.router)
 
 
 @app.exception_handler(SQLAlchemyError)
