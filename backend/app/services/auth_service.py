@@ -98,13 +98,16 @@ def enviar(message):
     # Ambas ramas validan el certificado del servidor con el contexto TLS por defecto.
     context = ssl.create_default_context()
     if secure:
-        smtp_client = smtplib.SMTP_SSL(host, port, timeout=15, context=context)
+        with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as smtp:
+            _autenticar_y_enviar(smtp, message)
     else:
-        smtp_client = smtplib.SMTP(host, port, timeout=15)
-    with smtp_client as smtp:
-        if not secure:
+        with smtplib.SMTP(host, port, timeout=15) as smtp:
             smtp.starttls(context=context)
-        if os.getenv('SMTP_USER'):
-            smtp.login(os.environ['SMTP_USER'], os.environ.get('SMTP_PASSWORD', ''))
-        smtp.send_message(message)
+            _autenticar_y_enviar(smtp, message)
+
+
+def _autenticar_y_enviar(smtp, message):
+    if os.getenv('SMTP_USER'):
+        smtp.login(os.environ['SMTP_USER'], os.environ.get('SMTP_PASSWORD', ''))
+    smtp.send_message(message)
 

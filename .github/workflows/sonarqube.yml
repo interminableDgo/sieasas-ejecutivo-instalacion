@@ -32,6 +32,23 @@ jobs:
         run: flutter test --coverage
         continue-on-error: true # si una prueba falla, el análisis se hace de todos modos
 
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+
+      - name: Instalar dependencias del backend
+        working-directory: backend
+        run: pip install -r requirements.lock.txt pytest-cov==7.1.0
+
+      - name: Pruebas del backend con cobertura
+        working-directory: backend
+        # Sin base de datos: las pruebas que necesitan MySQL se omiten solas (RUN_DB_TESTS).
+        run: python -m pytest -q --cov=app --cov-report=xml:coverage.xml
+        continue-on-error: true
+
       - name: Análisis SonarQube Cloud
         uses: SonarSource/sonarqube-scan-action@v6
         env:

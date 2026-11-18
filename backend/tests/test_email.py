@@ -1,7 +1,86 @@
-from app.services.auth_service import build_reset_message
+import ssl
+
+import pytest
+
+from app.services import auth_service
+from app.services.auth_service import build_reset_message, enviar
 from app.services.email_template import render_reset_email
 from email import policy
+from email.message import EmailMessage
 from email.parser import BytesParser
+
+
+class _FakeSMTP:
+    """Servidor SMTP simulado: registra las llamadas sin abrir conexiones."""
+
+    instances = []
+
+    def __init__(self, host, port, timeout=None, context=None):
+        self.host, self.port, self.timeout, self.context = host, port, timeout, context
+        self.calls = []
+        _FakeSMTP.instances.append(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.calls.append('quit')
+        return False
+
+    def starttls(self, context=None):
+        self.calls.append(('starttls', context))
+
+    def login(self, user, password):
+        self.calls.append(('login', user, password))
+
+    def send_message(self, message):
+        self.calls.append(('send', message['To']))
+
+
+@pytest.fixture
+def fake_smtp(monkeypatch):
+    _FakeSMTP.instances = []
+    monkeypatch.setattr(auth_service.smtplib, 'SMTP', _FakeSMTP)
+    monkeypatch.setattr(auth_service.smtplib, 'SMTP_SSL', _FakeSMTP)
+    monkeypatch.setenv('SMTP_HOST', 'smtp.example.com')
+    return _FakeSMTP
+
+
+def _mensaje():
+    message = EmailMessage()
+    message['To'] = 'recipient@example.com'
+    message.set_content('hola')
+    return message
+
+
+def _verifica_certificado(context):
+    assert isinstance(context, ssl.SSLContext)
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname
+
+
+def test_enviar_con_starttls_valida_certificado(fake_smtp, monkeypatch):
+    monkeypatch.delenv('SMTP_SSL', raising=False)
+    monkeypatch.delenv('SMTP_PORT', raising=False)
+    monkeypatch.setenv('SMTP_USER', 'usuario')
+    monkeypatch.setenv('SMTP_PASSWORD', 'secreto')
+    enviar(_mensaje())
+    smtp = fake_smtp.instances[0]
+    assert (smtp.host, smtp.port, smtp.timeout, smtp.context) == ('smtp.example.com', 587, 15, None)
+    assert smtp.calls[0][0] == 'starttls'
+    _verifica_certificado(smtp.calls[0][1])
+    assert smtp.calls[1:] == [('login', 'usuario', 'secreto'), ('send', 'recipient@example.com'), 'quit']
+
+
+def test_enviar_con_ssl_directo_valida_certificado_sin_login(fake_smtp, monkeypatch):
+    monkeypatch.setenv('SMTP_SSL', 'true')
+    monkeypatch.setenv('SMTP_PORT', '2465')
+    monkeypatch.delenv('SMTP_USER', raising=False)
+    enviar(_mensaje())
+    smtp = fake_smtp.instances[0]
+    assert (smtp.port, smtp.timeout) == (2465, 15)
+    _verifica_certificado(smtp.context)
+    assert smtp.calls == [('send', 'recipient@example.com'), 'quit']
 
 
 def test_email_embeds_logo_and_has_accessible_text(monkeypatch):
