@@ -1,0 +1,78 @@
+name: Imágenes Docker
+
+# Comprueba que las imágenes del backend y del gateway se construyen y que las pruebas de cada
+# microservicio pasan dentro de su imagen. No publica ninguna imagen.
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'gateway/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'gateway/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+jobs:
+  microservicios:
+    name: Microservicio ${{ matrix.servicio }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        servicio: [indicadores, detalle, registro, reportes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen y correr sus pruebas (etapa test)
+        working-directory: backend
+        run: docker build -f services/${{ matrix.servicio }}/Dockerfile --target test -t sgsc-${{ matrix.servicio }}-test .
+
+      - name: Construir imagen de producción (etapa runtime)
+        working-directory: backend
+        run: docker build -f services/${{ matrix.servicio }}/Dockerfile --target runtime -t sgsc-${{ matrix.servicio }} .
+
+      - name: La imagen arranca como usuario sin privilegios e importa la app
+        run: |
+          docker run --rm --entrypoint sh sgsc-${{ matrix.servicio }} -c \
+            'test "$(id -u)" != "0" && python -c "import sgsc_common, sgsc_${{ matrix.servicio }}.main"'
+
+  nucleo:
+    name: Núcleo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen del núcleo
+        working-directory: backend
+        run: docker build -f Dockerfile.nucleo -t sgsc-nucleo .
+
+      - name: La imagen arranca como usuario sin privilegios e importa la app
+        run: |
+          docker run --rm --entrypoint sh sgsc-nucleo -c \
+            'test "$(id -u)" != "0" && python -c "import app.main"'
+
+  gateway:
+    name: Gateway Nginx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen del gateway
+        run: docker build -t sgsc-gateway gateway
+
+      - name: El gateway arranca y responde /nginx-health
+        run: |
+          docker network create sgsc-ci
+          docker run -d --name gateway --network sgsc-ci sgsc-gateway
+          for i in $(seq 1 15); do
+            if docker exec gateway wget -qO- http://127.0.0.1/nginx-health; then
+              docker logs gateway; exit 0
+            fi
+            sleep 2
+          done
+          docker logs gateway; exit 1
