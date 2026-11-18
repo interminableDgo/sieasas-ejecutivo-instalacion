@@ -1,0 +1,11 @@
+﻿/                                200 text/html 2 KB cache=no-store
+/index.html                      200 text/html 2 KB cache=no-store
+/main.dart.js                    200 application/javascript 3,623 KB cache=no-store
+/flutter_bootstrap.js            200 application/javascript 13 KB cache=no-store
+/restablecer                     200 text/html 2 KB cache=no-store
+/assets/AssetManifest.bin.json   200 application/json 0 KB cache=no-store
+/auth/me                             401 servicio=
+/ejecutivo/dashboard                 401 servicio=indicadores
+/ejecutivo/solicitudes               401 servicio=detalle
+/ejecutivo/colonias?municipio_id=1   401 servicio=registro
+/ejecutivo/exportar/pdf              401 servicio=reportes

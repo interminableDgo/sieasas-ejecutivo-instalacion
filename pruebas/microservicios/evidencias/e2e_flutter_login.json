@@ -1,0 +1,45 @@
+{
+ "escenario": "E01 Inicio de sesión y 2FA",
+ "aprobado": true,
+ "login": [
+  {
+   "metodo": "POST",
+   "ruta": "/auth/login",
+   "codigo": 200,
+   "servicio": "nucleo",
+   "ms": 1404
+  }
+ ],
+ "uso_2fa": false,
+ "peticiones_tras_login": [
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "codigo": 200,
+   "servicio": "detalle",
+   "ms": 590,
+   "consulta": [
+    "direccion",
+    "orden",
+    "page"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "codigo": 200,
+   "servicio": "indicadores",
+   "ms": 804,
+   "consulta": []
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/catalogos",
+   "codigo": 200,
+   "servicio": "indicadores",
+   "ms": 1326,
+   "consulta": []
+  }
+ ],
+ "token_en_memoria": true
+}

@@ -1,0 +1,23 @@
+# Contexto de construcción del núcleo y de los cuatro microservicios (backend/).
+# Secretos: nunca entran a una imagen. Docker Compose entrega las variables y monta ca.pem
+# como secreto en /run/secrets/db_ca.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+
+# Entornos, cachés y registros locales
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/*.local.*
+**/*.log
+
+# Pruebas del monolito (no se ejecutan en la imagen del núcleo). Las pruebas de cada
+# microservicio (services/*/tests) sí forman parte del contexto, pero solo la etapa `test`
+# de su Dockerfile las copia; la etapa `runtime` copia únicamente el paquete del servicio.
+/tests

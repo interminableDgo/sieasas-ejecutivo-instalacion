@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sgsc-common"
+version = "0.1.0"
+description = "Utilidades transversales de los microservicios del Ejecutivo de SIEASAS"
+requires-python = ">=3.12"
+# Las versiones exactas se fijan en el requirements.txt de cada microservicio.
+dependencies = ["fastapi", "sqlalchemy", "pymysql", "python-dotenv"]
+
+[tool.setuptools]
+packages = ["sgsc_common"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

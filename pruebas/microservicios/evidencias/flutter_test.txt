@@ -1,0 +1,78 @@
+00:00 +0: loading <repo>/sgsc_ejecutiva/test/category_chart_test.dart
+00:00 +0: <repo>/sgsc_ejecutiva/test/category_chart_test.dart: Views preserve counts, percentages, Others and filter callbacks
+00:00 +1: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: selecting a bar keeps the scroll position and the content
+00:00 +2: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: selecting a bar keeps the scroll position and the content
+00:01 +3: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: selecting a bar keeps the scroll position and the content
+00:01 +4: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:01 +5: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:01 +6: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:01 +7: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:04 +8: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:04 +9: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:04 +10: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:04 +11: <repo>/sgsc_ejecutiva/test/export_test.dart: HU6 dates reach dashboard list and export and survive retry
+00:04 +12: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:04 +13: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:04 +14: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:04 +15: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:04 +16: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:05 +17: <repo>/sgsc_ejecutiva/test/sprint1_test.dart: HU4 category filters list and detail returns to same context
+00:05 +18: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality filter shows counts, most requests first
+00:07 +19: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: "Todos" clears the specific selections of a filter
+00:07 +20: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: a single selection can be removed inside the sheet
+00:08 +21: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: "Limpiar todo" asks before clearing
+00:08 +22: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: closing with pending changes asks before discarding
+00:08 +23: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: Escape closes the option list
+00:08 +24: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: applied chips wrap and "Ver todos" reveals the rest
+00:09 +25: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: removing a filter can be undone
+00:09 +26: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: bars accept several values and keep active rows visible
+00:09 +27: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: bars accept several values and keep active rows visible
+00:10 +28: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: CURP errors update while typing without submitting
+00:10 +29: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:10 +30: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +31: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +32: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +33: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +34: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +35: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:11 +36: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:12 +37: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:12 +38: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:12 +39: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:12 +40: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: sin respuesta no avanza y no muestra la cantidad
+00:12 +41: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:12 +42: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:12 +43: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:12 +44: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:12 +45: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:12 +46: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:13 +47: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:13 +48: <repo>/sgsc_ejecutiva/test/ssnl_registration_test.dart: Step indicator, colony catalog with derived postal code and same address
+00:13 +49: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: No envía 0 hijos, sin seguridad social y con el contrato original
+00:13 +50: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: No envía 0 hijos, sin seguridad social y con el contrato original
+00:13 +51: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: No envía 0 hijos, sin seguridad social y con el contrato original
+00:14 +52: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: No envía 0 hijos, sin seguridad social y con el contrato original
+00:14 +53: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: sheets fit the phone at 360.0x640.0 (variant: TargetPlatform.fuchsia)
+00:14 +54: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:14 +55: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:14 +56: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:14 +57: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:15 +58: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:15 +59: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:15 +60: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:15 +61: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí exige un entero entre 1 y 100
+00:15 +62: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: switching Meses/Años keeps the chosen periods
+00:16 +63: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:16 +64: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:16 +65: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:16 +66: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:16 +67: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:17 +68: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: Sí → No limpia y fija 0; No → Sí vuelve a pedir la cantidad
+00:17 +69: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: checkboxes use the brand orange on both platforms (variant: TargetPlatform.iOS)
+00:17 +70: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: la respuesta se conserva al regresar y aparece en la revisión
+00:17 +71: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: la respuesta se conserva al regresar y aparece en la revisión
+00:17 +72: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: la respuesta se conserva al regresar y aparece en la revisión
+00:18 +73: <repo>/sgsc_ejecutiva/test/tiene_hijos_test.dart: la respuesta se conserva al regresar y aparece en la revisión
+00:18 +74: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map map keeps selection on error, retries and displays filtered empty state
+00:18 +75: <repo>/sgsc_ejecutiva/test/dashboard_ux_test.dart: municipality map is not shown for other states
+00:18 +76: All tests passed!

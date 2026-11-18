@@ -49,6 +49,9 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   final colonyLoads = <String, int>{'b': 0, 's': 0};
   Map<String, dynamic>? beneficiary, applicant;
   bool existingBeneficiary = false, existingApplicant = false, busy = false;
+  // «¿Tiene hijos?» es solo estado de la interfaz (null = sin responder); el
+  // backend sigue recibiendo numero_hijos y hijo_seguridad_social.
+  bool? tieneHijos;
   int step = 0, birthLoad = 0;
   String? error;
 
@@ -101,6 +104,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     String? help,
     bool multiline = false,
     int? minimum,
+    int? maximum,
   }) {
     labels[key] = label;
     return LabeledField(
@@ -126,6 +130,15 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         validator: (v) {
           final value = (v ?? '').trim();
           if (required && value.isEmpty) return 'Completa este campo.';
+          // Con límite superior solo se aceptan dígitos: sin signo, decimales ni texto.
+          if (value.isNotEmpty &&
+              number &&
+              maximum != null &&
+              (!RegExp(r'^\d+$').hasMatch(value) ||
+                  int.parse(value) < (minimum ?? 0) ||
+                  int.parse(value) > maximum)) {
+            return 'Ingresa un número entero entre ${minimum ?? 0} y $maximum.';
+          }
           if (value.isNotEmpty &&
               number &&
               (int.tryParse(value) == null ||
@@ -236,6 +249,63 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
       value: flags[key] ?? false,
       controlAffinity: ListTileControlAffinity.leading,
       onChanged: busy ? null : (v) => setState(() => flags[key] = v ?? false),
+    );
+  }
+
+  /// Sí muestra la cantidad vacía para exigirla; No guarda 0 hijos y ningún
+  /// hijo con seguridad social, aunque antes se hubiera capturado otro valor.
+  void answerChildren(bool value) {
+    if (value == tieneHijos) return;
+    setState(() {
+      tieneHijos = value;
+      if (value) {
+        controller('b.numero_hijos').clear();
+      } else {
+        controller('b.numero_hijos').text = '0';
+        flags['b.hijo_seguridad_social'] = false;
+      }
+    });
+  }
+
+  Widget childrenQuestion() {
+    labels['b.tiene_hijos'] = '¿Tiene hijos?';
+    return LabeledField(
+      '¿Tiene hijos?',
+      FormField<bool>(
+        key: ValueKey('tiene_hijos-$tieneHijos'),
+        initialValue: tieneHijos,
+        validator: (v) => v == null ? 'Indica si tiene hijos.' : null,
+        builder: (state) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Sí')),
+                ButtonSegment(value: false, label: Text('No')),
+              ],
+              selected: {?tieneHijos},
+              emptySelectionAllowed: true,
+              showSelectedIcon: false,
+              onSelectionChanged: busy
+                  ? null
+                  : (selection) {
+                      if (selection.isNotEmpty) answerChildren(selection.first);
+                    },
+            ),
+            if (state.hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  state.errorText!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -565,8 +635,18 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
     if (step == 2) ...[
       section('Información social'),
       select('¿Con quién vive?', 'b.con_quien_vive_id', 'con_quien_vive'),
-      input('Número de hijos', 'b.numero_hijos', number: true, max: 3),
-      check('Algún hijo tiene seguridad social', 'b.hijo_seguridad_social'),
+      childrenQuestion(),
+      if (tieneHijos == true) ...[
+        input(
+          '¿Cuántos hijos tiene?',
+          'b.numero_hijos',
+          number: true,
+          max: 3,
+          minimum: 1,
+          maximum: 100,
+        ),
+        check('Algún hijo tiene seguridad social', 'b.hijo_seguridad_social'),
+      ],
       check('Estudia actualmente', 'b.estudia'),
       if (flags['b.estudia'] == true)
         select('Área de estudio', 'b.area_estudio_id', 'areas_estudio'),
@@ -686,6 +766,7 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
   ];
 
   String reviewValue(String key) {
+    if (key == 'b.tiene_hijos') return tieneHijos == true ? 'Sí' : 'No';
     if (booleanFields.contains(key)) return flags[key] == true ? 'Sí' : 'No';
     if (optionsByField.containsKey(key)) {
       for (final row in optionsByField[key]!) {
@@ -711,6 +792,11 @@ class _NewRequestScreenState extends State<NewRequestScreen> {
         else
           for (final entry in labels.entries)
             if (!skip(entry.key) &&
+                !(tieneHijos != true &&
+                    const {
+                      'b.numero_hijos',
+                      'b.hijo_seguridad_social',
+                    }.contains(entry.key)) &&
                 (prefix.isEmpty
                     ? !entry.key.contains('.') && entry.key != 'birth_entity'
                     : entry.key.startsWith('$prefix.') ||

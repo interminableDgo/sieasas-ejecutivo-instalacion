@@ -1,0 +1,147 @@
+{
+ "resultados": [
+  {
+   "escenario": "E03 Filtro por municipio",
+   "esperado": "Hidalgo: total del selector = API tablero = pantalla = API listado",
+   "obtenido": "selector=23, API=23, pantalla=23, listado=23",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 238
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 450
+    }
+   ]
+  },
+  {
+   "escenario": "E02 Tablero e indicadores",
+   "esperado": "pantalla = API; activas+resueltas+otras = total; suma por municipio = total; 12 meses",
+   "obtenido": "total=564 (pantalla 564), activas=231, resueltas=197, suma estatus=564, suma municipios=564, meses=12",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 465
+    }
+   ]
+  },
+  {
+   "escenario": "E12 Cierre de sesión y revocación",
+   "esperado": "POST /auth/logout 200; el mismo token da 401 en el núcleo y en indicadores; vuelve al login",
+   "obtenido": "logout=200, /auth/me con el token=401, /ejecutivo/dashboard con el token=401 (servicio indicadores), pantalla de login=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "POST",
+     "ruta": "/auth/logout",
+     "parametros": [],
+     "codigo": 200,
+     "servicio": "nucleo",
+     "servicio_esperado": null,
+     "ms": 637
+    }
+   ]
+  }
+ ],
+ "paridad_monolito": [
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  }
+ ],
+ "consola_navegador": [],
+ "peticiones_api": [
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 238
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 450
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 465
+  },
+  {
+   "metodo": "POST",
+   "ruta": "/auth/logout",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "nucleo",
+   "servicio_esperado": null,
+   "ms": 637
+  }
+ ]
+}

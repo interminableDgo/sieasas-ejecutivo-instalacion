@@ -1,0 +1,3 @@
+# Solo nginx.conf entra a la imagen del gateway.
+*
+!nginx.conf

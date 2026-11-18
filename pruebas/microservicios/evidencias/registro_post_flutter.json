@@ -1,0 +1,239 @@
+{
+ "pasos": [
+  {
+   "paso": 1,
+   "siguiente": 2
+  },
+  {
+   "paso": 2,
+   "siguiente": 3
+  },
+  {
+   "paso": 3,
+   "siguiente": 4
+  },
+  {
+   "paso": 4,
+   "siguiente": 5
+  },
+  {
+   "paso": 5,
+   "siguiente": 6
+  },
+  {
+   "paso": 6,
+   "siguiente": 7
+  },
+  {
+   "paso": 7,
+   "siguiente": 8
+  }
+ ],
+ "peticiones": [
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "codigo": 200,
+   "servicio": "detalle",
+   "ms": 250,
+   "consulta": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "codigo": 200,
+   "servicio": "indicadores",
+   "ms": 955,
+   "consulta": [
+    "municipio_id"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/municipios-nacimiento",
+   "codigo": 200,
+   "servicio": "registro",
+   "ms": 196,
+   "consulta": [
+    "entidad_id"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/colonias",
+   "codigo": 200,
+   "servicio": "registro",
+   "ms": 191,
+   "consulta": [
+    "municipio_id"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "ruta": "/ejecutivo/solicitudes",
+   "codigo": 201,
+   "servicio": "registro",
+   "ms": 1188,
+   "consulta": []
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "codigo": 200,
+   "servicio": "detalle",
+   "ms": 256,
+   "consulta": [
+    "direccion",
+    "orden",
+    "page"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "codigo": 200,
+   "servicio": "indicadores",
+   "ms": 463,
+   "consulta": []
+  }
+ ],
+ "revision_visible": [
+  "Volver",
+  "Nueva solicitud",
+  "Paso 8 de 8: Revisión, Revisar y registrar",
+  "Revisa la información antes de registrar. Usa Paso anterior para corregir los datos.",
+  "Beneficiario",
+  "Nombre(s)",
+  "PRUEBA E2E SGSC",
+  "Apellidos",
+  "REGISTRO SINTETICO 17NOV2026",
+  "CURP (opcional)",
+  "Sin especificar",
+  "Fecha de nacimiento",
+  "2000-01-01",
+  "Género",
+  "Prefiere no especificar",
+  "Estado de nacimiento",
+  "Nuevo León",
+  "Municipio de nacimiento",
+  "Monterrey",
+  "Municipio de domicilio · Nuevo León",
+  "Monterrey",
+  "Colonia",
+  "Centro · CP 64000",
+  "Calle",
+  "CALLE DE PRUEBA SGSC",
+  "Número exterior / interior",
+  "0",
+  "Años de residencia",
+  "0",
+  "¿Con quién vive?",
+  "Solo(a)",
+  "Número de hijos",
+  "0",
+  "Algún hijo tiene seguridad social",
+  "No",
+  "Estudia actualmente",
+  "No",
+  "Ocupación (opcional)",
+  "Sin especificar",
+  "Fuente de ingresos (opcional)",
+  "Sin especificar",
+  "Seguridad social",
+  "Ninguno",
+  "Número de afiliación (opcional)",
+  "Sin especificar",
+  "Grupo vulnerable",
+  "No",
+  "Realiza el trámite personalmente",
+  "No",
+  "Es migrante",
+  "No",
+  "Pertenece a Código 2024",
+  "No",
+  "Solicitante",
+  "Nombre(s)",
+  "PRUEBA E2E SGSC",
+  "Apellidos",
+  "SOLICITANTE SINTETICO",
+  "Parentesco con el beneficiario",
+  "El mismo / Ella misma"
+ ],
+ "clave_idempotencia": "a367de33-41e8-46e2-b404-646b8b7160a1",
+ "campos_enviados": [
+  "beneficiario",
+  "canal_id",
+  "descripcion",
+  "detalles_envio",
+  "enviado_por_id",
+  "idempotencia",
+  "observaciones",
+  "solicitante",
+  "tipo_apoyo_id",
+  "unidad_tratante_id"
+ ],
+ "beneficiario_enviado": {
+  "nombres": "PRUEBA E2E SGSC",
+  "apellidos": "REGISTRO SINTETICO 17NOV2026",
+  "curp": null,
+  "fecha_nacimiento": "2000-01-01",
+  "calle": "CALLE DE PRUEBA SGSC",
+  "numero": "0",
+  "tiempo_residencia": 0,
+  "numero_hijos": 0,
+  "afiliacion": null,
+  "genero_id": 1,
+  "municipio_nacimiento_id": 1003,
+  "municipio_id": 1003,
+  "colonia_id": 1,
+  "con_quien_vive_id": 1,
+  "seguridad_social_id": 7,
+  "grupo_vulnerable_id": 1
+ },
+ "solicitante_enviado": {
+  "nombres": "PRUEBA E2E SGSC",
+  "apellidos": "SOLICITANTE SINTETICO",
+  "fecha_nacimiento": "2000-01-01",
+  "telefono": "0000000000",
+  "parentesco_id": 12,
+  "mismo_domicilio": true
+ },
+ "primer_envio_flutter": {
+  "codigo": 201,
+  "servicio": "registro",
+  "json": {
+   "solicitud_id": 581,
+   "folio": "Solicitud #581"
+  },
+  "ms": null
+ },
+ "segundo_envio_gateway_misma_clave": {
+  "codigo": 201,
+  "servicio": "registro",
+  "json": {
+   "solicitud_id": 581,
+   "folio": "Solicitud #581"
+  },
+  "ms": 2252
+ },
+ "mismo_folio": true,
+ "pantalla_tras_envio": [
+  "Panel ejecutivo · Nuevo León",
+  "Solicitudes registradas",
+  "Mi perfil",
+  "Nueva solicitud",
+  "Resumen Solicitudes (564) Filtros Exportar reporte PDF o Excel",
+  "Resumen",
+  "Solicitudes (564)",
+  "Filtros",
+  "Exportar reporte PDF o Excel",
+  "Solicitud #581 registrada correctamente",
+  "Copiar imagen de la gráfica",
+  "Cómo se calcula"
+ ]
+}

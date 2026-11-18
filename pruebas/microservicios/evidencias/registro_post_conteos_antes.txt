@@ -1,0 +1,2 @@
+﻿Pruebas previas -> beneficiarios "PRUEBA%": 1 | solicitudes con "[PRUEBA": 0
+Totales -> solicitudes: 563 | beneficiarios: 75 | solicitantes: 82 | ejecutivo_registro: 553

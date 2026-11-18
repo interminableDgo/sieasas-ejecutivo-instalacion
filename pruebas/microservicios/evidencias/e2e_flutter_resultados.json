@@ -1,0 +1,751 @@
+{
+ "resultados": [
+  {
+   "escenario": "E03 Filtro por municipio",
+   "esperado": "Hidalgo: total del selector = API tablero = pantalla = API listado",
+   "obtenido": "selector=23, API=23, pantalla=23, listado=23",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 246
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 437
+    }
+   ]
+  },
+  {
+   "escenario": "E02 Tablero e indicadores",
+   "esperado": "pantalla = API; activas+resueltas+otras = total; suma por municipio = total; 12 meses",
+   "obtenido": "total=563 (pantalla 563), activas=230, resueltas=197, suma estatus=563, suma municipios=563, meses=12",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 489
+    }
+   ]
+  },
+  {
+   "escenario": "E04 Filtro por periodo",
+   "esperado": "fechas 2025-01-01..2025-12-31 en la petición; tendencia ene–dic 2025; pantalla = API",
+   "obtenido": "fechas=['2025-01-01']..['2025-12-31'], total=204 (pantalla 204), tendencia 2025-01..2025-12",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "fecha_fin",
+      "fecha_inicio",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 260
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "fecha_fin",
+      "fecha_inicio"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 462
+    }
+   ]
+  },
+  {
+   "escenario": "E05 Combinación de filtros",
+   "esperado": "municipio + periodo en la petición; total ≤ cada filtro por separado; solo el municipio elegido",
+   "obtenido": "total=13 (pantalla 13), municipio solo=23, periodo solo=204, municipios en respuesta=1",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "fecha_fin",
+      "fecha_inicio",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 246
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "fecha_fin",
+      "fecha_inicio",
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 440
+    }
+   ]
+  },
+  {
+   "escenario": "E10 Exportación Excel",
+   "esperado": "archivo descargado = respuesta; XLSX válido; filtros en la petición y en el reporte; total = tablero filtrado",
+   "obtenido": "descargado=True (25 KB), igual a la respuesta=True, hojas=6, total en Excel=13 (tablero 13), municipio y periodo en el reporte=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/exportar/xlsx",
+     "parametros": [
+      "chart_apoyos",
+      "chart_grupos",
+      "fecha_fin",
+      "fecha_inicio",
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "reportes",
+     "servicio_esperado": "reportes",
+     "ms": 2957
+    }
+   ]
+  },
+  {
+   "escenario": "E11 Exportación PDF",
+   "esperado": "archivo descargado = respuesta; PDF válido; municipio, periodo y total del tablero filtrado en el texto",
+   "obtenido": "descargado=True (18 KB), igual a la respuesta=True, municipio en PDF=True, periodo en PDF=True, total en PDF=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/exportar/pdf",
+     "parametros": [
+      "chart_apoyos",
+      "chart_grupos",
+      "fecha_fin",
+      "fecha_inicio",
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "reportes",
+     "servicio_esperado": "reportes",
+     "ms": 1623
+    }
+   ]
+  },
+  {
+   "escenario": "E06 Comparación de periodos",
+   "esperado": "comparación",
+   "obtenido": "error de automatización: TimeoutError: control no visible: ^Meses$",
+   "estado": "FALLIDA",
+   "peticiones": []
+  },
+  {
+   "escenario": "E07 Navegación del indicador al detalle",
+   "esperado": "al pulsar «Hidalgo» el listado y el tablero se filtran igual; la pestaña muestra el total",
+   "obtenido": "listado=23 (esperado 23), mismo municipio en ambas peticiones=True, pestaña «Solicitudes (23)»=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 247
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/dashboard",
+     "parametros": [
+      "municipio_id"
+     ],
+     "codigo": 200,
+     "servicio": "indicadores",
+     "servicio_esperado": "indicadores",
+     "ms": 441
+    }
+   ]
+  },
+  {
+   "escenario": "E08 Listado, paginación y ordenamiento",
+   "esperado": "cambio de página de uno en uno con ≤10 filas del mismo total; orden por folio aplicado en el servidor",
+   "obtenido": "«Siguiente»: página 0→1, filas=10, total=23, orden=['solicitud'] ['asc'], folios ordenados=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 251
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 242
+    }
+   ]
+  },
+  {
+   "escenario": "E09 Búsqueda y apertura de una solicitud",
+   "esperado": "buscar «#5» la sugiere y filtra el listado; abrir una fila trae su detalle",
+   "obtenido": "en sugerencias=True, en listado filtrado=True, abierta=Solicitud #5, detalle folio=Solicitud #5, campos=16, pantalla de detalle=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes/sugerencias",
+     "parametros": [
+      "municipio_id",
+      "q"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 346
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes",
+     "parametros": [
+      "direccion",
+      "municipio_id",
+      "orden",
+      "page",
+      "q"
+     ],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 242
+    },
+    {
+     "metodo": "GET",
+     "ruta": "/ejecutivo/solicitudes/5",
+     "parametros": [],
+     "codigo": 200,
+     "servicio": "detalle",
+     "servicio_esperado": "detalle",
+     "ms": 204
+    }
+   ]
+  },
+  {
+   "escenario": "E12 Cierre de sesión y revocación",
+   "esperado": "POST /auth/logout 200; el mismo token da 401 en el núcleo y en indicadores; vuelve al login",
+   "obtenido": "logout=200, /auth/me con el token=401, /ejecutivo/dashboard con el token=401 (servicio indicadores), pantalla de login=True",
+   "estado": "APROBADA",
+   "peticiones": [
+    {
+     "metodo": "POST",
+     "ruta": "/auth/logout",
+     "parametros": [],
+     "codigo": 200,
+     "servicio": "nucleo",
+     "servicio_esperado": null,
+     "ms": 293
+    }
+   ]
+  }
+ ],
+ "paridad_monolito": [
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "fecha_fin",
+    "fecha_inicio",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "fecha_fin",
+    "fecha_inicio"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/exportar/xlsx",
+   "parametros": [
+    "chart_apoyos",
+    "chart_grupos",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true,
+   "excluido": "celda B6 de cada hoja (fecha y hora de generación)"
+  },
+  {
+   "ruta": "/ejecutivo/exportar/pdf",
+   "parametros": [
+    "chart_apoyos",
+    "chart_grupos",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true,
+   "excluido": "fecha y hora de generación"
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes/sugerencias",
+   "parametros": [
+    "municipio_id",
+    "q"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page",
+    "q"
+   ],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  },
+  {
+   "ruta": "/ejecutivo/solicitudes/5",
+   "parametros": [],
+   "codigo_ms": 200,
+   "codigo_monolito": 200,
+   "igual": true
+  }
+ ],
+ "consola_navegador": [],
+ "peticiones_api": [
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 246
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 437
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 489
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "fecha_fin",
+    "fecha_inicio",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 260
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "fecha_fin",
+    "fecha_inicio"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 462
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 246
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 440
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/exportar/xlsx",
+   "parametros": [
+    "chart_apoyos",
+    "chart_grupos",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "reportes",
+   "servicio_esperado": "reportes",
+   "ms": 2957
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/exportar/pdf",
+   "parametros": [
+    "chart_apoyos",
+    "chart_grupos",
+    "fecha_fin",
+    "fecha_inicio",
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "reportes",
+   "servicio_esperado": "reportes",
+   "ms": 1623
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 274
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 507
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 247
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/dashboard",
+   "parametros": [
+    "municipio_id"
+   ],
+   "codigo": 200,
+   "servicio": "indicadores",
+   "servicio_esperado": "indicadores",
+   "ms": 441
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 251
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 242
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes/sugerencias",
+   "parametros": [
+    "municipio_id",
+    "q"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 346
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes",
+   "parametros": [
+    "direccion",
+    "municipio_id",
+    "orden",
+    "page",
+    "q"
+   ],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 242
+  },
+  {
+   "metodo": "GET",
+   "ruta": "/ejecutivo/solicitudes/5",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "detalle",
+   "servicio_esperado": "detalle",
+   "ms": 204
+  },
+  {
+   "metodo": "POST",
+   "ruta": "/auth/logout",
+   "parametros": [],
+   "codigo": 200,
+   "servicio": "nucleo",
+   "servicio_esperado": null,
+   "ms": 293
+  }
+ ]
+}

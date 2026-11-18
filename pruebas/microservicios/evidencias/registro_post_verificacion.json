@@ -1,0 +1,66 @@
+﻿{
+ "solicitud": {
+  "solapoyo_id": 581,
+  "ben": 88,
+  "sol": 100,
+  "estatus": 1,
+  "tipo": 13,
+  "origen": 2,
+  "canal": 1,
+  "unidad": 1,
+  "createdBy": 14,
+  "descripcion": "[PRUEBA AUTOMATIZADA SGSC – NO ATENDER] Valid"
+ },
+ "estatus": "Inicio",
+ "beneficiario": {
+  "ben_id": 88,
+  "ben_gen_name": "PRUEBA E2E SGSC",
+  "ben_gen_lastname": "REGISTRO SINTETICO 17NOV2026",
+  "ben_gen_curp": null,
+  "ben_gen_birthdate": "2000-01-01",
+  "ben_dom_entidad": 19,
+  "ben_dom_municipio": 1003,
+  "ben_dom_colonia_id": 1,
+  "ben_dom_cp": "64000",
+  "createdBy": 14
+ },
+ "solicitante": {
+  "sol_id": 100,
+  "sol_nombres": "PRUEBA E2E SGSC",
+  "sol_apellidos": "SOLICITANTE SINTETICO",
+  "sol_parentescoid": 12,
+  "sol_municipioid": 1003,
+  "sol_colonia_id": 1,
+  "sol_codigopostal": "64000",
+  "sol_telefono": "0000000000",
+  "sol_estadoid": 19,
+  "createdBy": 14
+ },
+ "ejecutivo_registro": [
+  {
+   "solicitud_id": 581,
+   "usuario_id": 14,
+   "idempotencia": "a367de33-41e8-46e2-b404-646b8b7160a1"
+  }
+ ],
+ "verificaciones": {
+  "folio_es_el_id": true,
+  "estatus_inicio": true,
+  "beneficiario_sintetico_sin_curp": true,
+  "beneficiario_en_NL_Monterrey_Centro": true,
+  "solicitante_copia_domicilio": true,
+  "solicitante_telefono_sintetico": true,
+  "una_fila_ejecutivo_registro_con_la_clave": true,
+  "mismo_autor_en_las_4_tablas": true,
+  "descripcion_marcada_no_atender": true,
+  "solicitudes_marcadas_en_total": 1,
+  "beneficiarios_sinteticos_de_esta_prueba": 1,
+  "solicitantes_sinteticos_de_esta_prueba": 1
+ },
+ "conteos_despues": {
+  "Tbl_SolicitudesApoyo": 564,
+  "Tbl_Beneficiarios": 76,
+  "Tbl_Solicitantes": 83,
+  "ejecutivo_registro": 554
+ }
+}

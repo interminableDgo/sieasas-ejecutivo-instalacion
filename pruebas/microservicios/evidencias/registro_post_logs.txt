@@ -1,0 +1,6 @@
+﻿Nginx (upstream 172.30.0.6 = registro)
+172.30.0.1 [17/Nov/2026:19:33:33 +0000] "POST /ejecutivo/solicitudes" 201 45 1.187 rid=bda56fdd438d3298d17c4e3e0d4cce99 upstream=172.30.0.6:8000
+172.30.0.1 [17/Nov/2026:19:33:39 +0000] "POST /ejecutivo/solicitudes" 201 45 0.213 rid=3b3ceeab4f69d349cc9893d421940261 upstream=172.30.0.6:8000
+Contenedor registro (uvicorn)
+INFO:     <cliente> - "POST /ejecutivo/solicitudes HTTP/1.0" 201 Created
+INFO:     <cliente> - "POST /ejecutivo/solicitudes HTTP/1.0" 201 Created

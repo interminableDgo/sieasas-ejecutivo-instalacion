@@ -1,0 +1,123 @@
+# SIEASAS: API Gateway Nginx + núcleo de autenticación + cuatro microservicios del Ejecutivo
+# (tesis 2.8.4, 3.9, 3.17, 3.18 y Figura 53). MySQL sigue siendo la base de Aiven.
+#
+# Uso (desde la raíz del repositorio; las variables salen de backend/.env, que no entra a
+# ninguna imagen):
+#   docker compose --env-file backend/.env up -d --build
+#   docker compose --env-file backend/.env ps
+#   docker compose --env-file backend/.env up -d --no-deps --build detalle   # solo un servicio
+# No uses `docker compose config` sin --quiet: imprime los valores interpolados (secretos).
+name: sgsc
+
+# Variables que reciben los cuatro microservicios: solo las de MySQL y CORS. No reciben SMTP
+# ni AUTH_ENCRYPTION_KEY, que solo usa el núcleo.
+x-db-env: &db-env
+  DB_HOST: ${DB_HOST:?Falta DB_HOST. Ejecuta con --env-file backend/.env}
+  DB_PORT: ${DB_PORT:?Falta DB_PORT}
+  DB_NAME: ${DB_NAME:?Falta DB_NAME}
+  DB_USER: ${DB_USER:?Falta DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD}
+  DB_SSL: ${DB_SSL:-true}
+  # ca.pem se monta como secreto; la ruta de Windows del .env no aplica dentro de Linux.
+  DB_SSL_CA: /run/secrets/db_ca
+  # Conexiones a Aiven: 2 + 2 por microservicio (16 en total) más las del núcleo.
+  DB_POOL_SIZE: ${MS_DB_POOL_SIZE:-2}
+  DB_MAX_OVERFLOW: ${MS_DB_MAX_OVERFLOW:-2}
+  CORS_ORIGINS: ${GATEWAY_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+  # uvicorn --proxy-headers solo confía en el gateway.
+  FORWARDED_ALLOW_IPS: 172.30.0.10
+
+x-microservicio: &microservicio
+  build: &build
+    context: ./backend
+    target: runtime
+  environment: *db-env
+  secrets: [db_ca]
+  networks: [sgsc]
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 15s
+
+services:
+  gateway:
+    build: ./gateway
+    image: sgsc-gateway
+    ports:
+      # Único puerto publicado del sistema, solo en el equipo local.
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
+    volumes:
+      # Compilación web de Flutter: flutter build web --dart-define=API_BASE_URL=http://localhost:8080
+      - ${FLUTTER_WEB_DIR:-./sgsc_ejecutiva/build/web}:/usr/share/nginx/html:ro
+    networks:
+      sgsc:
+        ipv4_address: 172.30.0.10
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    # Sin depends_on: el gateway resuelve los servicios en cada petición y arranca aunque
+    # alguno esté detenido.
+
+  nucleo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.nucleo
+    image: sgsc-nucleo
+    # El núcleo (autenticación) necesita todas las variables: SMTP, RESET_URL, AUTH_ENCRYPTION_KEY.
+    env_file: backend/.env
+    environment:
+      DB_SSL_CA: /run/secrets/db_ca
+      FORWARDED_ALLOW_IPS: 172.30.0.10
+    secrets: [db_ca]
+    networks: [sgsc]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  indicadores:
+    <<: *microservicio
+    build:
+      <<: *build
+      dockerfile: services/indicadores/Dockerfile
+    image: sgsc-indicadores
+
+  detalle:
+    <<: *microservicio
+    build:
+      <<: *build
+      dockerfile: services/detalle/Dockerfile
+    image: sgsc-detalle
+
+  registro:
+    <<: *microservicio
+    build:
+      <<: *build
+      dockerfile: services/registro/Dockerfile
+    image: sgsc-registro
+
+  reportes:
+    <<: *microservicio
+    build:
+      <<: *build
+      dockerfile: services/reportes/Dockerfile
+    image: sgsc-reportes
+
+networks:
+  sgsc:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+secrets:
+  db_ca:
+    file: ./backend/ca.pem

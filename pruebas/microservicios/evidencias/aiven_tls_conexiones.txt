@@ -1,0 +1,10 @@
+﻿DB_SSL_CA dentro del contenedor: /run/secrets/db_ca | existe: True
+Contexto TLS: verify_mode = CERT_REQUIRED | check_hostname = True
+Pool configurado: pool_size = 2 | max_overflow = 2
+TLS de la sesiÃ³n: TLSv1.3 TLS_AES_256_GCM_SHA384
+SesiÃ³n de solo lectura: True
+MySQL 8.4.11
+max_connections = 76
+Threads_connected (todo el servidor) = 6
+PROCESSLIST no disponible: OperationalError
+Escritura bloqueada por READ ONLY: OperationalError

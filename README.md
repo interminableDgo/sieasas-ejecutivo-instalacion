@@ -1,41 +1,393 @@
-# SIESAS · Ejecutivo
+# SGSC · SIESAS Ejecutivo
 
-Réplica Flutter del módulo `AppEjecutivi.tsx` de los wireframes, conectada a FastAPI y MySQL. Incluye acceso, recuperación, solicitud de cuenta, verificación TOTP si la cuenta la tiene configurada, perfil, indicadores, filtros, comparación de periodos, detalle, registro y exportación Excel/PDF.
+**Sistema de Gestión de Solicitudes Ciudadanas (SGSC)**, aplicación **SIESAS · Ejecutivo**: tablero de indicadores, consulta y registro de solicitudes de apoyo para el personal directivo de la **Secretaría de Salud de Nuevo León**. Es el proyecto de titulación al que corresponde este repositorio.
 
-## Abrir en esta computadora
+Documentación complementaria:
+- [`GUIA_DESPLIEGUE_INSTITUCIONAL.md`](GUIA_DESPLIEGUE_INSTITUCIONAL.md): procedimiento de instalación en un servidor de la Secretaría.
+- [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): cómo dejar Aiven, Render y Netlify; esquema, privilegios, TLS y corte.
+- [`backend/README.md`](backend/README.md): API, administración y correo.
+- [`pruebas/microservicios/README.md`](pruebas/microservicios/README.md): pruebas de la arquitectura de microservicios.
 
-Desde la carpeta SGSC, ejecuta `./iniciar.ps1` y abre http://127.0.0.1:5173. El backend atiende en http://127.0.0.1:8000. Ambos procesos escuchan únicamente en esta computadora. Para recompilar: `./iniciar.ps1 -Recompilar`. La ruta local de Flutter está en `tools.local.json`, excluido de Git.
+---
 
-La fuente visual es el wireframe: Mulish, naranja institucional, azul Salud, tarjetas y logotipo de Nuevo León. La maqueta de teléfono se sustituye por una interfaz Flutter adaptable, de hasta 440 píxeles en escritorio y todo el ancho en móvil.
+## 1. Descripción general
 
-## Datos y alcance
+SIESAS Ejecutivo es una aplicación **web** (Flutter) que consulta la base de datos de solicitudes de apoyo de la Secretaría, el sistema **SSNL** (Gestoría de Apoyos), y presenta la información con indicadores, gráficas, filtros y reportes. También permite registrar nuevas solicitudes desde el módulo Ejecutivo.
 
-- La base activa es `siesas-v2` en Aiven, importada de `SSNL-original.sql`. La conexión valida certificado TLS y nombre de servidor. La anterior, `sgsc_salud`, permanece intacta.
-- Las 31 tablas originales mantienen su estructura. Cinco tablas auxiliares sostienen acceso por entidad, sesiones/recuperación, solicitudes de cuenta, límites e idempotencia. Se documentan en `backend/migrations/002_ssnl_ejecutivo.sql`.
-- Las consultas usan directamente `Tbl_SolicitudesApoyo`, `Tbl_Beneficiarios` y los catálogos SSNL. No hay vistas de equivalencia ni traslado de solicitudes de la base anterior.
-- Cada solicitud de API verifica cuenta activa, rol Ejecutivo y entidad asignada. El municipio utilizado es el domicilio del beneficiario y se verifica su coherencia con la entidad.
-- El registro tiene tres pasos: beneficiario, solicitante y solicitud. Permite expedientes existentes o nuevos con los datos obligatorios. Asigna estatus Inicio, conserva autoría y evita duplicados por reintentos.
-- Los filtros se aplican a resumen, barras, tendencia, comparación, listado y exportaciones. Los periodos se basan en fecha de registro. “Resueltas actualmente” describe el estado actual de cada cohorte, no el mes de resolución.
-- Se retiraron regiones, prioridad por solicitud y fecha de cierre porque el esquema original no las respalda. La dependencia se identifica como remitente y la unidad tratante se muestra aparte.
-- Se conservaron los expedientes de ejemplo incluidos en SSNL. Las pruebas adicionales se ejecutan en transacciones que se revierten.
-- Pendiente de confirmar con el proyecto original: el catálogo o interpretación de `ben_dom_colonia`, que exige un entero. Por ahora se pide la clave del expediente, sin inventar datos.
+La API está dividida en un **núcleo de autenticación** y **cuatro microservicios** (Indicadores y Filtros, Detalle de Indicadores, Registro Ejecutivo, Reportes y Exportación). Un **gateway Nginx** los publica, y todo se ejecuta con **Docker Compose**.
 
-## Estados vacíos
+## 2. Objetivo y problemática
 
-Sin solicitudes: total cero, invitación a registrar la primera y exportación deshabilitada. Sin coincidencias: mensaje específico y botón para limpiar filtros. Sin catálogos requeridos: formulario sin envío. Información opcional ausente: "Sin información". Sin movimientos mensuales: mensaje en lugar de una gráfica ficticia. Error de conexión: mensaje y reintento; nunca se sustituye por cero. Los resultados viejos se ocultan durante la recarga.
+Las solicitudes de apoyo (medicamentos, estudios, traslados, etc.) se registran en SSNL. Para dar seguimiento, el personal directivo dependía de consultas manuales y reportes armados a mano, sin una vista consolidada por municipio, tipo de apoyo, dependencia, grupo vulnerable o estatus.
 
-## Acceso y correo
+SGSC ofrece:
+- indicadores actualizados desde la base de datos;
+- desglose hasta la solicitud individual;
+- comparación de periodos;
+- exportaciones sin datos personales;
+- un formulario de registro guiado que respeta el esquema SSNL.
 
-La cuenta inicial de Aldo tiene ámbito Nuevo León. Se conservó el hash de su contraseña actual al crear su cuenta en SSNL. Las sesiones son tokens opacos aleatorios guardados como hash y duran 8 horas; el cliente los mantiene en memoria. Recargar la página requiere iniciar sesión otra vez.
+## 3. Institución a la que está dirigido
 
-El envío SMTP está configurado en el archivo local excluido de Git. Se conservó y se verificó su autenticación durante el cambio a SSNL. Los enlaces apuntan al servidor local de esta computadora; para abrirlos desde otro dispositivo hace falta una dirección accesible y configurar RESET_URL. No se configuró un dominio público.
+**Secretaría de Salud del Estado de Nuevo León**, personal con rol **Ejecutivo**. Cada cuenta está limitada a una entidad federativa (por omisión, Nuevo León, clave INEGI 19).
 
-La contraseña admite de 15 a 128 caracteres y se guarda con Argon2. El enlace vence en 30 minutos, es de un solo uso y revoca las sesiones al cambiar la contraseña. La verificación TOTP es real cuando está configurada; no existe un código universal de demostración.
+## 4. Funcionalidades principales
 
-## Verificación realizada
+| Área | Funcionalidad |
+|---|---|
+| Acceso | Inicio de sesión con contraseña (Argon2, o bcrypt heredado de SSNL), segundo factor TOTP si la cuenta lo tiene, solicitud de cuenta, recuperación de contraseña por correo (enlace de 30 minutos y un solo uso), perfil y cierre de sesión |
+| Tablero | Total, activas y resueltas; distribución por municipio, tipo de apoyo, dependencia remitente, grupo vulnerable y estatus; tendencia mensual (registradas contra resueltas actualmente); comparación de dos periodos |
+| Desglose | Desde cada indicador o barra, listado filtrado de 10 por página, y detalle de la solicitud |
+| Filtros | Municipio, tipo de apoyo, dependencia, grupo vulnerable, estatus y rango de fechas de registro. Se aplican a todo el tablero, al listado y a las exportaciones. |
+| Registro | Asistente de tres pasos: beneficiario (nuevo o existente, CURP opcional con validación de formato), solicitante y solicitud; pantalla de revisión antes de enviar. Asigna el estatus «Inicio», guarda la autoría y evita duplicados por reintento (idempotencia). |
+| Reportes | Excel (seis hojas) y PDF con indicadores, distribuciones y tendencia del periodo filtrado, **sin nombres ni filas individuales** |
 
-- Pruebas de backend con MySQL real: ámbito estatal, autenticación, TOTP, enlace vencido/reutilizado, revocación de sesión, creación/reintento, agregaciones y exportaciones.
-- Pruebas Flutter: acceso y validación, estado vacío, filtros sin resultados, error de conexión, catálogos vacíos y gráficas con datos de prueba.
-- Compilación Flutter web. Android/iOS no se han compilado ni probado en dispositivo.
+**Estados vacíos y errores.**
+- Sin solicitudes: total cero e invitación a registrar la primera.
+- Filtros sin coincidencias: mensaje y botón para limpiar.
+- Error de conexión: mensaje y reintento; nunca se sustituye por cero.
+- Información opcional ausente: «Sin información».
 
-Para una publicación posterior se requiere HTTPS, dominio de recuperación, orígenes CORS explícitos y un usuario MySQL de ejecución con permisos acotados. La configuración local conserva el usuario Aiven proporcionado para esta integración.
+**Fuera de alcance:**
+- el módulo **Ciudadano**: hay un prototipo con rutas `/ciudadano/*` en el núcleo, que el gateway no publica;
+- regiones, prioridad por solicitud y fecha de cierre, porque el esquema SSNL no las respalda;
+- métricas de tiempos o SLA.
+
+## 5. Tecnologías utilizadas
+
+| Capa | Tecnología |
+|---|---|
+| Frontend | Flutter 3 (Dart `^3.13.2`) para web: `http`, `uuid`, `share_plus`, `file_selector`; tipografía Mulish |
+| Gateway | Nginx 1.27 (Alpine) |
+| API | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2, PyMySQL |
+| Seguridad | argon2-cffi, bcrypt, pyotp, cryptography (Fernet), tokens opacos guardados como hash SHA-256 |
+| Reportes | openpyxl (Excel), reportlab (PDF) |
+| Base de datos | MySQL 8.4 (hoy en Aiven, con TLS verificado) |
+| Contenedores | Docker, Docker Compose v2 |
+| Pruebas | pytest, httpx, flutter_test, Playwright (recorridos en navegador) |
+
+## 6. Arquitectura y comunicación entre componentes
+
+```
+              Navegador (Flutter web)
+                       │  HTTP(S)
+                       ▼
+     ┌──────────────── gateway (Nginx) ────────────────┐   único puerto publicado
+     │  /                → archivos de Flutter web     │   127.0.0.1:8080 → 80
+     │  /auth/*          → nucleo                      │
+     │  /ejecutivo/dashboard|comparacion|catalogos      → indicadores
+     │  GET  /ejecutivo/solicitudes[/{id}]              → detalle
+     │  POST /ejecutivo/solicitudes, /personas,
+     │       /colonias, /municipios-nacimiento         → registro
+     │  /ejecutivo/exportar/{xlsx,pdf}                  → reportes
+     │  /ciudadano/*, /docs, otras                      → 404
+     └──────────────────────────────────────────────────┘
+          │ red interna Docker «sgsc» (172.30.0.0/24), sin puertos publicados
+          ▼
+   nucleo · indicadores · detalle · registro · reportes   (FastAPI, puerto 8000 cada uno)
+          │ cada servicio con su propio pool de conexiones, TLS verificado
+          ▼
+                   MySQL 8 (esquema SSNL + tablas de SGSC)
+```
+
+- Los servicios **no se llaman entre sí**. Cada uno valida por su cuenta el token contra MySQL, con la librería común `sgsc_common`, y consulta directamente las tablas que necesita.
+- Si uno se detiene, solo sus rutas responden 503 y los demás siguen funcionando.
+- El encabezado `Authorization: Bearer <token>` pasa intacto por el gateway.
+- Cada respuesta indica qué servicio la atendió en `X-SGSC-Service`.
+
+## 7. Frontend Flutter
+
+- Proyecto en `sgsc_ejecutiva/`. Punto de entrada `lib/main.dart`; cliente de la API `lib/services/executive_api.dart`; pantallas en `lib/screens/`.
+- La dirección de la API se fija **al compilar**: `--dart-define=API_BASE_URL=<url>`. Con Docker es `http://localhost:8080`; con `iniciar.ps1`, `http://127.0.0.1:8000`.
+- El token de sesión se guarda solo en memoria: recargar la página exige iniciar sesión de nuevo.
+- El diseño sigue el wireframe institucional: naranja Nuevo León, azul Salud, tarjetas y Mulish. Ancho máximo de 440 px en escritorio y ancho completo en móvil.
+- Solo se ha compilado y probado para **web**. Las carpetas `android/`, `ios/`, `linux/`, `macos/` y `windows/` son las plantillas de Flutter, sin compilar ni probar.
+
+## 8. Gateway Nginx
+
+- `gateway/nginx.conf` y `gateway/Dockerfile`.
+- Resuelve los servicios por el DNS interno de Docker en cada petición: arranca aunque falte un servicio.
+- Límite de 30 inicios de sesión por minuto por IP (`/auth/login`, ráfaga de 10).
+- Cuerpo máximo de 64 KB.
+- No publica `/docs` ni `/ciudadano/*`.
+- Sus registros no guardan las consultas (el enlace de recuperación lleva el token en la URL).
+- `gateway/tests/test_nginx_routes.py` comprueba que cada ruta que usa Flutter llegue a su servicio.
+
+## 9. Núcleo FastAPI y autenticación
+
+- Código en `backend/app/`, la aplicación FastAPI original, también llamada «monolito». En Docker, el contenedor `nucleo` la ejecuta y el gateway solo le envía `/auth/*` y `/health`.
+- **Rutas:**
+  - `POST /auth/login`, `/auth/verify` (TOTP), `/auth/logout`, `/auth/request-access`, `/auth/forgot-password`, `/auth/reset-password`;
+  - `GET /auth/me`.
+- **Sesión:**
+  - token opaco aleatorio; en la tabla `ejecutivo_token` solo se guarda su hash;
+  - duración de 8 horas;
+  - cambiar la contraseña revoca las sesiones abiertas.
+- **Cada petición del Ejecutivo exige:**
+  - una cuenta activa (`Tbl_Users`);
+  - el rol `Ejecutivo` (`auth_assignment`);
+  - una entidad asignada (`ejecutivo_acceso`);
+  - todas las consultas se limitan a esa entidad.
+- Límite de intentos por IP y por cuenta (`ejecutivo_limite`).
+- El núcleo es el único contenedor que recibe las variables SMTP y `AUTH_ENCRYPTION_KEY`.
+- **Render** publica hoy este mismo monolito, con todas sus rutas, desde la rama `dev` (`render.yaml`).
+  - La prueba de paridad (`pruebas/microservicios/codigo/`) exige que la lógica copiada en los microservicios siga siendo idéntica a la del monolito.
+
+## 10. Microservicios
+
+| Servicio | Carpeta | Paquete | Rutas |
+|---|---|---|---|
+| Indicadores y Filtros | `backend/services/indicadores/` | `sgsc_indicadores` | `GET /ejecutivo/dashboard`, `/ejecutivo/comparacion`, `/ejecutivo/catalogos` |
+| Detalle de Indicadores | `backend/services/detalle/` | `sgsc_detalle` | `GET /ejecutivo/solicitudes`, `/ejecutivo/solicitudes/{id}` |
+| Registro Ejecutivo | `backend/services/registro/` | `sgsc_registro` | `POST /ejecutivo/solicitudes`; `GET /ejecutivo/personas`, `/ejecutivo/colonias`, `/ejecutivo/municipios-nacimiento` |
+| Reportes y Exportación | `backend/services/reportes/` | `sgsc_reportes` | `GET /ejecutivo/exportar/xlsx`, `/ejecutivo/exportar/pdf` |
+
+- **Estructura de cada servicio:**
+  - un `Dockerfile` con dos etapas: `runtime` y `test`, que ejecuta sus pruebas;
+  - su propio `requirements.txt`;
+  - sus pruebas en `tests/`, incluido `test_isolation.py`, que prohíbe importar el monolito u otro servicio.
+- **Rutas de salud:** cada servicio expone `/health` (proceso) y `/health/db` (MySQL). El gateway publica esta última como `/health/<servicio>`.
+- **Librería común** `backend/libs/sgsc_common/`:
+  - conexión a MySQL (pool configurable);
+  - validación de sesión de solo lectura;
+  - contrato de filtros;
+  - creación de la app FastAPI con CORS, cabeceras y manejo de errores 503.
+- Reportes calcula sus agregados por su cuenta: no depende de Indicadores.
+
+## 11. Base de datos MySQL
+
+- Esquema **SSNL** de la Secretaría (`Tbl_SolicitudesApoyo`, `Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_Users`, catálogos `Cat_*`, INEGI y RBAC `auth_*`). Hoy está en la base `siesas-v2` de Aiven.
+- **El esquema base no está en este repositorio.**
+- SGSC le agrega, con migraciones aditivas (`backend/manage.py migrate`):
+  - `002_ssnl_ejecutivo.sql`: tablas `ejecutivo_*` y el rol `Ejecutivo`;
+  - `003_catalogos_solicitud.sql`: `Cat_Colonias` y catálogos socioeconómicos;
+  - columnas `ben_dom_colonia_id` y `sol_colonia_id`;
+  - `004_ciudadano.sql`: tablas del prototipo Ciudadano.
+- Se requiere MySQL 8 con InnoDB, `utf8mb4_unicode_ci`, UTC, `lower_case_table_names=0` y TLS.
+- Las tablas, relaciones, índices y catálogos indispensables se detallan en `docs/MIGRACION_INFRAESTRUCTURA.md`.
+- `sgsc_salud_desde_cero.sql` y `backend/migrations/001_ejecutivo.sql` corresponden a un esquema anterior. **No deben ejecutarse sobre una base con datos**: el primero contiene `DROP DATABASE`.
+
+## 12. Requisitos para ejecutar el proyecto
+
+| Para | Necesitas |
+|---|---|
+| Ejecutar con Docker (recomendado) | Docker Engine o Docker Desktop con Compose v2; en Windows, WSL 2 y la virtualización habilitada. La compilación de Flutter web (`sgsc_ejecutiva/build/web`). `backend/.env` y la CA de MySQL (`backend/ca.pem`). |
+| Compilar Flutter | Flutter SDK estable, compatible con Dart `^3.13.2` |
+| Ejecutar sin Docker y administrar | Python 3.12 (las imágenes usan 3.12; el entorno local del monolito usa 3.14 y sus pruebas pasan) |
+| Pruebas de navegador (opcional) | Python con Playwright y Google Chrome |
+| Base de datos | MySQL 8 con el esquema SSNL y las migraciones (§11) |
+
+## 13. Instalación local (sin Docker)
+
+Es el modo de desarrollo original: el monolito en `:8000` y Flutter web en `:5173`, solo en el equipo local.
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env          # completar (sección 14) y colocar ca.pem
+.\.venv\Scripts\python.exe manage.py migrate     # solo la primera vez sobre una base nueva
+cd ..
+.\iniciar.ps1 -Recompilar            # compila Flutter (-Flutter <ruta de flutter.bat> si no está en PATH)
+.\iniciar.ps1                        # en adelante: http://127.0.0.1:5173
+```
+
+- `iniciar.ps1` busca `flutter` en el `PATH` o en `tools.local.json` (`{"flutter": "<ruta>"}`), un archivo ignorado por git.
+- Las bitácoras quedan en `backend/*.local.log`.
+
+## 14. Variables de entorno
+
+Se definen en **`backend/.env`**, ignorado por git. La plantilla es `backend/.env.example`.
+
+| Variable | Uso |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Conexión MySQL |
+| `DB_SSL` | `true` para exigir TLS |
+| `DB_SSL_CA` | Ruta del PEM de la CA de MySQL. Docker la sustituye por `/run/secrets/db_ca`. |
+| `CORS_ORIGINS` | Orígenes permitidos para el núcleo, separados por comas |
+| `CORS_ORIGIN_REGEX` | Opcional, solo el núcleo. Por omisión admite `*.netlify.app` (prototipo Ciudadano). |
+| `AUTH_ENCRYPTION_KEY` | Clave Fernet que cifra los secretos TOTP; consérvala. Se genera con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `RESET_URL` | Dirección pública de Flutter web para el enlace de recuperación |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SSL`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME` | Correo. Sin ellas no se envían correos. |
+| `GATEWAY_PORT`, `GATEWAY_ORIGINS`, `FLUTTER_WEB_DIR`, `MS_DB_POOL_SIZE`, `MS_DB_MAX_OVERFLOW` | Opcionales, solo para Docker Compose (§15) |
+
+**No** se versionan `.env`, `*.pem`, `*.key` ni `tools.local.json`. Las imágenes Docker tampoco los incluyen (`backend/.dockerignore`).
+
+## 15. Instalación y ejecución con Docker Compose
+
+Desde la raíz del repositorio, con `backend/.env` y `backend/ca.pem` listos:
+
+```powershell
+# 1. Flutter web apuntando al gateway
+cd sgsc_ejecutiva
+flutter build web --dart-define=API_BASE_URL=http://localhost:8080
+cd ..
+
+# 2. Construir e iniciar los seis contenedores
+docker compose --env-file backend/.env up -d --build
+
+# 3. Abrir http://localhost:8080
+```
+
+**Variables de Compose**, en el mismo `.env`:
+
+| Variable | Por omisión | Uso |
+|---|---|---|
+| `GATEWAY_PORT` | `8080` | Puerto local del gateway (`127.0.0.1`) |
+| `GATEWAY_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | CORS de los microservicios |
+| `FLUTTER_WEB_DIR` | `./sgsc_ejecutiva/build/web` | Carpeta de Flutter que sirve el gateway |
+| `MS_DB_POOL_SIZE` / `MS_DB_MAX_OVERFLOW` | `2` / `2` | Conexiones por microservicio |
+
+> `docker compose config` **sin** `--quiet` imprime las contraseñas sustituidas. Usa `docker compose --env-file backend/.env config --quiet`.
+
+## 16. Comandos para construir, iniciar, detener y verificar
+
+```powershell
+docker compose --env-file backend/.env build                          # construir imágenes
+docker compose --env-file backend/.env up -d                          # iniciar
+docker compose --env-file backend/.env ps                             # estado (todos «healthy»)
+docker compose --env-file backend/.env logs -f --tail 100 detalle     # bitácora de un servicio
+docker compose --env-file backend/.env up -d --no-deps --build detalle  # reconstruir solo uno
+docker compose --env-file backend/.env stop                           # detener
+docker compose --env-file backend/.env down                           # detener y retirar contenedores
+
+# Verificación sin sesión
+Invoke-RestMethod http://localhost:8080/health/db                     # núcleo → MySQL
+foreach ($s in 'indicadores','detalle','registro','reportes') { Invoke-RestMethod "http://localhost:8080/health/$s" }
+docker run --rm -v ${PWD}/gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro nginx:1.27-alpine nginx -t
+```
+
+## 17. Procedimiento de pruebas
+
+| Qué | Comando | Base de datos |
+|---|---|---|
+| Microservicios, librería común, gateway, paridad con el monolito y monolito | `.\pruebas\microservicios\ejecutar_pruebas_locales.ps1` (`-Recrear` rehace los entornos) | No (las variables apuntan a un servidor inexistente) |
+| Monolito | `cd backend; .\.venv\Scripts\python.exe -m pytest -q` | No |
+| Monolito con MySQL real | `$env:RUN_DB_TESTS='1'` y el comando anterior | **Sí**: escribe dentro de transacciones que se revierten. Requiere autorización. |
+| Cada imagen | `docker build -f backend/services/<servicio>/Dockerfile --target test backend` | No |
+| Flutter | `cd sgsc_ejecutiva; flutter analyze; flutter test` | No (API simulada) |
+| Gateway real (rutas, 401, 404) | `python -m pytest pruebas/microservicios/integracion/test_gateway.py -q` | Solo lectura |
+| Independencia de los servicios | `.\pruebas\microservicios\independencia.ps1` | Solo lectura |
+| Entorno sin base real | `python pruebas/microservicios/offline/generar_offline.py`, luego `verificar_offline.py` | Ninguna (MySQL ficticio) |
+| Recorrido en navegador | `pruebas/microservicios/e2e/` (Playwright y Chrome; ver `pruebas/microservicios/README.md`, §4) | El inicio de sesión escribe la sesión |
+
+Las evidencias de la última validación están en `pruebas/microservicios/evidencias/` y en los informes `INFORME_E2E_FLUTTER.md` e `INFORME_REGISTRO_POST.md`.
+
+## 18. Estructura del repositorio
+
+```
+SGSC/
+├── README.md                         este documento
+├── GUIA_DESPLIEGUE_INSTITUCIONAL.md  instalación en la Secretaría
+├── docs/MIGRACION_INFRAESTRUCTURA.md salida de Aiven, Render y Netlify
+├── docker-compose.yml                gateway + núcleo + 4 microservicios
+├── render.yaml                       despliegue actual del monolito en Render (rama dev)
+├── iniciar.ps1                       arranque local sin Docker
+├── AGENTS.md                         instrucciones de desarrollo del proyecto
+├── sgsc_salud_desde_cero.sql         esquema ANTERIOR (no usar; ver la última sección)
+├── gateway/                          Nginx: nginx.conf, Dockerfile, pruebas de rutas
+├── backend/
+│   ├── app/                          núcleo / monolito FastAPI (routers, services, schemas, plantillas)
+│   ├── libs/sgsc_common/             librería común de los microservicios
+│   ├── services/{indicadores,detalle,registro,reportes}/   microservicios
+│   ├── migrations/                   SQL aditivo (002, 003, 004; 001 es histórico)
+│   ├── tests/                        pruebas del monolito
+│   ├── manage.py                     migrate, create-user, setup-2fa, cargar-colonias, ciudadano-*
+│   ├── serve_web.py                  servidor local de Flutter web (iniciar.ps1)
+│   ├── Dockerfile.nucleo, .dockerignore, pytest.ini
+│   └── requirements.txt, requirements.lock.txt, .env.example
+├── sgsc_ejecutiva/                   app Flutter (lib/, test/, web/, assets/, plataformas)
+├── pruebas/
+│   ├── microservicios/               pruebas, informes y evidencias de la arquitectura
+│   ├── sprint_1/ sprint_2/ sprint_3/ evidencias de pruebas por sprint (tesis)
+│   └── usabilidad/                   pruebas de usabilidad (antes/después)
+├── logo/                             rondas de diseño del logotipo
+└── promocion/                        póster, sitio y material de difusión
+```
+
+## 19. Diferencias entre desarrollo y producción
+
+| Aspecto | Desarrollo (probado) | Producción institucional (pendiente) |
+|---|---|---|
+| Ejecución | `iniciar.ps1` (monolito en `:8000`, Flutter en `:5173`) o Docker Desktop | Docker Engine en un servidor (Linux recomendado) |
+| Base de datos | MySQL 8.4 en Aiven (`siesas-v2`) | MySQL 8 institucional con el esquema SSNL |
+| Usuario de MySQL | Uno solo para todos los servicios | Uno por función, con privilegios mínimos |
+| Transporte | HTTP en `127.0.0.1` | HTTPS con un dominio institucional (proxy o TLS en el gateway) |
+| API pública | Render (monolito) | Gateway propio; Render se retira |
+| `API_BASE_URL` de Flutter | `http://localhost:8080` o `http://127.0.0.1:8000` | `https://<dominio>` |
+| CORS | `localhost`; `*.netlify.app` en el núcleo | Solo el dominio institucional |
+| Correo | SMTP configurado localmente; enlaces a `localhost` | SMTP institucional y `RESET_URL` HTTPS |
+| Datos | Expedientes de ejemplo SSNL más algunos registros de prueba marcados «PRUEBA» | Datos reales; depuración previa con autorización |
+| Respaldos y monitoreo | Los del proveedor (Aiven) | Política de TI |
+
+## 20. Requisitos para desplegarlo institucionalmente
+
+En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y en [la migración](docs/MIGRACION_INFRAESTRUCTURA.md):
+
+1. **Cambiar variables de entorno no basta.** Se necesita la base SSNL de la Secretaría, a la que luego se aplican las migraciones de SGSC, el catálogo de colonias y las cuentas Ejecutivo.
+2. Un servidor con Docker y Compose, o la alternativa que defina TI.
+3. MySQL 8 configurado como indica la migración (§3), con TLS y su CA.
+4. Dominio y certificado HTTPS. Si hay un proxy delante del gateway, ajustar `real_ip` en Nginx.
+5. Flutter web compilado con la URL HTTPS.
+6. SMTP institucional.
+7. Firewall: usuarios → 443; servidor → MySQL; nada más publicado.
+8. Respaldos, bitácoras y actualizaciones de seguridad a cargo de TI.
+9. Decisiones de la Secretaría: transferir o no los datos de Aiven, Ciudadano, el administrador PHP y el aviso de privacidad.
+
+## Entrega a la Secretaría
+
+**Necesario para desplegar:**
+- `docker-compose.yml`;
+- `gateway/` (sin `tests/`);
+- `backend/`: `app/`, `libs/sgsc_common/sgsc_common/` (con `pyproject.toml`), `services/*/` (paquete, `Dockerfile` y `requirements.txt`), `migrations/` (002–004), `manage.py`, `Dockerfile.nucleo`, `.dockerignore`, `requirements*.txt` y `.env.example`;
+- la compilación `sgsc_ejecutiva/build/web`, o el código para generarla;
+- esta documentación.
+
+**Para mantener el código fuente completo:** además de lo anterior,
+- `sgsc_ejecutiva/` completo, con `test/`;
+- todas las pruebas (`backend/tests`, `backend/services/*/tests`, `backend/libs/sgsc_common/tests`, `gateway/tests`, `pruebas/microservicios/`);
+- `backend/pytest.ini` e `iniciar.ps1`;
+- `backend/serve_web.py`;
+- `AGENTS.md`.
+
+**No se entregan dentro del repositorio:**
+- `backend/.env`, la CA y cualquier credencial (se entregan por un canal seguro o los genera TI);
+- los entornos `.venv`, `build/` y `.dart_tool/`.
+
+**Evidencia académica que puede archivarse aparte:** `pruebas/sprint_*`, `pruebas/usabilidad`, `logo/` y `promocion/`.
+
+## Archivos y carpetas candidatos a limpieza futura
+
+> **No se ha eliminado nada.** Esta tabla es una propuesta para revisar en los próximos días; cada eliminación requiere autorización. La evidencia de pruebas, la documentación de tesis y las migraciones solo se **archivarían**, nunca se borrarían sin respaldo.
+
+**Rastreados por git:**
+
+| Ruta | Para qué servía | Por qué ya no parece necesario | Referencias | Si se elimina | Recomendación |
+|---|---|---|---|---|---|
+| `sgsc_salud_desde_cero.sql` | Crear el esquema anterior `sgsc_salud` desde cero | Se reemplazó por el esquema SSNL (`siesas-v2`). Contiene `DROP DATABASE`: es un riesgo si alguien lo ejecuta por error. | `backend/README.md` (advertencia), esta documentación | Ningún código lo usa | **Archivar fuera** (junto con la tesis) y quitar del repo |
+| `backend/migrations/001_ejecutivo.sql` | Tablas `ejecutivo_*` para el esquema anterior | `migrate` solo aplica 002–004; 002 recrea lo mismo para SSNL | `docs/MIGRACION_INFRAESTRUCTURA.md` (como histórico) | Ningún efecto en la ejecución | Archivar o eliminar |
+| `backend/seed_comparison_demo.py` | Insertar solicitudes sintéticas para demostrar la comparación de periodos | Escribe en la base; no se usa en pruebas ni en `manage.py` | Ninguna | Ninguno | Eliminar (o archivar) |
+| `backend/app/routers/catalogos.py`, `dashboard.py`, `indicadores.py`, `solicitudes.py` | Rutas antiguas del Ejecutivo | `main.py` no los publica: no aplicaban la validación de rol y entidad. `executive.py` los sustituye. | No se importan | Ninguno; se elimina código muerto | Eliminar tras revisión |
+| Archivos **vacíos** (0 bytes) del backend: `app/schemas/filtros.py`, `app/schemas/solicitudes.py`, `app/services/indicadores_service.py`, `app/services/solicitudes_service.py` | Esqueletos iniciales | No tienen contenido | No se importan | Ninguno | Eliminar |
+| Archivos **vacíos** de Flutter: `lib/core/constants.dart`; `lib/models/{beneficiario,indicador,solicitud}.dart`; `lib/screens/auth/forgot_password_screen.dart`; `lib/screens/dashboard/indicator_detail_screen.dart`; `lib/screens/solicitudes/solicitudes_screen.dart`; `lib/services/{auth_service,solicitud_service}.dart`; `lib/widgets/{dashboard_filters,kpi_card,loading_widget,solicitud_card}.dart` | Esqueletos de la estructura inicial | 0 bytes; la funcionalidad vive en otros archivos | Ninguna | Ninguno (`flutter analyze` sin cambios) | Eliminar |
+| `sgsc_ejecutiva/lib/screens/perfil/perfil_screen.dart │` | Ninguno: archivo vacío con el carácter «│» en el nombre, creado por error | Nombre inválido en la práctica; puede causar problemas en algunas herramientas | Ninguna | Ninguno | Eliminar |
+| `sgsc_ejecutiva/lib/services/api_service.dart`, `dashboard_service.dart` | Clientes HTTP de la primera versión | Los reemplaza `executive_api.dart`; nadie los importa | Ninguna | Ninguno | Eliminar tras revisión |
+| `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma de Flutter | La app es solo web y nunca se compiló en esas plataformas | `flutter` las usa solo al compilar para ellas | Se pierde la opción de compilar a esas plataformas sin regenerarlas (`flutter create .`) | Conservar si se planea móvil; si no, eliminar |
+| `render.yaml` | Desplegar el monolito en Render | Sobra cuando la Secretaría use su infraestructura | Render lo lee desde `dev` | Render deja de actualizarse desde el repo | **Conservar** mientras Render esté en uso |
+| `iniciar.ps1`, `backend/serve_web.py` | Ejecución local sin Docker | Docker Compose cubre el despliegue | `serve_web.py` lo usa `iniciar.ps1` | Se pierde el modo de desarrollo rápido | Conservar (desarrollo) |
+| `backend/app/routers/ciudadano.py`, `services/ciudadano_service.py`, `migrations/004_ciudadano.sql`, `manage.py ciudadano-*` | Prototipo Ciudadano (Netlify) | Fuera del alcance actual; el gateway no lo publica | `main.py`, pruebas del monolito, Render | Se rompe el prototipo publicado en Netlify | **Conservar** hasta decidir sobre Ciudadano |
+| `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` (~1.4 MB) | Evidencias de pruebas por sprint | Material de tesis, no de ejecución | Documento de tesis | Se pierde la trazabilidad desde el repo | **Archivar** fuera (con la tesis) |
+| `pruebas/usabilidad/` (~3 MB) | Pruebas de usabilidad y capturas antes/después | Material de tesis | Documento de tesis | Igual | Archivar |
+| `logo/` (~2.8 MB), `promocion/` (~5.2 MB) | Diseño del logotipo, póster, sitio y calcomanías | Material de difusión; la app usa sus propios assets | Ninguna desde el código | Ninguno en la app | Archivar fuera |
+| `pruebas/microservicios/evidencias/` | Evidencia de la validación de microservicios | Útil para la tesis y como referencia | Informes E2E y Registro | Se pierde la trazabilidad de la validación | Conservar (o archivar con la tesis) |
+
+**Ignorados por git (solo en disco local, se regeneran):**
+
+| Ruta | Qué es | Tamaño aprox. | Recomendación |
+|---|---|---|---|
+| `backend/.venv/`, `backend/services/*/.venv/`, `backend/libs/sgsc_common/.venv/`, `gateway/.venv/`, `pruebas/microservicios/codigo/.venv/` | Entornos virtuales de Python por suite | ~0.9 GB en total | Se pueden borrar; `ejecutar_pruebas_locales.ps1 -Recrear` los regenera. Conservar `backend/.venv` para `iniciar.ps1`. |
+| `sgsc_ejecutiva/build/`, `sgsc_ejecutiva/.dart_tool/` | Compilación y caché de Flutter | ~180 MB | Se regeneran con `flutter build web`. `build/web` lo sirve el gateway: recompilar antes de `docker compose up`. |
+| `**/__pycache__/`, `.pytest_cache/`, `backend/libs/sgsc_common/build/`, `*.egg-info/` | Cachés de Python | < 2 MB | Borrar cuando se quiera |
+| `backend/*.local.log`, `backend/*.local.json` (si existen) | Bitácoras locales y respaldo de la corrección de catálogos (`catalog_encoding_backup.local.json`) | Pequeños | Las bitácoras se pueden borrar. El respaldo de catálogos conviene archivarlo antes de borrarlo. |
+| `pruebas/microservicios/offline/salida/` | Compose generado para el entorno offline | Pequeño | Se regenera con `generar_offline.py` |
+| `backend/.env`, `backend/ca.pem`, `tools.local.json` | Configuración y secretos locales | — | **No borrar** sin un respaldo seguro: son necesarios para ejecutar |

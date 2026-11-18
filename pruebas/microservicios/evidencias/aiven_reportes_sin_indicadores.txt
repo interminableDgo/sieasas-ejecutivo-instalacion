@@ -1,0 +1,5 @@
+﻿Indicadores: exited
+{"rol": "reportes", "prueba": "exportar_xlsx", "sha": "bec6baa48ef83695", "formato_valido": true, "hojas": 6, "kb": 33}
+{"rol": "reportes", "prueba": "exportar_pdf", "sha": "b5bea41b6c623f7c", "formato_valido": true, "kb": 38}
+{"rol": "reportes", "prueba": "sesion_solo_lectura", "sha": "", "read_only": true}
+Indicadores tras reiniciarlo: healthy
