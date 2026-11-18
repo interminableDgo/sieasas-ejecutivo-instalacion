@@ -7,12 +7,14 @@ ARG PYTHON_IMAGE=python:3.12-slim
 
 FROM ${PYTHON_IMAGE} AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    FORWARDED_ALLOW_IPS=127.0.0.1
+    FORWARDED_ALLOW_IPS=127.0.0.1 PYTHONPATH=/app
 RUN useradd --create-home --uid 10001 sgsc
 WORKDIR /app
-COPY services/indicadores/requirements.txt /tmp/requirements.txt
-COPY libs/sgsc_common /tmp/sgsc_common
-RUN pip install -r /tmp/requirements.txt /tmp/sgsc_common && rm -rf /tmp/requirements.txt /tmp/sgsc_common
+# Dependencias fijadas con hashes (requirements.docker.lock) y solo paquetes precompilados:
+# pip no ejecuta scripts de instalación. sgsc_common se copia como código (PYTHONPATH=/app).
+COPY services/indicadores/requirements.docker.lock /tmp/requirements.lock
+RUN pip install --only-binary :all: --require-hashes --no-deps -r /tmp/requirements.lock && rm /tmp/requirements.lock
+COPY libs/sgsc_common/sgsc_common ./sgsc_common
 COPY services/indicadores/sgsc_indicadores ./sgsc_indicadores
 USER sgsc
 EXPOSE 8000
@@ -21,8 +23,8 @@ CMD ["sh", "-c", "exec uvicorn sgsc_indicadores.main:app --host 0.0.0.0 --port 8
 
 FROM runtime AS test
 USER root
-COPY services/indicadores/requirements-test.txt /tmp/requirements-test.txt
-RUN pip install -r /tmp/requirements-test.txt && rm /tmp/requirements-test.txt
+COPY services/indicadores/requirements-test.docker.lock /tmp/requirements-test.lock
+RUN pip install --only-binary :all: --require-hashes --no-deps -r /tmp/requirements-test.lock && rm /tmp/requirements-test.lock
 COPY services/indicadores/pytest.ini ./pytest.ini
 COPY services/indicadores/tests ./tests
 USER sgsc

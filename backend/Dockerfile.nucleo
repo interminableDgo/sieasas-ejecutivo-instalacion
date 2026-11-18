@@ -8,8 +8,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_
     FORWARDED_ALLOW_IPS=127.0.0.1
 RUN useradd --create-home --uid 10001 sgsc
 WORKDIR /app
-COPY requirements.lock.txt /tmp/requirements.lock.txt
-RUN pip install -r /tmp/requirements.lock.txt && rm /tmp/requirements.lock.txt
+# Mismas versiones que requirements.lock.txt, fijadas con hashes y solo paquetes precompilados.
+COPY requirements.docker.lock /tmp/requirements.lock
+RUN pip install --only-binary :all: --require-hashes --no-deps -r /tmp/requirements.lock && rm /tmp/requirements.lock
 COPY app ./app
 COPY manage.py ./manage.py
 COPY migrations ./migrations
