@@ -26,4 +26,4 @@ if (!(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyCo
 if (!(Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue)) {
     Start-Process -FilePath $pythonExe -ArgumentList 'serve_web.py' -WorkingDirectory $backendRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $backendRoot 'web.local.log') -RedirectStandardError (Join-Path $backendRoot 'web-error.local.log')
 }
-Write-Output 'SIESAS Ejecutivo: http://127.0.0.1:5173'
+Write-Output 'SIESAS Ejecutivo: https://127.0.0.1:5173'

@@ -19,7 +19,7 @@ app = FastAPI(
 # En producción se deben reemplazar los orígenes "*" por dominios permitidos.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[s.strip() for s in os.getenv('CORS_ORIGINS','http://localhost:5173,http://127.0.0.1:5173').split(',') if s.strip()],
+    allow_origins=[s.strip() for s in os.getenv('CORS_ORIGINS','https://localhost:5173,https://127.0.0.1:5173').split(',') if s.strip()],
     # La versión web del Ciudadano se publica en Netlify (cualquier subdominio *.netlify.app).
     # El API usa tokens Bearer, no cookies, por lo que permitir ese origen no expone sesiones.
     allow_origin_regex=os.getenv('CORS_ORIGIN_REGEX', r'https://[a-z0-9-]+\.netlify\.app'),

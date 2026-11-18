@@ -31,7 +31,7 @@ services:
       - key: AUTH_ENCRYPTION_KEY
         sync: false
       - key: CORS_ORIGINS
-        value: http://127.0.0.1:5173,http://localhost:5173
+        value: https://127.0.0.1:5173,https://localhost:5173
       # Recuperación de contraseña por correo (opcional; sin estos valores no se envían correos).
       - key: RESET_URL
         sync: false

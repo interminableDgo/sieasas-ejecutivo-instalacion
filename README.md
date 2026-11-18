@@ -189,7 +189,7 @@ Copy-Item .env.example .env          # completar (sección 14) y colocar ca.pem
 .\.venv\Scripts\python.exe manage.py migrate     # solo la primera vez sobre una base nueva
 cd ..
 .\iniciar.ps1 -Recompilar            # compila Flutter (-Flutter <ruta de flutter.bat> si no está en PATH)
-.\iniciar.ps1                        # en adelante: http://127.0.0.1:5173
+.\iniciar.ps1                        # en adelante: https://127.0.0.1:5173
 ```
 
 - `iniciar.ps1` busca `flutter` en el `PATH` o en `tools.local.json` (`{"flutter": "<ruta>"}`), un archivo ignorado por git.

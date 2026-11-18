@@ -1,6 +1,6 @@
 # Flutter · SIESAS Ejecutivo
 
-Desde SGSC, `./iniciar.ps1` abre los servicios locales ya compilados; la aplicación está en http://127.0.0.1:5173.
+Desde SGSC, `./iniciar.ps1` abre los servicios locales ya compilados; la aplicación está en https://127.0.0.1:5173.
 
 Para desarrollo, usa Flutter 3.47.5 / Dart 3.13.4 o una versión compatible con pubspec.yaml:
 
