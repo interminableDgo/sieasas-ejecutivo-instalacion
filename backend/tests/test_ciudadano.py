@@ -285,6 +285,40 @@ def test_recovery_needs_mail_service(monkeypatch):
         assert client.post('/ciudadano/recuperar', json={'correo': 'nadie@example.com'}).status_code == 503
 
 
+def test_recovery_tells_when_email_has_no_account(monkeypatch):
+    # Sin MySQL: la sesión simulada responde si el correo tiene cuenta.
+    from app.routers import ciudadano as router
+
+    class SesionFalsa:
+        def __init__(self, existe):
+            self.existe = existe
+
+        def execute(self, *_):
+            return self
+
+        def scalar(self):
+            return 1 if self.existe else None
+
+    class TareasFalsas:
+        def __init__(self):
+            self.tareas = []
+
+        def add_task(self, funcion, *args):
+            self.tareas.append((funcion, args))
+
+    monkeypatch.setattr(router, 'limit_request', lambda *a, **k: None)
+    monkeypatch.setattr(router, 'smtp_configurado', lambda: True)
+
+    tareas = TareasFalsas()
+    with pytest.raises(HTTPException) as error:
+        router.recuperar(router.Correo(correo='nadie@example.com'), None, tareas, SesionFalsa(False))
+    assert error.value.status_code == 404 and 'No existe una cuenta' in error.value.detail
+    assert tareas.tareas == []
+
+    assert router.recuperar(router.Correo(correo='Ana@Example.com'), None, tareas, SesionFalsa(True)) == router.ENVIADO
+    assert tareas.tareas == [(router.enviar_codigo, (router.normalizar('Ana@Example.com'),))]
+
+
 def test_code_email_contains_code(monkeypatch):
     from app.services.auth_service import mensaje_codigo_ciudadano
     monkeypatch.setenv('SMTP_HOST', 'smtp.example.com')
