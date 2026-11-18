@@ -46,7 +46,12 @@ jobs:
       - name: Pruebas del backend con cobertura
         working-directory: backend
         # Sin base de datos: las pruebas que necesitan MySQL se omiten solas (RUN_DB_TESTS).
-        run: python -m pytest -q --cov=app --cov-report=xml:coverage.xml
+        run: python -m pytest -q --cov=app --cov=serve_web --cov-report=xml:coverage.xml
+        continue-on-error: true
+
+      - name: Pruebas de sgsc_common con cobertura
+        working-directory: backend/libs/sgsc_common
+        run: PYTHONPATH=. python -m pytest -q --cov=sgsc_common --cov-report=xml:coverage.xml
         continue-on-error: true
 
       - name: Análisis SonarQube Cloud
