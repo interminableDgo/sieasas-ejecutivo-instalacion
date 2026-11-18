@@ -301,9 +301,48 @@ SGSC/
 │   ├── microservicios/               pruebas, informes y evidencias de la arquitectura
 │   ├── sprint_1/ sprint_2/ sprint_3/ evidencias de pruebas por sprint (tesis)
 │   └── usabilidad/                   pruebas de usabilidad (antes/después)
-├── logo/                             rondas de diseño del logotipo
-└── promocion/                        póster, sitio y material de difusión
 ```
+
+`logo/` y `promocion/` ya no forman parte del repositorio. Se archivaron fuera, en la carpeta de la tesis (`TESIS/logo` y `TESIS/promocion`).
+
+### Función de cada carpeta y control de archivos
+
+Cada carpeta tiene una de cuatro clasificaciones:
+
+- **Ejecución**: el sistema la necesita para funcionar o desplegarse.
+- **Desarrollo**: no se ejecuta en producción, pero sirve para probar, mantener o arrancar el proyecto en local.
+- **Académica**: evidencia o material para la tesis. Ningún código la usa; puede archivarse junto con la tesis.
+- **Obsoleta**: ya no se usa. Es candidata a archivar o eliminar (ver la última sección).
+
+| Carpeta / archivo | Función | ¿La usa el sistema? | Clasificación |
+|---|---|---|---|
+| `backend/app/` | Núcleo FastAPI: autenticación, rutas del Ejecutivo, servicios, esquemas y plantillas de correo | Sí, lo levanta `docker-compose.yml` y también `iniciar.ps1` | Ejecución |
+| `backend/services/{indicadores,detalle,registro,reportes}/` | Los cuatro microservicios, cada uno con su `Dockerfile` y sus pruebas | Sí, contenedores de `docker-compose.yml` | Ejecución |
+| `backend/libs/sgsc_common/` | Librería común de los microservicios: base de datos, validación de sesión, consultas y utilidades web | Sí, la instala cada microservicio | Ejecución |
+| `backend/migrations/` | SQL aditivo que `manage.py migrate` aplica sobre el esquema SSNL (002–004) | Sí, en la instalación | Ejecución (`001` es obsoleta) |
+| `backend/manage.py`, `Dockerfile.nucleo`, `requirements*.txt`, `.env.example` | Comandos de administración, imagen del núcleo, dependencias y plantilla de variables | Sí | Ejecución |
+| `backend/tests/` | Pruebas del monolito | No | Desarrollo |
+| `backend/serve_web.py` | Servidor local de Flutter web que usa `iniciar.ps1` | Solo en local | Desarrollo |
+| `backend/seed_comparison_demo.py` | Inserta datos sintéticos para la demostración de comparación | No | Obsoleta |
+| `gateway/` | Nginx: único punto de entrada; enruta hacia el núcleo y los microservicios y sirve Flutter web | Sí | Ejecución (`tests/` es Desarrollo) |
+| `sgsc_ejecutiva/lib/`, `web/`, `assets/`, `pubspec.*` | App Flutter del Ejecutivo: código, página web base, logo (`nl-logo.png`), municipios y fuente Mulish | Sí, se compila en `build/web` | Ejecución |
+| `sgsc_ejecutiva/test/` | Pruebas de widgets y servicios de Flutter | No | Desarrollo |
+| `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma generadas por Flutter | No, la app es solo web | Obsoleta salvo que se planee una versión móvil o de escritorio |
+| `docker-compose.yml` | Define los seis contenedores (gateway, núcleo y cuatro microservicios) | Sí | Ejecución |
+| `render.yaml` | Despliegue actual del monolito en Render desde `dev` | Sí, mientras se use Render | Ejecución temporal |
+| `iniciar.ps1` | Arranque local sin Docker | Solo en local | Desarrollo |
+| `README.md`, `GUIA_DESPLIEGUE_INSTITUCIONAL.md`, `docs/` | Documentación técnica, de despliegue y de migración de infraestructura | — | Ejecución (documentación que se entrega) |
+| `AGENTS.md` | Reglas de desarrollo del proyecto | No | Desarrollo |
+| `pruebas/microservicios/` | Pruebas de integración, independencia, entorno offline, recorrido E2E con Playwright, informes y evidencias de la arquitectura | No | Desarrollo (`evidencias/` e informes: también Académica) |
+| `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` | Evidencias de pruebas por sprint | No | Académica |
+| `pruebas/usabilidad/` | Pruebas de usabilidad con capturas antes/después | No | Académica |
+| `logo/` *(archivada fuera del repo)* | Propuestas de logotipo SIEASAS: ronda 1 (4 conceptos), ronda 2 (4 conceptos y `generar_logos.py`) y las comparativas | **No.** La app usa `assets/nl-logo.png` y ninguna propuesta se integró | Académica |
+| `promocion/` *(archivada fuera del repo)* | Material de difusión: guion del póster, página de producto (`sieasas.html`, `sitio/`), guía para publicarla en Lovable (`LOVABLE.md`), calcomanía con QR y tarjetas para el jurado | **No.** Ningún archivo del sistema la referencia | Académica |
+| `sgsc_salud_desde_cero.sql` | Esquema anterior `sgsc_salud`; contiene `DROP DATABASE` | No | Obsoleta (riesgo si se ejecuta) |
+
+**Observaciones sobre `logo/` y `promocion/`:** no aportan nada al funcionamiento ni al despliegue, y quitarlas no afecta la app, las pruebas ni Docker. Su valor es la presentación y la defensa (póster, sitio, calcomanía y tarjetas del jurado). Además, `promocion/` tiene duplicados: `Mulish.ttf` es idéntica a `sgsc_ejecutiva/assets/fonts/Mulish.ttf`, las imágenes `.webp` de `img/` se repiten en `sitio/img/`, y `sieasas.html` y `sitio/index.html` son dos versiones casi iguales de la misma página. Por eso ambas carpetas se retiraron del repositorio y se archivaron en la carpeta de la tesis; siguen disponibles en el historial de git.
+
+**Control de archivos:** al agregar una carpeta nueva en la raíz, en `backend/` o en `pruebas/`, añádela a esta tabla con su función y su clasificación. Si algo pasa a Obsoleta, regístralo también en «Archivos y carpetas candidatos a limpieza futura».
 
 ## 19. Diferencias entre desarrollo y producción
 
@@ -354,11 +393,11 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 - `backend/.env`, la CA y cualquier credencial (se entregan por un canal seguro o los genera TI);
 - los entornos `.venv`, `build/` y `.dart_tool/`.
 
-**Evidencia académica que puede archivarse aparte:** `pruebas/sprint_*`, `pruebas/usabilidad`, `logo/` y `promocion/`.
+**Evidencia académica que puede archivarse aparte:** `pruebas/sprint_*` y `pruebas/usabilidad`. (`logo/` y `promocion/` ya se archivaron fuera del repositorio.)
 
 ## Archivos y carpetas candidatos a limpieza futura
 
-> **No se ha eliminado nada.** Esta tabla es una propuesta para revisar en los próximos días; cada eliminación requiere autorización. La evidencia de pruebas, la documentación de tesis y las migraciones solo se **archivarían**, nunca se borrarían sin respaldo.
+> **Solo `logo/` y `promocion/` se retiraron del repositorio** (archivadas en la carpeta de la tesis). Esta tabla es una propuesta para revisar en los próximos días; cada eliminación requiere autorización. La evidencia de pruebas, la documentación de tesis y las migraciones solo se **archivarían**, nunca se borrarían sin respaldo.
 
 **Rastreados por git:**
 
@@ -378,7 +417,7 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 | `backend/app/routers/ciudadano.py`, `services/ciudadano_service.py`, `migrations/004_ciudadano.sql`, `manage.py ciudadano-*` | Prototipo Ciudadano (Netlify) | Fuera del alcance actual; el gateway no lo publica | `main.py`, pruebas del monolito, Render | Se rompe el prototipo publicado en Netlify | **Conservar** hasta decidir sobre Ciudadano |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` (~1.4 MB) | Evidencias de pruebas por sprint | Material de tesis, no de ejecución | Documento de tesis | Se pierde la trazabilidad desde el repo | **Archivar** fuera (con la tesis) |
 | `pruebas/usabilidad/` (~3 MB) | Pruebas de usabilidad y capturas antes/después | Material de tesis | Documento de tesis | Igual | Archivar |
-| `logo/` (~2.8 MB), `promocion/` (~5.2 MB) | Diseño del logotipo, póster, sitio y calcomanías | Material de difusión; la app usa sus propios assets | Ninguna desde el código | Ninguno en la app | Archivar fuera |
+| `logo/` (~2.8 MB), `promocion/` (~5.2 MB) | Diseño del logotipo, póster, sitio y calcomanías | Material de difusión; la app usa sus propios assets | Ninguna desde el código | Ninguno en la app | **Hecho:** archivadas en la carpeta de la tesis y retiradas del repo |
 | `pruebas/microservicios/evidencias/` | Evidencia de la validación de microservicios | Útil para la tesis y como referencia | Informes E2E y Registro | Se pierde la trazabilidad de la validación | Conservar (o archivar con la tesis) |
 
 **Ignorados por git (solo en disco local, se regeneran):**
