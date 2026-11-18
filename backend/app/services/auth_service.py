@@ -93,13 +93,17 @@ Mensaje automático. Nunca te pediremos tu contraseña por correo.
 
 def enviar(message):
     secure = os.getenv('SMTP_SSL', 'false').lower() == 'true'
-    client = smtplib.SMTP_SSL if secure else smtplib.SMTP
-    kwargs = {'timeout': 15}
+    host = os.environ['SMTP_HOST']
+    port = int(os.getenv('SMTP_PORT', '465' if secure else '587'))
+    # Ambas ramas validan el certificado del servidor con el contexto TLS por defecto.
+    context = ssl.create_default_context()
     if secure:
-        kwargs['context'] = ssl.create_default_context()
-    with client(os.environ['SMTP_HOST'], int(os.getenv('SMTP_PORT', '465' if secure else '587')), **kwargs) as smtp:
+        smtp_client = smtplib.SMTP_SSL(host, port, timeout=15, context=context)
+    else:
+        smtp_client = smtplib.SMTP(host, port, timeout=15)
+    with smtp_client as smtp:
         if not secure:
-            smtp.starttls(context=ssl.create_default_context())
+            smtp.starttls(context=context)
         if os.getenv('SMTP_USER'):
             smtp.login(os.environ['SMTP_USER'], os.environ.get('SMTP_PASSWORD', ''))
         smtp.send_message(message)

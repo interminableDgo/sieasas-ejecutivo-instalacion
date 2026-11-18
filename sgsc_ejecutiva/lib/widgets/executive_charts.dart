@@ -185,7 +185,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                     ),
                     Text(
                       otherTotal > 0 ? 'mostradas' : 'solicitudes',
-                      style: TextStyle(fontSize: 11, color: muted),
+                      style: const TextStyle(fontSize: 11, color: muted),
                     ),
                   ],
                 ),
@@ -235,7 +235,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
             otherTotal > 0
                 ? 'Composición de las categorías mostradas'
                 : 'Composición del total · 100%',
-            style: TextStyle(fontSize: 11, color: muted),
+            style: const TextStyle(fontSize: 11, color: muted),
           ),
         ],
         const SizedBox(height: 12),

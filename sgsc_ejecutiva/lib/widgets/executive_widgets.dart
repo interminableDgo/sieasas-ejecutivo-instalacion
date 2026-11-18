@@ -389,8 +389,8 @@ class StatusDaysIcon extends StatelessWidget {
                     alignment: Alignment.center,
                     children: pending
                         ? [
-                            CustomPaint(
-                              size: const Size(36, 36),
+                            const CustomPaint(
+                              size: Size(36, 36),
                               painter: _DaysTrianglePainter(yellow),
                             ),
                             Padding(

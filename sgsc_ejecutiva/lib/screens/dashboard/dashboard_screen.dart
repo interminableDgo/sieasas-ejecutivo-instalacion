@@ -985,7 +985,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               alignment: Alignment.centerRight,
               child: Semantics(
                 liveRegion: true,
-                child: Text(
+                child: const Text(
                   'Actualizando…',
                   style: TextStyle(fontSize: 11, color: muted),
                 ),
