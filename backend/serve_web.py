@@ -5,9 +5,10 @@ La primera vez genera un certificado autofirmado para 127.0.0.1 y localhost
 Se renueva solo cuando falta o está por vencer.
 """
 import datetime
+import gzip
 import ipaddress
 import ssl
-from functools import partial
+from functools import lru_cache, partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -17,9 +18,35 @@ PORT = 5173
 BACKEND = Path(__file__).resolve().parent
 CERT = BACKEND / 'serve_web.local.crt'
 KEY = BACKEND / 'serve_web.local.key'
+# Igual que gateway/nginx.conf: texto, JavaScript, WebAssembly y fuentes se envían con gzip.
+COMPRIMIBLES = {'.html', '.css', '.js', '.mjs', '.json', '.wasm', '.svg', '.ttf', '.otf', '.txt'}
+
+
+@lru_cache(maxsize=64)
+def _gzip(ruta, modificado):
+    # `modificado` forma parte de la llave: si el archivo cambia, se vuelve a comprimir.
+    return gzip.compress(Path(ruta).read_bytes(), compresslevel=6)
 
 
 class Handler(SimpleHTTPRequestHandler):
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.wasm': 'application/wasm'}
+
+    def do_GET(self):
+        ruta = Path(self.translate_path(self.path))
+        if ruta.is_dir() and urlsplit(self.path).path.endswith('/'):
+            ruta = ruta / 'index.html'
+        acepta_gzip = 'gzip' in self.headers.get('Accept-Encoding', '')
+        if not (acepta_gzip and ruta.suffix in COMPRIMIBLES and ruta.is_file()):
+            return super().do_GET()
+        datos = _gzip(str(ruta), ruta.stat().st_mtime_ns)
+        self.send_response(200)
+        self.send_header('Content-Type', self.guess_type(str(ruta)))
+        self.send_header('Content-Encoding', 'gzip')
+        self.send_header('Vary', 'Accept-Encoding')
+        self.send_header('Content-Length', str(len(datos)))
+        self.end_headers()
+        self.wfile.write(datos)
+
     def end_headers(self):
         self.send_header('Cache-Control','no-store')
         self.send_header('Referrer-Policy','no-referrer')

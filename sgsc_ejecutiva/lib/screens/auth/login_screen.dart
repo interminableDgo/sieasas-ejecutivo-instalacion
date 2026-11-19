@@ -7,7 +7,24 @@ import '../../widgets/executive_widgets.dart';
 class LoginScreen extends StatefulWidget {
   final ExecutiveApi api;
   final ValueChanged<Map<String, dynamic>> onLogin;
-  const LoginScreen({super.key, required this.api, required this.onLogin});
+
+  /// What the HTML login (web/index.html) hands over: the screen to open
+  /// (`login`, `recover` or `register`), what the person typed and whether
+  /// they already pressed «Iniciar sesión».
+  final String? initialMode;
+  final String initialEmail;
+  final String initialPassword;
+  final bool submitOnStart;
+
+  const LoginScreen({
+    super.key,
+    required this.api,
+    required this.onLogin,
+    this.initialMode,
+    this.initialEmail = '',
+    this.initialPassword = '',
+    this.submitOnStart = false,
+  });
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -100,8 +117,11 @@ class _LoginScreenState extends State<LoginScreen> {
               value: length == 0 ? 0 : (strength + 1) / 4,
               backgroundColor: border,
               color: strength < 2 ? brand : salud,
-              semanticsLabel: 'Fortaleza estimada',
-              semanticsValue: length == 0 ? 'Sin contraseña' : strengthLabel,
+              // A progress bar's value must be a number (0–100); the
+              // words go in the label so screen readers still say them.
+              semanticsLabel:
+                  'Fortaleza estimada: ${length == 0 ? 'Sin contraseña' : strengthLabel}',
+              semanticsValue: '${length == 0 ? 0 : (strength + 1) * 25}',
               borderRadius: BorderRadius.circular(4),
             ),
             const SizedBox(height: 8),
@@ -118,7 +138,15 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     resetToken = Uri.base.queryParameters['reset_token'];
-    mode = resetToken == null ? 'login' : 'reset';
+    mode = resetToken == null ? widget.initialMode ?? 'login' : 'reset';
+    email.text = widget.initialEmail;
+    if (mode == 'login') password.text = widget.initialPassword;
+    if (widget.submitOnStart && mode == 'login') {
+      // The form must be built before it can be validated.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) submit();
+      });
+    }
     // Correcting the email or password clears the previous error, so the
     // red message does not stay while the person fixes what was wrong.
     for (final field in [email, password, code]) {
@@ -196,6 +224,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Links in a readable orange; the same colour as in web/index.html.
+  static final _link = TextButton.styleFrom(foregroundColor: brandText);
+
   /// Eye toggle inside the field; the tooltip gives screen readers the action.
   Widget eye() => IconButton(
     tooltip: show ? 'Ocultar contraseña' : 'Mostrar contraseña',
@@ -230,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: brand,
+                color: brandText,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.6,
               ),
@@ -415,15 +446,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     if (mode == 'login') ...[
                       TextButton(
+                        style: _link,
                         onPressed: busy ? null : () => go('recover'),
                         child: const Text('¿Olvidaste tu contraseña?'),
                       ),
                       TextButton(
+                        style: _link,
                         onPressed: busy ? null : () => go('register'),
                         child: const Text('Solicitar cuenta ejecutiva'),
                       ),
                     ] else
                       TextButton(
+                        style: _link,
                         onPressed: busy ? null : () => go('login'),
                         child: const Text('Volver al inicio de sesión'),
                       ),

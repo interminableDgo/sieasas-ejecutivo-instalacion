@@ -18,8 +18,13 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- La misma etiqueta que Flutter pone al arrancar (full_page_embedding_strategy.dart);
+       tenerla desde el inicio hace que el celular muestre la pantalla de carga a su tamaño
+       real. "flt-viewport" le indica a Flutter que es suya y la reemplaza sin avisos. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" flt-viewport>
   <meta name="description" content="SIESAS · Panel ejecutivo de solicitudes de salud.">
   <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#F3F3F0">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -30,18 +35,261 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- Flutter descarga su motor gráfico (CanvasKit) y una fuente de respaldo de estos
+       servidores: la conexión se abre mientras se carga la app. -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
   <title>SIESAS · Ejecutivo</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- La misma fuente que usa Flutter: el navegador la descarga una sola vez para los dos. -->
+  <link rel="preload" href="assets/assets/fonts/Mulish.ttf" as="font" type="font/ttf" crossorigin>
+
+  <style>
+    @font-face {
+      font-family: Mulish; src: url(assets/assets/fonts/Mulish.ttf) format("truetype");
+      font-weight: 200 1000; font-display: block;
+    }
+    html, body { margin: 0; background: #E3E3DE; }
+    /* Inicio de sesión en HTML: la misma pantalla que login_screen.dart, con sus medidas,
+       para que se pueda usar desde el primer instante sin esperar a Flutter. Flutter se
+       descarga en cuanto la persona interactúa con la página y, al presionar un botón,
+       recibe lo que escribió y continúa (validación, API, errores, verificación en dos
+       pasos). Flutter usa controles más compactos en computadora que en celular; la clase
+       "compacto" reproduce esa diferencia. */
+    :root { --campo: 56px; --boton: 48px; --enlace: 48px; --ojo: 48px; }
+    .compacto { --campo: 48px; --boton: 40px; --enlace: 32px; --ojo: 40px; }
+    #carga { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; }
+    #carga > div {
+      width: 100%; max-width: 440px; height: 100%; display: flex; flex-direction: column;
+      background: #F3F3F0; overflow-y: auto;
+    }
+    #carga main {
+      margin: auto 0; padding: 40px 24px 32px; display: flex; flex-direction: column;
+      font: 14px/1.5 Mulish, sans-serif; letter-spacing: .25px; color: #1B2A33;
+    }
+    #carga form { display: flex; flex-direction: column; margin: 0; }
+    #carga p { margin: 0; }
+    #carga button {
+      font: inherit; letter-spacing: inherit; border: 0; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #carga button:focus-visible { outline: 2px solid #12A5E5; outline-offset: 2px; }
+    #carga form[aria-busy="true"] button { cursor: progress; }
+    #carga img { height: 72px; width: auto; align-self: center; }
+    #carga .marca {
+      margin-top: 18px; text-align: center; color: #A85400; font-size: 12px; font-weight: 800;
+      letter-spacing: 1.6px;
+    }
+    #carga h1 {
+      margin: 10px 0 28px; text-align: center; font-size: 23px; line-height: 1.3334;
+      font-weight: 800; letter-spacing: 0;
+    }
+    #carga .aviso {
+      margin-bottom: 16px; padding: 13px; border-radius: 12px; background: #E7F6FD;
+      font-size: 12px;
+    }
+    #carga .etiqueta { font-size: 12px; font-weight: 800; margin-bottom: 8px; }
+    #carga .campo {
+      height: var(--campo); box-sizing: border-box; display: flex; align-items: center;
+      padding-left: 19px; background: #FFF; border: 1px solid #E3E3DE; border-radius: 14px;
+    }
+    /* Al enfocar, el mismo borde azul de 2 px que Flutter, sin mover el contenido. */
+    #carga .campo:focus-within { border: 2px solid #12A5E5; padding-left: 18px; }
+    #carga .campo:focus-within button { margin-right: -1px; }
+    #carga input {
+      flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0;
+      background: transparent; font: 16px Mulish, sans-serif; letter-spacing: .5px;
+      color: #1B2A33; caret-color: #FF8300;
+    }
+    #carga input::placeholder { color: #52443B; opacity: 1; }
+    #carga .campo button {
+      width: var(--ojo); height: var(--ojo); flex: none; display: flex; align-items: center;
+      justify-content: center; padding: 0; border-radius: 50%; background: transparent;
+    }
+    #carga .campo svg { width: 24px; height: 24px; fill: #52443B; }
+    #carga #ojo[aria-pressed="true"] .ver, #carga #ojo[aria-pressed="false"] .ocultar { display: none; }
+    #carga .contador {
+      height: 22px; padding: 4px 16px 0 0; box-sizing: border-box; text-align: right;
+      font-size: 12px; line-height: 18px; letter-spacing: .4px; color: #52443B;
+    }
+    #carga .separa { height: 17px; }
+    #carga .boton {
+      height: var(--boton); margin-bottom: 16px; display: flex; align-items: center;
+      justify-content: center; border-radius: 14px; background: #FF8300; color: #1B2A33;
+      font-weight: 800; letter-spacing: .1px;
+    }
+    /* Mientras Flutter termina de cargar después de presionar el botón. */
+    #carga .boton .giro {
+      display: none; width: 16px; height: 16px; border: 2px solid #1B2A33;
+      border-right-color: transparent; border-radius: 50%; animation: giro .8s linear infinite;
+    }
+    #carga form[aria-busy="true"] .boton .giro { display: block; }
+    #carga form[aria-busy="true"] .boton .texto { display: none; }
+    @keyframes giro { to { transform: rotate(360deg); } }
+    #carga .enlace {
+      height: var(--enlace); display: flex; align-items: center; justify-content: center;
+      border-radius: 20px; background: transparent; color: #A85400; font-weight: 500;
+      letter-spacing: .1px;
+    }
+    #carga .pie {
+      margin-top: 32px; text-align: center; font-size: 11px; color: #5B6B74;
+    }
+    /* Con un enlace para restablecer la contraseña la app abre directamente otra pantalla
+       de Flutter: mientras carga, solo el logo. */
+    .solo-logo #carga main > :not(img):not(.marca) { visibility: hidden; }
+  </style>
+  <script>
+    // Misma detección de sistema que el motor web de Flutter: en computadora sus controles
+    // son compactos. Y si la dirección trae un enlace de recuperación, solo se muestra el logo.
+    (function () {
+      var p = navigator.platform || '', ua = navigator.userAgent || '', clases = [];
+      var movil = (p.indexOf('Mac') === 0 && navigator.maxTouchPoints > 2) ||
+        /iphone|ipad|ipod/i.test(p) || (p.indexOf('Mac') !== 0 && ua.indexOf('Android') !== -1);
+      if (!movil && (p.indexOf('Mac') === 0 || p.indexOf('Linux') === 0 || p.indexOf('Win') === 0)) clases.push('compacto');
+      if (/[?&]reset_token=/.test(location.search)) clases.push('solo-logo');
+      if (clases.length) document.documentElement.className = clases.join(' ');
+    })();
+  </script>
+
+  <script>
+    // Flutter web usa Intl.v8BreakIterator (API obsoleta de Chrome/Edge) solo para saber
+    // dónde se puede partir una línea de texto. Este reemplazo da los mismos puntos de corte
+    // (después de espacios, de saltos de línea y de un guion entre letras) sin usar la API
+    // obsoleta. Solo se instala donde el navegador la tiene, así Flutter elige el mismo motor.
+    (function () {
+      if (!Object.getOwnPropertyDescriptor(Intl, 'v8BreakIterator') || typeof Intl.Segmenter !== 'function') return;
+      var espacio = new RegExp('[ \\t\\u1680\\u2000-\\u2006\\u2008-\\u200A\\u205F\\u3000]');
+      var salto = new RegExp('[\\n\\r\\u000B\\u000C\\u0085\\u2028\\u2029]');
+      var guion = new RegExp('[\\-\\u2010\\u2012\\u2013\\u2014]');
+      var letra = new RegExp('\\p{L}', 'u');
+      function SegmenterLineBreaker() { this._b = [0]; this._i = 0; }
+      SegmenterLineBreaker.prototype.adoptText = function (texto) {
+        var t = String(texto), b = [0];
+        for (var i = 1; i < t.length; i++) {
+          var a = t[i - 1], c = t[i];
+          if (a === '\r' && c === '\n') continue;
+          if (salto.test(a)) { b.push(i); continue; }
+          if (espacio.test(c) || salto.test(c)) continue;
+          if (espacio.test(a) || (guion.test(a) && letra.test(c) && i > 1 && letra.test(t[i - 2]))) b.push(i);
+        }
+        if (t.length > 0) b.push(t.length);
+        this._b = b; this._i = 0;
+      };
+      SegmenterLineBreaker.prototype.first = function () { this._i = 0; return this._b[0]; };
+      SegmenterLineBreaker.prototype.next = function () {
+        if (this._i + 1 >= this._b.length) return -1;
+        this._i++; return this._b[this._i];
+      };
+      SegmenterLineBreaker.prototype.current = function () { return this._b[this._i]; };
+      SegmenterLineBreaker.prototype.breakType = function () { return 'none'; };
+      Object.defineProperty(Intl, 'v8BreakIterator', {
+        value: SegmenterLineBreaker, writable: true, configurable: true,
+      });
+    })();
+  </script>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <div id="carga">
+    <div>
+      <main>
+        <img src="assets/assets/nl-logo.png" alt="" width="59" height="72" fetchpriority="high">
+        <div class="marca">SIESAS · EJECUTIVO</div>
+        <h1>Iniciar sesión</h1>
+        <form id="acceso" novalidate>
+          <p class="aviso">Consulta las solicitudes y los indicadores de tu estado con tu cuenta autorizada.</p>
+          <label class="etiqueta" for="correo">Correo electrónico</label>
+          <div class="campo">
+            <input id="correo" name="correo" type="email" inputmode="email" autocomplete="username"
+                   maxlength="150" placeholder="correo@ejemplo.com" aria-describedby="contador">
+          </div>
+          <div class="contador" id="contador">0/150</div>
+          <div class="separa"></div>
+          <label class="etiqueta" for="clave">Contraseña</label>
+          <div class="campo">
+            <input id="clave" name="password" type="password" autocomplete="current-password"
+                   autocapitalize="off" spellcheck="false">
+            <button id="ojo" type="button" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="ver" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6a9.77 9.77 0 0 1 8.82 5.5C19.17 14.87 15.79 17 12 17s-7.17-2.13-8.82-5.5A9.77 9.77 0 0 1 12 6m0-2C7 4 2.73 7.11 1 11.5 2.73 15.89 7 19 12 19s9.27-3.11 11-7.5C21.27 7.11 17 4 12 4zm0 5a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 1 0-5m0-2c-2.48 0-4.5 2.02-4.5 4.5S9.52 16 12 16s4.5-2.02 4.5-4.5S14.48 7 12 7z"/></svg>
+              <svg class="ocultar" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c3.79 0 7.17 2.13 8.82 5.5-.59 1.22-1.42 2.27-2.41 3.12l1.41 1.41c1.39-1.23 2.49-2.77 3.18-4.53C21.27 7.11 17 4 12 4c-1.27 0-2.49.2-3.64.57l1.65 1.65C10.66 6.09 11.32 6 12 6zm-1.07 1.14L13 9.21c.57.25 1.03.71 1.28 1.28l2.07 2.07c.08-.34.14-.7.14-1.07C16.5 9.01 14.48 7 12 7c-.37 0-.72.05-1.07.14zM2.01 3.87l2.68 2.68C3.06 7.83 1.78 9.52 1 11.5 2.73 15.89 7 19 12 19c1.52 0 2.98-.29 4.32-.82l3.42 3.42 1.41-1.41L3.42 2.45 2.01 3.87zm7.5 7.5l2.61 2.61c-.04.01-.08.02-.12.02-1.38 0-2.5-1.12-2.5-2.5 0-.05.01-.08.01-.13zm-3.4-3.4l1.75 1.75c-.23.55-.36 1.15-.36 1.78 0 2.48 2.02 4.5 4.5 4.5.63 0 1.23-.13 1.77-.36l.98.98c-.88.24-1.8.38-2.75.38-3.79 0-7.17-2.13-8.82-5.5.7-1.43 1.72-2.61 2.93-3.53z"/></svg>
+            </button>
+          </div>
+          <div class="separa"></div>
+          <button class="boton" type="submit"><span class="texto">Iniciar sesión</span><span class="giro" role="img" aria-label="Cargando"></span></button>
+          <button class="enlace" type="button" data-modo="recover">¿Olvidaste tu contraseña?</button>
+          <button class="enlace" type="button" data-modo="register">Solicitar cuenta ejecutiva</button>
+        </form>
+        <p class="pie">Secretaría de Salud · Nuevo León</p>
+      </main>
+    </div>
+  </div>
+  <script>
+    // Puente con Flutter (lib/services/html_login_web.dart). Flutter se descarga con la
+    // primera interacción de la persona con la página; al presionar un botón, el formulario
+    // deja lo que escribió en window.siesasLogin.entrada y Flutter lo toma desde ahí.
+    (function () {
+      var carga = document.getElementById('carga');
+      var form = document.getElementById('acceso');
+      var correo = document.getElementById('correo');
+      var clave = document.getElementById('clave');
+      var ojo = document.getElementById('ojo');
+      var restablecer = /[?&]reset_token=/.test(location.search);
+      var login = window.siesasLogin = {
+        activo: !restablecer, entrada: null, alEntregar: null,
+        quitar: function () { carga.remove(); },
+      };
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+      var cargada = false;
+      function cargarFlutter() {
+        if (cargada) return;
+        cargada = true;
+        var s = document.createElement('script');
+        s.src = 'flutter_bootstrap.js';
+        s.async = true;
+        document.body.appendChild(s);
+      }
+
+      if (restablecer) {
+        // Otra pantalla de Flutter: solo el logo mientras carga, y se retira al dibujarla.
+        carga.setAttribute('aria-hidden', 'true');
+        carga.inert = true;
+        window.addEventListener('flutter-first-frame', login.quitar);
+        cargarFlutter();
+        return;
+      }
+
+      ['pointerdown', 'keydown', 'focusin', 'touchstart'].forEach(function (evento) {
+        document.addEventListener(evento, cargarFlutter, { once: true, passive: true });
+      });
+
+      correo.addEventListener('input', function () {
+        document.getElementById('contador').textContent = correo.value.length + '/150';
+      });
+      ojo.addEventListener('click', function () {
+        var mostrar = clave.type === 'password';
+        clave.type = mostrar ? 'text' : 'password';
+        ojo.setAttribute('aria-pressed', String(mostrar));
+        ojo.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      });
+
+      var entregado = false;
+      function entregar(modo) {
+        if (entregado) return;
+        entregado = true;
+        login.entrada = {
+          modo: modo, correo: correo.value, enviar: modo === 'login',
+          password: modo === 'login' ? clave.value : '',
+        };
+        form.setAttribute('aria-busy', 'true');
+        cargarFlutter();
+        if (login.alEntregar) login.alEntregar();
+      }
+      form.addEventListener('submit', function (e) { e.preventDefault(); entregar('login'); });
+      Array.prototype.forEach.call(form.querySelectorAll('[data-modo]'), function (boton) {
+        boton.addEventListener('click', function () { entregar(boton.getAttribute('data-modo')); });
+      });
+    })();
+  </script>
 </body>
 </html>

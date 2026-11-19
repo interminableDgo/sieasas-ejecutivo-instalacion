@@ -9,6 +9,10 @@ const muted = Color(0xFF5B6B74);
 const blueTint = Color(0xFFE7F6FD);
 const brandTint = Color(0xFFFFF1E3);
 
+/// Brand orange darkened for text on [paper]: 4.8:1, above the 4.5:1 that
+/// WCAG AA asks of normal text ([brand] itself reaches only 2.2:1).
+const brandText = Color(0xFFA85400);
+
 /// Widest layout the app uses; wider windows are treated as a phone.
 const phoneMaxWidth = 440.0;
 

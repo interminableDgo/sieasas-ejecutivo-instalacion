@@ -68,13 +68,19 @@ jobs:
       - name: El gateway arranca y responde /nginx-health
         run: |
           docker network create sgsc-ci
-          docker run -d --name gateway --network sgsc-ci sgsc-gateway
+          # Un main.dart.js de prueba para comprobar la compresión gzip de los estáticos.
+          mkdir -p web && head -c 200000 /dev/zero | tr '\0' 'a' > web/main.dart.js && echo '<html></html>' > web/index.html
+          chmod -R a+rX web
+          docker run -d --name gateway --network sgsc-ci -v "$PWD/web:/usr/share/nginx/html:ro" sgsc-gateway
           for i in $(seq 1 15); do
             if docker exec gateway wget -qO- http://127.0.0.1/nginx-health; then
               docker logs gateway
               # Ningún proceso de nginx corre como root.
               docker exec gateway sh -c 'test "$(id -u)" != "0"'
               ! docker top gateway -o user,args | grep -E '^root .*nginx'
+              # Los estáticos de Flutter se sirven comprimidos con gzip.
+              docker exec gateway wget -q -S --header='Accept-Encoding: gzip' -O /dev/null \
+                http://127.0.0.1/main.dart.js 2>&1 | grep -i 'Content-Encoding: gzip'
               exit 0
             fi
             sleep 2

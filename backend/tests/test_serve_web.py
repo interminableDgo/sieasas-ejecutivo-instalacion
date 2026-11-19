@@ -1,3 +1,4 @@
+import gzip
 import http.client
 import ssl
 import threading
@@ -33,6 +34,39 @@ def test_sirve_por_https_con_certificado_valido_para_127(servidor):
     assert b'SIESAS' in respuesta.read()
     assert respuesta.getheader('Strict-Transport-Security') == 'max-age=31536000'
     assert respuesta.getheader('Referrer-Policy') == 'no-referrer'
+    conexion.close()
+
+
+def _https(puerto, cert):
+    contexto = ssl.create_default_context(cafile=str(cert))
+    return http.client.HTTPSConnection('127.0.0.1', puerto, context=contexto, timeout=5)
+
+
+def test_comprime_con_gzip_si_el_navegador_lo_acepta(servidor):
+    puerto, cert, _ = servidor
+    conexion = _https(puerto, cert)
+    conexion.request('GET', '/', headers={'Accept-Encoding': 'gzip, br'})
+    respuesta = conexion.getresponse()
+    cuerpo = respuesta.read()
+    assert respuesta.status == 200
+    assert respuesta.getheader('Content-Encoding') == 'gzip'
+    assert respuesta.getheader('Vary') == 'Accept-Encoding'
+    assert respuesta.getheader('Content-Type') == 'text/html'
+    assert respuesta.getheader('Cache-Control') == 'no-store'
+    assert gzip.decompress(cuerpo) == '<h1>SIESAS</h1>'.encode()
+    conexion.close()
+
+
+def test_sin_gzip_si_no_lo_acepta_y_archivos_no_comprimibles(servidor, tmp_path):
+    puerto, cert, _ = servidor
+    (tmp_path / 'web' / 'logo.png').write_bytes(b'\x89PNG')
+    conexion = _https(puerto, cert)
+    conexion.request('GET', '/index.html')
+    respuesta = conexion.getresponse()
+    assert respuesta.getheader('Content-Encoding') is None and b'SIESAS' in respuesta.read()
+    conexion.request('GET', '/logo.png', headers={'Accept-Encoding': 'gzip'})
+    respuesta = conexion.getresponse()
+    assert respuesta.getheader('Content-Encoding') is None and respuesta.read() == b'\x89PNG'
     conexion.close()
 
 

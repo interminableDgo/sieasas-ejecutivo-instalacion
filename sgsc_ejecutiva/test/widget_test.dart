@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sgsc_ejecutiva/main.dart';
 import 'package:sgsc_ejecutiva/core/theme.dart';
+import 'package:sgsc_ejecutiva/screens/auth/login_screen.dart';
 import 'package:sgsc_ejecutiva/screens/dashboard/dashboard_screen.dart';
 import 'package:sgsc_ejecutiva/screens/solicitudes/nueva_solicitud_screen.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
@@ -316,5 +317,86 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await screenshot(tester, '06-municipios');
+  });
+  // On the web the first login is HTML (web/index.html); Flutter receives
+  // what the person typed and continues from there.
+  Widget handoff({
+    String? mode,
+    String email = '',
+    String password = '',
+    bool submit = false,
+    ValueChanged<Map<String, dynamic>>? onLogin,
+  }) => MaterialApp(
+    theme: executiveTheme(),
+    home: Scaffold(
+      body: LoginScreen(
+        key: ValueKey(mode),
+        api: mockApi(),
+        initialMode: mode,
+        initialEmail: email,
+        initialPassword: password,
+        submitOnStart: submit,
+        onLogin: onLogin ?? (_) {},
+      ),
+    ),
+  );
+  testWidgets('HTML login hand-off signs in without a second click', (
+    tester,
+  ) async {
+    await prepare(tester);
+    Map<String, dynamic>? signedIn;
+    await tester.pumpWidget(
+      handoff(
+        email: 'prueba@example.com',
+        password: 'Una contraseña de prueba',
+        submit: true,
+        onLogin: (value) => signedIn = value,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(signedIn?['correo'], 'prueba@example.com');
+  });
+  testWidgets('HTML login hand-off validates like the Flutter form', (
+    tester,
+  ) async {
+    await prepare(tester);
+    Map<String, dynamic>? signedIn;
+    await tester.pumpWidget(
+      handoff(
+        email: 'sin-arroba',
+        submit: true,
+        onLogin: (value) => signedIn = value,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(signedIn, isNull);
+    expect(find.text('Ingresa un correo válido.'), findsOneWidget);
+    expect(find.text('Ingresa tu contraseña.'), findsOneWidget);
+  });
+  testWidgets('HTML links open recovery and access request with the email', (
+    tester,
+  ) async {
+    await prepare(tester);
+    await tester.pumpWidget(handoff(mode: 'recover', email: 'a@b.mx'));
+    await tester.pumpAndSettle();
+    expect(find.text('Recuperar contraseña'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'a@b.mx'), findsOneWidget);
+    await tester.pumpWidget(handoff(mode: 'register'));
+    await tester.pumpAndSettle();
+    expect(find.text('Solicitar acceso'), findsWidgets);
+  });
+  testWidgets('Login links meet WCAG AA contrast on the page background', (
+    tester,
+  ) async {
+    await prepare(tester);
+    await tester.pumpWidget(handoff());
+    await tester.pumpAndSettle();
+    double luminance(Color c) => c.computeLuminance();
+    final ratio = (luminance(paper) + 0.05) / (luminance(brandText) + 0.05);
+    expect(ratio, greaterThanOrEqualTo(4.5));
+    final link = tester.widget<TextButton>(
+      find.widgetWithText(TextButton, '¿Olvidaste tu contraseña?'),
+    );
+    expect(link.style?.foregroundColor?.resolve({}), brandText);
   });
 }
