@@ -13,9 +13,29 @@ void main() {
   runApp(const SgscApp());
 }
 
+/// El inicio de sesión HTML de web/index.html (en otras plataformas, inactivo).
+const browserHtmlLogin = HtmlLoginBridge(
+  isActive: htmlLoginActive,
+  listen: listenHtmlLogin,
+  remove: removeHtmlLogin,
+);
+
 class SgscApp extends StatefulWidget {
   final ExecutiveApi? api;
-  const SgscApp({super.key, this.api});
+
+  /// Puente con el inicio de sesión HTML; las pruebas pasan uno propio.
+  final HtmlLoginBridge htmlLogin;
+
+  /// Paso previo a descargar el código del tablero; las pruebas lo usan para
+  /// simular una falla de red.
+  final Future<void> Function()? beforeDashboardLoad;
+
+  const SgscApp({
+    super.key,
+    this.api,
+    this.htmlLogin = browserHtmlLogin,
+    this.beforeDashboardLoad,
+  });
   @override
   State<SgscApp> createState() => _SgscAppState();
 }
@@ -32,26 +52,32 @@ class _SgscAppState extends State<SgscApp> {
   HtmlLoginHandoff? _handoff;
 
   Future<void> _loadDashboard() =>
-      _dashboardLoad ??= dashboard.loadLibrary().catchError((Object error) {
+      _dashboardLoad ??= _downloadDashboard().catchError((Object error) {
         _dashboardLoad = null; // permite reintentar
         throw error;
       });
 
+  Future<void> _downloadDashboard() async {
+    await widget.beforeDashboardLoad?.call();
+    await dashboard.loadLibrary();
+  }
+
   @override
   void initState() {
     super.initState();
-    if (!htmlLoginActive()) return;
+    final htmlLogin = widget.htmlLogin;
+    if (!htmlLogin.isActive()) return;
     _waitingForHtml = true;
     // La persona ya está escribiendo: el tablero se descarga mientras tanto.
     _loadDashboard().ignore();
-    listenHtmlLogin((handoff) {
+    htmlLogin.listen((handoff) {
       if (!mounted) return;
       setState(() {
         _waitingForHtml = false;
         _handoff = handoff;
       });
       // El HTML se retira cuando Flutter ya dibujó la misma pantalla.
-      WidgetsBinding.instance.addPostFrameCallback((_) => removeHtmlLogin());
+      WidgetsBinding.instance.addPostFrameCallback((_) => htmlLogin.remove());
     });
   }
 

@@ -14,6 +14,8 @@ import 'package:sgsc_ejecutiva/screens/auth/login_screen.dart';
 import 'package:sgsc_ejecutiva/screens/dashboard/dashboard_screen.dart';
 import 'package:sgsc_ejecutiva/screens/solicitudes/nueva_solicitud_screen.dart';
 import 'package:sgsc_ejecutiva/services/executive_api.dart';
+import 'package:sgsc_ejecutiva/services/html_login_data.dart';
+import 'package:sgsc_ejecutiva/services/html_login_stub.dart' as stub;
 import 'package:sgsc_ejecutiva/widgets/executive_widgets.dart';
 
 const user = {
@@ -384,6 +386,83 @@ void main() {
     await tester.pumpWidget(handoff(mode: 'register'));
     await tester.pumpAndSettle();
     expect(find.text('Solicitar acceso'), findsWidgets);
+  });
+  testWidgets('App waits for the HTML login, signs in and removes it', (
+    tester,
+  ) async {
+    await prepare(tester);
+    void Function(HtmlLoginHandoff)? deliver;
+    var removed = 0;
+    await tester.pumpWidget(
+      wrap(
+        SgscApp(
+          api: mockApi(),
+          htmlLogin: HtmlLoginBridge(
+            isActive: () => true,
+            listen: (onHandoff) => deliver = onHandoff,
+            remove: () => removed++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Under the HTML form Flutter shows nothing that could take the focus.
+    expect(find.byType(LoginScreen), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
+    deliver!(
+      const HtmlLoginHandoff(
+        mode: 'login',
+        email: 'prueba@example.com',
+        password: 'Una contraseña de prueba',
+        submit: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(removed, 1);
+    expect(find.text('Aún no hay solicitudes'), findsOneWidget);
+  });
+  testWidgets('Dashboard code that fails to download can be retried', (
+    tester,
+  ) async {
+    await prepare(tester);
+    var offline = true;
+    await tester.pumpWidget(
+      wrap(
+        SgscApp(
+          api: mockApi(),
+          beforeDashboardLoad: () async {
+            if (offline) throw Exception('sin conexión');
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'prueba@example.com',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).at(1),
+      'Una contraseña de prueba',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Iniciar sesión'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('No se pudo cargar el tablero. Revisa tu conexión.'),
+      findsOneWidget,
+    );
+    offline = false;
+    await tester.tap(find.widgetWithText(FilledButton, 'Reintentar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Aún no hay solicitudes'), findsOneWidget);
+  });
+  test('Without a browser there is no HTML login', () {
+    expect(stub.htmlLoginActive(), isFalse);
+    stub.listenHtmlLogin((_) => fail('No HTML form outside the browser'));
+    stub.removeHtmlLogin();
+    final handoff = HtmlLoginHandoff(mode: 'recover');
+    expect([handoff.email, handoff.password, handoff.submit], ['', '', false]);
+    expect(HtmlLoginHandoff.modes, contains(handoff.mode));
   });
   testWidgets('Login links meet WCAG AA contrast on the page background', (
     tester,
