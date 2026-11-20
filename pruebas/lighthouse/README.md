@@ -11,7 +11,7 @@ Cada perfil se corre tres veces y se reporta la mediana de rendimiento.
 
 ## Cómo repetir la medición
 
-1. Compilar la app: `cd sgsc_ejecutiva; flutter build web --release -O4 --dart-define=API_BASE_URL=http://127.0.0.1:8000`
+1. Compilar la app: `cd sgsc_ejecutiva; flutter build web --release -O4 --dart-define=API_BASE_URL=https://127.0.0.1:5173`
 2. Servirla: `cd backend; .venv\Scripts\python.exe serve_web.py`
 3. Medir: `.\pruebas\lighthouse\ejecutar_lighthouse.ps1 -Modo mobile` y `-Modo desktop`.
    Los reportes quedan en `reportes/ultima/` (ignorada por Git).

@@ -7,7 +7,7 @@ Para desarrollo, usa Flutter 3.47.5 / Dart 3.13.4 o una versión compatible con 
 ```powershell
 flutter pub get
 flutter test --no-pub
-flutter build web --no-pub --dart-define=API_BASE_URL=http://127.0.0.1:8000
+flutter build web --no-pub --dart-define=API_BASE_URL=https://127.0.0.1:5173
 ```
 
 En esta computadora se utilizó `dart pub get` y luego `flutter ... --no-pub` porque Windows no tiene habilitado el soporte de enlaces simbólicos para plugins de escritorio. Web compila y se prueba sin cambiar ajustes del sistema. La compilación de escritorio Windows requiere configurar ese soporte.

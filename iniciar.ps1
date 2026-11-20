@@ -15,7 +15,7 @@ if ($Recompilar) {
     if (!$Flutter) { throw 'Indica la ruta de flutter.bat con -Flutter.' }
     Push-Location (Join-Path $projectRoot 'sgsc_ejecutiva')
     try {
-        & $Flutter build web --no-pub --dart-define=API_BASE_URL=http://127.0.0.1:8000
+        & $Flutter build web --no-pub --dart-define=API_BASE_URL=https://127.0.0.1:5173
         if ($LASTEXITCODE -ne 0) { throw 'No se pudo compilar Flutter.' }
     } finally { Pop-Location }
 }

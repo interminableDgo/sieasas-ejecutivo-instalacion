@@ -3,11 +3,19 @@
 La primera vez genera un certificado autofirmado para 127.0.0.1 y localhost
 (serve_web.local.crt / serve_web.local.key, excluidos de Git por backend/*.local.*).
 Se renueva solo cuando falta o está por vencer.
+
+Como el gateway en producción, reenvía /auth, /ejecutivo y /health a la API local
+(SERVE_WEB_API, por omisión http://127.0.0.1:8000). Así la app y la API comparten la misma
+dirección HTTPS y el navegador no bloquea las llamadas: con un certificado autofirmado, una
+página HTTPS no puede llamar a una API en otra dirección por HTTP.
 """
 import datetime
 import gzip
 import ipaddress
+import os
 import ssl
+import urllib.error
+import urllib.request
 from functools import lru_cache, partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -20,6 +28,19 @@ CERT = BACKEND / 'serve_web.local.crt'
 KEY = BACKEND / 'serve_web.local.key'
 # Igual que gateway/nginx.conf: texto, JavaScript, WebAssembly y fuentes se envían con gzip.
 COMPRIMIBLES = {'.html', '.css', '.js', '.mjs', '.json', '.wasm', '.svg', '.ttf', '.otf', '.txt'}
+API = os.getenv('SERVE_WEB_API', 'http://127.0.0.1:8000').rstrip('/')
+RUTAS_API = ('/auth/', '/ejecutivo/', '/health')
+# Encabezados que la API necesita y los que la app necesita de vuelta (incluido el nombre de los reportes).
+ENCABEZADOS_PETICION = ('Authorization', 'Content-Type', 'Accept', 'Accept-Language')
+ENCABEZADOS_RESPUESTA = ('Content-Type', 'Content-Disposition', 'X-SGSC-Service')
+
+
+class _SinRedireccion(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_cliente_api = urllib.request.build_opener(_SinRedireccion)
 
 
 @lru_cache(maxsize=64)
@@ -30,8 +51,57 @@ def _gzip(ruta, modificado):
 
 class Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.wasm': 'application/wasm'}
+    api = API
+
+    def _es_api(self):
+        return urlsplit(self.path).path.startswith(RUTAS_API)
+
+    def _reenviar(self):
+        largo = int(self.headers.get('Content-Length') or 0)
+        cuerpo = self.rfile.read(largo) if largo else None
+        peticion = urllib.request.Request(self.api + self.path, data=cuerpo, method=self.command,
+                                          headers={k: self.headers[k] for k in ENCABEZADOS_PETICION if self.headers.get(k)})
+        try:
+            respuesta = _cliente_api.open(peticion, timeout=120)
+        except urllib.error.HTTPError as error:  # 401, 404, 422, 503…: se devuelven tal cual
+            respuesta = error
+        except OSError:
+            datos = b'{"detail":"La API local no responde. Inicia la API en el puerto 8000."}'
+            self.send_response(502)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(datos)))
+            self.end_headers()
+            self.wfile.write(datos)
+            return
+        with respuesta:
+            datos = respuesta.read()
+            self.send_response(respuesta.status)
+            for nombre in ENCABEZADOS_RESPUESTA:
+                if respuesta.headers.get(nombre):
+                    self.send_header(nombre, respuesta.headers[nombre])
+            self.send_header('Content-Length', str(len(datos)))
+            self.end_headers()
+            self.wfile.write(datos)
+
+    def do_POST(self):
+        if self._es_api(): return self._reenviar()
+        self.send_error(405)
+
+    def do_PUT(self):
+        if self._es_api(): return self._reenviar()
+        self.send_error(405)
+
+    def do_PATCH(self):
+        if self._es_api(): return self._reenviar()
+        self.send_error(405)
+
+    def do_DELETE(self):
+        if self._es_api(): return self._reenviar()
+        self.send_error(405)
 
     def do_GET(self):
+        if self._es_api():
+            return self._reenviar()
         ruta = Path(self.translate_path(self.path))
         if ruta.is_dir() and urlsplit(self.path).path.endswith('/'):
             ruta = ruta / 'index.html'

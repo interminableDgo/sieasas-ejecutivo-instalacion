@@ -100,7 +100,7 @@ SGSC ofrece:
 ## 7. Frontend Flutter
 
 - Proyecto en `sgsc_ejecutiva/`. Punto de entrada `lib/main.dart`; cliente de la API `lib/services/executive_api.dart`; pantallas en `lib/screens/`.
-- La dirección de la API se fija **al compilar**: `--dart-define=API_BASE_URL=<url>`. Con Docker es `http://localhost:8080`; con `iniciar.ps1`, `http://127.0.0.1:8000`.
+- La dirección de la API se fija **al compilar**: `--dart-define=API_BASE_URL=<url>`. Con Docker es `http://localhost:8080`; con `iniciar.ps1`, `https://127.0.0.1:5173` (el servidor local reenvía `/auth`, `/ejecutivo` y `/health` a la API, como el gateway).
 - El token de sesión se guarda solo en memoria: recargar la página exige iniciar sesión de nuevo.
 - El diseño sigue el wireframe institucional: naranja Nuevo León, azul Salud, tarjetas y Mulish. Ancho máximo de 440 px en escritorio y ancho completo en móvil.
 - Solo se ha compilado y probado para **web**. Las carpetas `android/`, `ios/`, `linux/`, `macos/` y `windows/` son las plantillas de Flutter, sin compilar ni probar.
