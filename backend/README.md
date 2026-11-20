@@ -102,7 +102,7 @@ Arquitectura de la tesis (2.8.4, 3.9 y Figura 53): App Ejecutiva → API Gateway
 - Reportes calcula sus agregados con la misma función que Indicadores, por lo que exporta aunque Indicadores esté detenido.
 - Escrituras en MySQL: solo Registro (`Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_SolicitudesApoyo`, `ejecutivo_registro`) y el núcleo. Los demás solo leen.
 - Solo el gateway publica un puerto (`127.0.0.1:8080`). `.env` y `ca.pem` nunca entran a las imágenes: las variables llegan por Compose y `ca.pem` se monta en `/run/secrets/db_ca`. Los microservicios solo reciben las variables de MySQL y CORS.
-- El gateway no publica `/ciudadano/*` (fuera del alcance) ni `/docs`.
+- El gateway no publica `/docs`; `/ciudadano/*` responde 404 (el Ciudadano no forma parte de este repositorio).
 
 Desde la raíz del repositorio, con Docker Desktop (WSL 2) disponible:
 

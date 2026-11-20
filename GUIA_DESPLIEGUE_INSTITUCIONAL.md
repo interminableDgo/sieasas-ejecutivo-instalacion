@@ -36,9 +36,9 @@ Leyenda: ✅ probado localmente · ⏳ pendiente de validar en la infraestructur
 - Todos los contenedores están en la red interna `sgsc` (`172.30.0.0/24`; el gateway usa `172.30.0.10`) y se conectan **directamente** a MySQL. No se llaman entre sí.
 - Si un microservicio se detiene, solo sus rutas responden 503 ✅ (`pruebas/microservicios/independencia.ps1`).
 - **No incluidos:**
-  - el prototipo **Ciudadano**: el gateway responde 404 en `/ciudadano/*`;
+  - el prototipo **Ciudadano**: no forma parte de este repositorio; el gateway responde 404 en `/ciudadano/*`;
   - el administrador PHP/Yii 2 de SSNL;
-  - la base de datos (Migración, sección «Sustitución de Render, Netlify y Aiven»).
+  - la base de datos (Migración, sección «Sustitución de Render y Aiven»).
 
 ## 3. Preparación del servidor
 
@@ -56,15 +56,15 @@ Leyenda: ✅ probado localmente · ⏳ pendiente de validar en la infraestructur
 
 ```bash
 cd /opt/sgsc
-git clone --branch dev <url del repositorio> .
+git clone https://github.com/interminableDgo/sieasas-ejecutivo-instalacion.git .
 ```
 
 ## 5. Base de datos institucional
 
 Seguir Migración §3 (requisitos), §6 (preparación) y §10 (usuarios). En resumen:
 
-- MySQL 8.x con InnoDB, `utf8mb4` y `utf8mb4_unicode_ci`, un `sql_mode` equivalente, `lower_case_table_names=0` y UTC.
-- **El esquema SSNL base lo proporciona la Secretaría**; no está en el repositorio. ❓
+- MySQL 8.x con InnoDB, `utf8mb4`, un `sql_mode` equivalente, `lower_case_table_names=0` y UTC. Las tablas de SGSC toman la collation de la base.
+- **La base SSNL la administra el sistema SSNL Gestoría de Apoyos.** La versión de referencia es la que generan sus migraciones en el commit `710a73a` (13/11/2026) de [`TheRadikalStyle/ssnl-gestoria-apoyos`](https://github.com/TheRadikalStyle/ssnl-gestoria-apoyos) (README §11).
 - Usuarios: uno de instalación, temporal, y uno de ejecución con privilegios mínimos. ⏳ Hoy todos los servicios usan el mismo usuario.
 - Acceso de red a MySQL solo desde el servidor de SGSC.
 
@@ -75,14 +75,14 @@ Con la base SSNL ya importada y un `.env` que apunte a ella con el usuario de in
 ```bash
 cd /opt/sgsc/backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python manage.py migrate                                    # 002, 003, 004 + columnas de colonia
+.venv/bin/python manage.py migrate                                    # 002, 003 + columnas de colonia (README §11.1)
 .venv/bin/python manage.py cargar-colonias CPdescarga.txt --estado 19  # catálogo SEPOMEX
 .venv/bin/python manage.py create-user --correo persona@salud.nl.gob.mx --nombres Nombre --apellidos Apellido --entidad 19
 .venv/bin/python manage.py setup-2fa --correo persona@salud.nl.gob.mx   # opcional
 ```
 
-- `migrate` es aditiva y está pensada para poder repetirse ✅ (sobre Aiven). Hacer un respaldo antes.
-- Si no se usará Ciudadano, ver Migración §7.
+- `migrate` es aditiva y se puede repetir ✅ (ensayada sobre una base limpia con las migraciones de SSNL de referencia: `pruebas/instalacion/`). Hacer un respaldo antes.
+- Solo agrega 5 catálogos y 2 columnas opcionales; no modifica nada de SSNL (README §11.1).
 - No ejecutar `sgsc_salud_desde_cero.sql` ni `backend/migrations/001_ejecutivo.sql`.
 - El archivo de SEPOMEX se descarga del sitio de Correos de México (formato TXT, separado por «|»).
 - Si se transfieren datos desde Aiven, solo con autorización: Migración §8 y §9.
@@ -277,11 +277,10 @@ Se recomienda que TI etiquete cada versión desplegada (`git tag`).
 | Separar usuarios de base de datos por servicio (cambio en `docker-compose.yml`) | TI con el equipo de desarrollo | ⏳ |
 | Dominio, DNS y certificado HTTPS; `real_ip` si hay un proxy delante | TI | ⏳ |
 | SMTP institucional y `RESET_URL` | TI | ❓ |
-| `CORS_ORIGIN_REGEX` (hoy admite `*.netlify.app`) y `GATEWAY_ORIGINS` | TI | ⏳ |
+| `CORS_ORIGINS` y `GATEWAY_ORIGINS` con el dominio institucional | TI | ⏳ |
 | Cuentas Ejecutivo iniciales y entidad de cada una | Secretaría | ❓ |
 | Transferencia de datos desde Aiven y depuración de datos de prueba | Secretaría (autorización), TI | ❓ |
-| Retiro de Render y Netlify, y revocación del usuario de Aiven | Responsables actuales del proyecto | ⏳ |
-| Prototipo Ciudadano (fuera del alcance actual) | Secretaría | ❓ |
+| Retiro de Render y revocación del usuario de Aiven | Responsables actuales del proyecto | ⏳ |
 | Administrador PHP/Yii 2 de SSNL | TI | ❓ |
 | Pruebas de seguridad, de carga y de restauración | TI | ⏳ |
 | Aviso de privacidad y tratamiento de datos personales (Migración §20) | Jurídico, Transparencia | ❓ |
@@ -302,5 +301,5 @@ Se recomienda que TI etiquete cada versión desplegada (`git tag`).
 - SMTP institucional.
 - Rotación de bitácoras.
 - Pruebas de seguridad, carga y restauración.
-- Decisión sobre Ciudadano y el administrador PHP.
-- Retiro de Render, Netlify y Aiven.
+- Decisión sobre el administrador PHP.
+- Retiro de Render y Aiven.

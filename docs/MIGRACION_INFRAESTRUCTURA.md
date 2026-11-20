@@ -1,12 +1,12 @@
 # Migración de SGSC desde Aiven a la infraestructura de la Secretaría de Salud de Nuevo León
 
-Este documento describe qué hace falta para que SGSC (SIESAS · Ejecutivo) deje de depender de **Aiven** (MySQL administrado), **Render** (API publicada) y **Netlify** (prototipo Ciudadano), y funcione en servidores de la Secretaría.
+Este documento describe qué hace falta para que SGSC (SIESAS · Ejecutivo) deje de depender de **Aiven** (MySQL administrado) y **Render** (API publicada), y funcione en servidores de la Secretaría.
 
 > **Conclusión principal: no basta con cambiar las variables de entorno.**
 >
 > SGSC no crea su base de datos desde cero. Trabaja **sobre el esquema de SSNL** (Gestoría de Apoyos), que es un sistema de la propia Secretaría, y le agrega tablas y columnas mediante migraciones.
 >
-> El esquema base (`SSNL-original.sql`) **no está en este repositorio**. Por eso, primero hay que disponer de una base SSNL compatible. Después se aplican las migraciones de SGSC, se cargan catálogos y cuentas, se configura TLS y se cambian las variables.
+> El esquema base **no está en este repositorio**: lo generan las migraciones de Yii del sistema SSNL. La versión de referencia es el commit `710a73a` (13/11/2026) de [`TheRadikalStyle/ssnl-gestoria-apoyos`](https://github.com/TheRadikalStyle/ssnl-gestoria-apoyos). Primero hay que disponer de una base SSNL compatible; después se aplican las migraciones de SGSC, se cargan catálogos y cuentas, se configura TLS y se cambian las variables.
 
 Los datos técnicos de este documento se obtuvieron el 17/11/2026 a partir del código del repositorio y de **metadatos** de la base actual (`information_schema`, versión y configuración del servidor, conteos por tabla). No se leyeron, exportaron ni modificaron datos de personas.
 
@@ -16,15 +16,14 @@ Los datos técnicos de este documento se obtuvieron el 17/11/2026 a partir del c
 
 | Componente | Dónde se ejecuta hoy | Cómo se conecta | Código |
 |---|---|---|---|
-| Núcleo (autenticación `/auth/*`, health, rutas del prototipo Ciudadano) | Docker local (`nucleo`) | SQLAlchemy y PyMySQL, TLS | `backend/app/database.py` |
+| Núcleo (autenticación `/auth/*` y health) | Docker local (`nucleo`) | SQLAlchemy y PyMySQL, TLS | `backend/app/database.py` |
 | Monolito completo (núcleo y rutas del Ejecutivo en un proceso) | **Render** (`render.yaml`, rama `dev`) y local con `iniciar.ps1` | Igual | `backend/app/` |
 | Indicadores y Filtros | Docker (`indicadores`) | Igual, mediante la librería común | `backend/libs/sgsc_common/sgsc_common/database.py` |
 | Detalle de Indicadores | Docker (`detalle`) | Igual | idem |
 | Registro Ejecutivo | Docker (`registro`) | Igual | idem |
 | Reportes y Exportación | Docker (`reportes`) | Igual | idem |
-| Comandos de administración (`migrate`, `create-user`, `setup-2fa`, `cargar-colonias`, `ciudadano-demo`, `ciudadano-borrar`) | Ejecución manual | `backend/app/database.py` | `backend/manage.py` |
+| Comandos de administración (`migrate`, `create-user`, `setup-2fa`, `cargar-colonias`) | Ejecución manual | `backend/app/database.py` | `backend/manage.py` |
 | App Flutter Ejecutiva | Navegador (servida por el gateway o por `serve_web.py`) | **No se conecta a MySQL**; llama a la API | `sgsc_ejecutiva/` |
-| App Ciudadano (prototipo) | Netlify. **Su código no está en este repositorio** | Llama a la API publicada en Render (`/ciudadano/*`), que usa Aiven | `backend/app/routers/ciudadano.py` |
 | Administrador PHP/Yii 2 de SSNL | **Fuera de este repositorio** | Comparte las tablas `auth_*`, `Tbl_Users`, `admin_*` y catálogos | — |
 
 ## 2. Configuración que usa cada servicio
@@ -37,7 +36,6 @@ Todos leen las mismas variables, con algunas diferencias:
 | `DB_SSL` (`true` o `false`), `DB_SSL_CA` (ruta del certificado de la CA) | ✔ | ✔ | TLS con verificación del certificado y del nombre del servidor |
 | `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_RECYCLE` | — (fijo 5/10/280) | ✔ (en Compose se toman de `MS_DB_POOL_SIZE` y `MS_DB_MAX_OVERFLOW`, 2/2) | Número de conexiones |
 | `CORS_ORIGINS` | ✔ | ✔ (en Compose se toma de `GATEWAY_ORIGINS`; por omisión `http://localhost:8080`) | Orígenes web permitidos |
-| `CORS_ORIGIN_REGEX` | ✔ (por omisión `https://[a-z0-9-]+\.netlify\.app`) | — | Prototipo Ciudadano en Netlify |
 | `AUTH_ENCRYPTION_KEY` | ✔ | — | Cifra los secretos del segundo factor (TOTP) |
 | `RESET_URL`, `SMTP_*` | ✔ | — | Recuperación de contraseña por correo |
 | `FORWARDED_ALLOW_IPS` | ✔ (Docker) | ✔ (Docker) | IP del gateway en la que confía `--proxy-headers` |
@@ -74,8 +72,7 @@ La base actual (`siesas-v2`) tiene **52 tablas** y **43 claves foráneas**.
 | Administrador PHP (Sprint 2–3) | `admin_audit`, `admin_lock`, `admin_role`, `admin_unit` | Migraciones del administrador Yii 2 dentro de SSNL | **No** (confirmar con el repositorio del administrador) |
 | Ejecutivo | `ejecutivo_acceso`, `ejecutivo_token`, `ejecutivo_acceso_solicitud`, `ejecutivo_limite`, `ejecutivo_registro`, más el rol `Ejecutivo` en `auth_item` | `backend/migrations/002_ssnl_ejecutivo.sql` | Sí |
 | Catálogos del formulario | `Cat_Colonias`, `Cat_ConQuienVive`, `Cat_Ocupaciones`, `Cat_FuentesIngreso`, `Cat_AreasEstudio` (con sus valores iniciales) | `backend/migrations/003_catalogos_solicitud.sql` | Sí |
-| Columnas de colonia | `Tbl_Beneficiarios.ben_dom_colonia_id` y `Tbl_Solicitantes.sol_colonia_id`, con FK a `Cat_Colonias` | `backend/manage.py migrate` (`ALTER TABLE` condicional) | Sí. **Modifica dos tablas SSNL.** |
-| Prototipo Ciudadano | `ciudadano_cuenta`, `ciudadano_sesion`, `ciudadano_solicitud`, `ciudadano_recuperacion`, el canal «App SIEASAS Ciudadano» y el municipio «No especificado» (`cve_mun` 999) | `backend/migrations/004_ciudadano.sql` | Sí |
+| Columnas de colonia | `Tbl_Beneficiarios.ben_dom_colonia_id` y `Tbl_Solicitantes.sol_colonia_id`, opcionales, con FK a `Cat_Colonias` | `backend/manage.py migrate` (`ALTER TABLE` condicional) | Sí. **Agrega una columna a dos tablas SSNL**; no modifica las existentes. |
 
 `backend/migrations/001_ejecutivo.sql` y `sgsc_salud_desde_cero.sql` corresponden a un **esquema anterior** (`sgsc_salud`). **No son equivalentes al esquema actual**, no deben usarse para la migración, y el segundo contiene `DROP DATABASE`.
 
@@ -105,7 +102,6 @@ Tbl_Users            ─> admin_unit                            (organigrama)
 - `Tbl_Users`: correo y cuenta únicos.
 - `Cat_Colonias.uq_colonia_ubicacion`.
 - `INEGI_Cat_Municipios (entidad, municipio)` y `cvegeo`; `INEGI_Cat_Entidades.cve_ent`.
-- `ciudadano_solicitud.uq_ciudadano_reintento`, solo si se conserva Ciudadano.
 
 ## 5. Catálogos y datos iniciales indispensables
 
@@ -126,14 +122,14 @@ Sin estos datos, la API responde, pero el formulario se bloquea (muestra «Falta
 1. **TI decide** la plataforma:
    - servidor Linux, máquina virtual o servicio MySQL institucional;
    - versión 8.x, configurada según §3: InnoDB, `utf8mb4`, `utf8mb4_unicode_ci`, `sql_mode` equivalente, `lower_case_table_names=0` y UTC.
-2. **La Secretaría provee el esquema SSNL** vigente. Puede ser su base de producción o un *dump* de estructura (`mysqldump --no-data`) con los catálogos.
-   - SGSC no puede reconstruir el esquema base: sus 30+ tablas y columnas no se definen en el código.
-   - El código y los metadatos sí permiten **verificar** que el esquema provisto tenga las tablas, columnas y claves que SGSC usa (§4).
-3. Crear la base, por ejemplo `CREATE DATABASE sgsc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`, e importar el esquema SSNL con sus catálogos.
+2. **Base SSNL:** la que administra el sistema SSNL Gestoría de Apoyos. Su estructura de referencia la generan sus migraciones de Yii (commit `710a73a` (13/11/2026) de [`TheRadikalStyle/ssnl-gestoria-apoyos`](https://github.com/TheRadikalStyle/ssnl-gestoria-apoyos)) más las migraciones RBAC de Yii.
+   - Este repositorio no crea esa base; se instala sobre ella.
+   - `pruebas/instalacion/` reproduce la base de referencia en un MySQL de prueba y **verifica** que la instalación solo agregue lo previsto (README §11.1).
+3. Disponer de la base SSNL con sus catálogos (la del sistema SSNL o una creada con sus migraciones). Las tablas de SGSC toman su charset y su collation.
 4. Aplicar las migraciones de SGSC (§7).
 5. Cargar las colonias (`cargar-colonias`) y crear las cuentas Ejecutivo (`create-user`; `setup-2fa` si aplica).
 
-**No se puede completar todavía sin el esquema base:** crear la base desde cero, validar compatibilidad de columnas y probar contra la base institucional.
+**Ensayado:** sobre bases limpias creadas con las migraciones de SSNL de referencia (con `utf8mb4_unicode_ci` y con `utf8mb4_0900_ai_ci`), `migrate` solo agrega lo previsto y las pruebas del backend con MySQL real pasan. **Pendiente:** probar contra la base institucional en operación.
 
 ## 7. Migraciones de SGSC sobre la base SSNL
 
@@ -144,8 +140,8 @@ cd backend
 .\.venv\Scripts\python.exe manage.py migrate
 ```
 
-- `migrate` aplica `002`, `003` y **`004` (Ciudadano)**, y agrega las columnas `*_colonia_id` (§4.1). Es aditiva y está pensada para poder repetirse; aun así, **haz un respaldo antes**.
-- **Si no se usará el prototipo Ciudadano**, `004` agrega 4 tablas, un canal de recepción y el municipio 999 que no hacen falta. TI puede aplicar manualmente solo `002` y `003`, más los dos `ALTER TABLE` de `manage.py` (líneas `COLONY_COLUMNS`), en lugar de `migrate`.
+- `migrate` aplica `002` y `003`, y agrega las columnas `*_colonia_id` (§4.1). Es aditiva y se puede repetir; aun así, **haz un respaldo antes**.
+- El detalle exacto de lo que agrega está en README §11.1.
 - **No ejecutar** `001_ejecutivo.sql` ni `sgsc_salud_desde_cero.sql`.
 
 ## 8. Exportar e importar la información existente (solo con autorización)
@@ -159,7 +155,6 @@ Solo aplica si la Secretaría **autoriza por escrito** transferir los datos de A
 Datos de prueba que conviene **no** migrar o depurar, previa decisión de la Secretaría:
 - la solicitud sintética **#581** (beneficiario 88, solicitante 100, marcada «[PRUEBA AUTOMATIZADA SGSC – NO ATENDER]»);
 - otros registros «PRUEBA…»;
-- las cuentas del prototipo Ciudadano;
 - los tokens vencidos de `ejecutivo_token` y los contadores de `ejecutivo_limite`.
 
 Si **no** se autoriza transferir datos, se parte de la base SSNL institucional con sus propios registros y solo se aplican §6 y §7.
@@ -195,7 +190,7 @@ Hoy todos los servicios usan **el mismo usuario** de MySQL. Para producción se 
 | Usuario | Servicio | Privilegios mínimos |
 |---|---|---|
 | `sgsc_admin` | Instalación (`manage.py migrate`, `cargar-colonias`, `create-user`) | Esquema y datos durante la instalación; **deshabilitarlo después** |
-| `sgsc_nucleo` | Núcleo (`/auth`) | `SELECT` en `Tbl_Users`, `auth_assignment`, `auth_item`, `ejecutivo_acceso`, `INEGI_Cat_Entidades`. `SELECT, INSERT, UPDATE` en `ejecutivo_token`, `ejecutivo_limite` y `ejecutivo_acceso_solicitud`. `UPDATE` en `ejecutivo_acceso` y en `Tbl_Users` (columnas de contraseña). Con Ciudadano, además: `SELECT, INSERT, UPDATE, DELETE` en `ciudadano_*`; `INSERT, UPDATE` en `Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_SolicitudesApoyo`; `INSERT` en `Cat_Colonias`. |
+| `sgsc_nucleo` | Núcleo (`/auth`) | `SELECT` en `Tbl_Users`, `auth_assignment`, `auth_item`, `ejecutivo_acceso`, `INEGI_Cat_Entidades`. `SELECT, INSERT, UPDATE` en `ejecutivo_token`, `ejecutivo_limite` y `ejecutivo_acceso_solicitud`. `UPDATE` en `ejecutivo_acceso` y en `Tbl_Users` (columnas de contraseña). |
 | `sgsc_indicadores`, `sgsc_detalle`, `sgsc_reportes` | Lectura | `SELECT` en `Tbl_SolicitudesApoyo`, `Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Cat_*`, `INEGI_*`, y las tablas de sesión (`ejecutivo_token`, `ejecutivo_acceso`, `Tbl_Users`, `auth_*`) |
 | `sgsc_registro` | Registro | Lo mismo que lectura, más `INSERT` en `Tbl_Beneficiarios`, `Tbl_Solicitantes` y `Tbl_SolicitudesApoyo`, y `SELECT, INSERT` en `ejecutivo_registro` |
 
@@ -224,7 +219,6 @@ En `backend/.env` (no se versiona; partir de `backend/.env.example`):
 | `DB_USER`, `DB_PASSWORD` | Usuario de ejecución (§10), no el administrador |
 | `DB_SSL=true`, `DB_SSL_CA` | Ruta del PEM de la CA institucional (en Docker la sobrescribe Compose) |
 | `CORS_ORIGINS` | Solo el dominio HTTPS institucional de la app, por ejemplo `https://sgsc.salud.nl.gob.mx` (a confirmar). Si Flutter se sirve desde el mismo gateway, no hay peticiones de otro origen. |
-| `CORS_ORIGIN_REGEX` | Su valor por omisión admite cualquier `*.netlify.app`. En producción, fijarlo al dominio institucional del prototipo Ciudadano o a `^$` si no se usa. |
 | `RESET_URL` | `https://<dominio institucional>` (el enlace de recuperación apunta a la app Flutter) |
 | `SMTP_*` | Servidor de correo institucional |
 | `AUTH_ENCRYPTION_KEY` | **Conservar** la actual si se migran cuentas con 2FA. Si cambia, hay que volver a vincular el segundo factor (`setup-2fa`). |
@@ -232,14 +226,13 @@ En `backend/.env` (no se versiona; partir de `backend/.env.example`):
 Además, la app Flutter se compila con la dirección pública de la API:
 `flutter build web --dart-define=API_BASE_URL=https://<dominio institucional>`.
 
-## 13. Archivos con referencias a Aiven, Render o Netlify
+## 13. Archivos con referencias a Aiven o Render
 
 | Archivo | Referencia | Acción |
 |---|---|---|
 | `backend/.env` (local, ignorado) | Host, puerto y usuario de Aiven; `DB_SSL_CA` | Reemplazar (§12) |
 | `backend/ca.pem` (local, ignorado) | CA de Aiven | Reemplazar por la CA institucional |
 | `render.yaml` | Despliegue en Render (rama `dev`); comentarios sobre Aiven; `/etc/secrets/ca.pem` | Retirar o ignorar si se deja de usar Render |
-| `backend/app/main.py` | `CORS_ORIGIN_REGEX` por omisión para `*.netlify.app` | Definir la variable (§12) |
 | `docker-compose.yml`, `backend/libs/sgsc_common/sgsc_common/database.py` | Comentarios sobre Aiven | Solo documentación |
 | `README.md`, `backend/README.md`, `pruebas/**` (informes y evidencias) | Mencionan Aiven como entorno de pruebas | Documentación histórica |
 
@@ -262,7 +255,7 @@ Ningún archivo versionado contiene credenciales de Aiven.
 3. En el panel de Aiven, revisar que no haya conexiones activas (métricas de conexiones) después del corte.
 4. En el firewall institucional, bloquear la salida hacia los dominios `*.aivencloud.com`.
 5. Revocar el usuario de la aplicación en Aiven, o rotar su contraseña, una vez validado el corte (§18).
-6. Desactivar el servicio de Render y el sitio de Netlify, o apuntarlos a la nueva API, para que ninguna instancia antigua siga escribiendo en Aiven.
+6. Desactivar el servicio de Render, o apuntarlo a la nueva API, para que ninguna instancia antigua siga escribiendo en Aiven.
 
 ## 16. Validar cada microservicio contra la base nueva
 
@@ -312,7 +305,7 @@ El registro de una solicitud **escribe datos de negocio**: hacerlo solo con auto
    - pruebas de §16 con una copia de datos o datos sintéticos.
 2. **Ensayo:** importar un respaldo reciente, validar §9 y §16, y medir tiempos. Registrar cuánto tarda.
 3. **Ventana de mantenimiento**, anunciada a los usuarios:
-   1. Detener las escrituras: Render, el prototipo Ciudadano y el administrador PHP si comparte la base.
+   1. Detener las escrituras: Render y el administrador PHP si comparte la base.
    2. Respaldo final de Aiven.
    3. Importarlo en la base institucional.
    4. Validar §9: conteos iguales y 0 huérfanos.
@@ -321,7 +314,7 @@ El registro de una solicitud **escribe datos de negocio**: hacerlo solo con auto
 4. **Cambio definitivo:**
    - publicar el dominio institucional (DNS);
    - compilar Flutter con la nueva `API_BASE_URL`;
-   - desactivar Render y Netlify o reapuntarlos;
+   - desactivar Render o reapuntarlo;
    - aplicar §15.
 5. **Reversión**, si falla la validación dentro de la ventana:
    - volver a apuntar la configuración a Aiven, que sigue intacta porque no se borró;
@@ -364,19 +357,17 @@ Lo que debe decidir y operar TI:
 - Servidor SMTP institucional y remitente.
 - Política de respaldos, retención y monitoreo; bitácoras centralizadas.
 - Decisión sobre la **transferencia de datos** desde Aiven (§8) y sobre los datos de prueba.
-- Decisión sobre el **prototipo Ciudadano**: si se despliega, dónde y con qué dominio.
 - Relación con el **administrador PHP/Yii 2**: si comparte la base, cómo se despliega y quién lo mantiene.
 - Responsables de operación, cuentas iniciales del rol Ejecutivo y la entidad de cada una.
 
 ---
 
-## Sustitución de Render, Netlify y Aiven
+## Sustitución de Render y Aiven
 
 | Hoy | Reemplazo institucional | Estado |
 |---|---|---|
 | **Aiven** (MySQL) | MySQL 8 institucional (§3–§12) | Documentado. Requiere el esquema SSNL de la Secretaría. |
 | **Render** (monolito `backend/app` publicado) | `docker-compose.yml`: el gateway Nginx publica `/auth/*` (núcleo) y `/ejecutivo/*` (cuatro microservicios). Render deja de ser necesario para el Ejecutivo. | Implementado y probado localmente (Docker Desktop, Aiven) |
 | Flutter web del Ejecutivo (hoy `serve_web.py` local) | El mismo gateway sirve `sgsc_ejecutiva/build/web` (volumen `FLUTTER_WEB_DIR`) | Implementado y probado localmente |
-| **Netlify** (prototipo Ciudadano) | **No incluido en Docker.** Su código Flutter no está en este repositorio, y el gateway **no publica** `/ciudadano/*` (responde 404). Para alojarlo: compilar esa app y servirla desde Nginx u otro servidor web, y publicar `/ciudadano/*` hacia el núcleo, que ya contiene esas rutas, cambiando `location ^~ /ciudadano/` en `gateway/nginx.conf`. | **Pendiente**, fuera del alcance actual (tesis, «Trabajos a futuro») |
 | Administrador PHP/Yii 2 de SSNL | Lo despliega TI con su propia infraestructura (PHP-FPM y servidor web), sobre la misma base | Fuera de este repositorio |
 | HTTPS | Certificado institucional en el gateway o en un proxy frontal | Pendiente de configurar en la infraestructura |

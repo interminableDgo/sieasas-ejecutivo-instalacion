@@ -1,10 +1,12 @@
-# SGSC · SIESAS Ejecutivo
+# SGSC · SIESAS Ejecutivo (instalación)
 
-**Sistema de Gestión de Solicitudes Ciudadanas (SGSC)**, aplicación **SIESAS · Ejecutivo**: tablero de indicadores, consulta y registro de solicitudes de apoyo para el personal directivo de la **Secretaría de Salud de Nuevo León**. Es el proyecto de titulación al que corresponde este repositorio.
+**Sistema de Gestión de Solicitudes Ciudadanas (SGSC)**, aplicación **SIESAS · Ejecutivo**: tablero de indicadores, consulta y registro de solicitudes de apoyo para el personal directivo de la **Secretaría de Salud de Nuevo León**.
+
+> **Este repositorio es la versión para instalar.** Proviene del repositorio del proyecto de titulación (SGSC), con su historial, pero **sin el prototipo Ciudadano**: no incluye su código, sus tablas ni su migración. Se instala sobre la base SSNL de referencia (§11).
 
 Documentación complementaria:
 - [`GUIA_DESPLIEGUE_INSTITUCIONAL.md`](GUIA_DESPLIEGUE_INSTITUCIONAL.md): procedimiento de instalación en un servidor de la Secretaría.
-- [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): cómo dejar Aiven, Render y Netlify; esquema, privilegios, TLS y corte.
+- [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): cómo dejar Aiven y Render; esquema, privilegios, TLS y corte.
 - [`backend/README.md`](backend/README.md): API, administración y correo.
 - [`pruebas/microservicios/README.md`](pruebas/microservicios/README.md): pruebas de la arquitectura de microservicios.
 
@@ -49,7 +51,7 @@ SGSC ofrece:
 - Información opcional ausente: «Sin información».
 
 **Fuera de alcance:**
-- el módulo **Ciudadano**: hay un prototipo con rutas `/ciudadano/*` en el núcleo, que el gateway no publica;
+- el módulo **Ciudadano**: no forma parte de este repositorio; el gateway responde 404 en `/ciudadano/*`;
 - regiones, prioridad por solicitud y fecha de cierre, porque el esquema SSNL no las respalda;
 - métricas de tiempos o SLA.
 
@@ -156,16 +158,31 @@ SGSC ofrece:
 
 ## 11. Base de datos MySQL
 
-- Esquema **SSNL** de la Secretaría (`Tbl_SolicitudesApoyo`, `Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_Users`, catálogos `Cat_*`, INEGI y RBAC `auth_*`). Hoy está en la base `siesas-v2` de Aiven.
-- **El esquema base no está en este repositorio.**
+- Esquema **SSNL** de la Secretaría (`Tbl_SolicitudesApoyo`, `Tbl_Beneficiarios`, `Tbl_Solicitantes`, `Tbl_Users`, catálogos `Cat_*`, INEGI y RBAC `auth_*`). Lo administra el sistema SSNL Gestoría de Apoyos (PHP/Yii 2).
+- **Versión de referencia:** la estructura que generan las migraciones de Yii del commit `710a73a` (13/11/2026) de [`TheRadikalStyle/ssnl-gestoria-apoyos`](https://github.com/TheRadikalStyle/ssnl-gestoria-apoyos), más las migraciones RBAC de Yii (`@yii/rbac/migrations`). Este repositorio se instala **sobre** esa base; no la crea.
 - SGSC le agrega, con migraciones aditivas (`backend/manage.py migrate`):
-  - `002_ssnl_ejecutivo.sql`: tablas `ejecutivo_*` y el rol `Ejecutivo`;
-  - `003_catalogos_solicitud.sql`: `Cat_Colonias` y catálogos socioeconómicos;
-  - columnas `ben_dom_colonia_id` y `sol_colonia_id`;
-  - `004_ciudadano.sql`: tablas del prototipo Ciudadano.
-- Se requiere MySQL 8 con InnoDB, `utf8mb4_unicode_ci`, UTC, `lower_case_table_names=0` y TLS.
+  - `002_ssnl_ejecutivo.sql`: tablas `ejecutivo_*` y el rol `Ejecutivo`. Las migraciones de SSNL ya las incluyen (`m261009_190410_create_tablesfor_udem`) con la misma estructura, así que sobre esa base no hace nada;
+  - `003_catalogos_solicitud.sql`: `Cat_Colonias` y los catálogos socioeconómicos (`Cat_ConQuienVive`, `Cat_Ocupaciones`, `Cat_FuentesIngreso`, `Cat_AreasEstudio`);
+  - las columnas `Tbl_Beneficiarios.ben_dom_colonia_id` y `Tbl_Solicitantes.sol_colonia_id`, opcionales y con FK a `Cat_Colonias`.
+- Las tablas nuevas toman el charset y la collation de la base, igual que las tablas de SSNL. Se requiere MySQL 8 con InnoDB, UTC, `lower_case_table_names=0` y TLS.
 - Las tablas, relaciones, índices y catálogos indispensables se detallan en `docs/MIGRACION_INFRAESTRUCTURA.md`.
 - `sgsc_salud_desde_cero.sql` y `backend/migrations/001_ejecutivo.sql` corresponden a un esquema anterior. **No deben ejecutarse sobre una base con datos**: el primero contiene `DROP DATABASE`.
+
+### 11.1 Qué cambia la instalación en la base SSNL
+
+Instalar el Ejecutivo sobre la base de referencia hace exactamente esto, y nada más:
+
+| Acción | Objeto |
+|---|---|
+| Crea 4 catálogos con sus opciones iniciales | `Cat_ConQuienVive` (8), `Cat_Ocupaciones` (10), `Cat_FuentesIngreso` (7), `Cat_AreasEstudio` (9) |
+| Crea el catálogo de colonias (vacío) | `Cat_Colonias`; se llena con `manage.py cargar-colonias` desde el archivo de SEPOMEX |
+| Agrega una columna opcional con FK a `Cat_Colonias` | `Tbl_Beneficiarios.ben_dom_colonia_id` |
+| Agrega una columna opcional con FK a `Cat_Colonias` | `Tbl_Solicitantes.sol_colonia_id` |
+
+- No modifica ni borra ninguna tabla, columna, índice ni llave de SSNL. `migrate` se puede repetir sin efectos adicionales.
+- **Qué se escribe en las columnas de SSNL al registrar una solicitud:** en `Tbl_Beneficiarios.ben_dom_colonia` (texto) se guarda el **nombre** de la colonia, como lo hace el administrador SSNL, y su clave en `ben_dom_colonia_id`. Las columnas socioeconómicas de SSNL (`ben_estsocioeco_*`, texto) reciben la descripción elegida del catálogo.
+- Los indicadores dependen de las descripciones exactas de `Cat_StatusAtencion` que trae SSNL: «Inicio», «Resuelto», «Resuelto con observación», «Cerrado / Cancelado» y «No es competencia».
+- **Verificación:** `pruebas/instalacion/` contiene el ensayo que crea una base limpia con las migraciones de SSNL, instala el Ejecutivo, comprueba que solo se agregue lo anterior y corre las pruebas con MySQL real (ver su README).
 
 ## 12. Requisitos para ejecutar el proyecto
 
@@ -205,7 +222,6 @@ Se definen en **`backend/.env`**, ignorado por git. La plantilla es `backend/.en
 | `DB_SSL` | `true` para exigir TLS |
 | `DB_SSL_CA` | Ruta del PEM de la CA de MySQL. Docker la sustituye por `/run/secrets/db_ca`. |
 | `CORS_ORIGINS` | Orígenes permitidos para el núcleo, separados por comas |
-| `CORS_ORIGIN_REGEX` | Opcional, solo el núcleo. Por omisión admite `*.netlify.app` (prototipo Ciudadano). |
 | `AUTH_ENCRYPTION_KEY` | Clave Fernet que cifra los secretos TOTP; consérvala. Se genera con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
 | `RESET_URL` | Dirección pública de Flutter web para el enlace de recuperación |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SSL`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME` | Correo. Sin ellas no se envían correos. |
@@ -279,7 +295,7 @@ Las evidencias de la última validación están en `pruebas/microservicios/evide
 SGSC/
 ├── README.md                         este documento
 ├── GUIA_DESPLIEGUE_INSTITUCIONAL.md  instalación en la Secretaría
-├── docs/MIGRACION_INFRAESTRUCTURA.md salida de Aiven, Render y Netlify
+├── docs/MIGRACION_INFRAESTRUCTURA.md salida de Aiven y Render
 ├── docker-compose.yml                gateway + núcleo + 4 microservicios
 ├── render.yaml                       despliegue actual del monolito en Render (rama dev)
 ├── iniciar.ps1                       arranque local sin Docker
@@ -290,9 +306,9 @@ SGSC/
 │   ├── app/                          núcleo / monolito FastAPI (routers, services, schemas, plantillas)
 │   ├── libs/sgsc_common/             librería común de los microservicios
 │   ├── services/{indicadores,detalle,registro,reportes}/   microservicios
-│   ├── migrations/                   SQL aditivo (002, 003, 004; 001 es histórico)
+│   ├── migrations/                   SQL aditivo (002, 003; 001 es histórico)
 │   ├── tests/                        pruebas del monolito
-│   ├── manage.py                     migrate, create-user, setup-2fa, cargar-colonias, ciudadano-*
+│   ├── manage.py                     migrate, create-user, setup-2fa, cargar-colonias
 │   ├── serve_web.py                  servidor local de Flutter web (iniciar.ps1)
 │   ├── Dockerfile.nucleo, .dockerignore, pytest.ini
 │   └── requirements.txt, requirements.lock.txt, .env.example
@@ -300,7 +316,8 @@ SGSC/
 ├── pruebas/
 │   ├── microservicios/               pruebas, informes y evidencias de la arquitectura
 │   ├── sprint_1/ sprint_2/ sprint_3/ evidencias de pruebas por sprint (tesis)
-│   └── usabilidad/                   pruebas de usabilidad (antes/después)
+│   ├── instalacion/                  ensayo de instalación sobre la base SSNL de referencia
+│   └── usabilidad/                   prueba de usabilidad del Ejecutivo (antes/después)
 ```
 
 `logo/` y `promocion/` ya no forman parte del repositorio. Se archivaron fuera, en la carpeta de la tesis (`TESIS/logo` y `TESIS/promocion`).
@@ -319,7 +336,7 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | `backend/app/` | Núcleo FastAPI: autenticación, rutas del Ejecutivo, servicios, esquemas y plantillas de correo | Sí, lo levanta `docker-compose.yml` y también `iniciar.ps1` | Ejecución |
 | `backend/services/{indicadores,detalle,registro,reportes}/` | Los cuatro microservicios, cada uno con su `Dockerfile` y sus pruebas | Sí, contenedores de `docker-compose.yml` | Ejecución |
 | `backend/libs/sgsc_common/` | Librería común de los microservicios: base de datos, validación de sesión, consultas y utilidades web | Sí, la instala cada microservicio | Ejecución |
-| `backend/migrations/` | SQL aditivo que `manage.py migrate` aplica sobre el esquema SSNL (002–004) | Sí, en la instalación | Ejecución (`001` es obsoleta) |
+| `backend/migrations/` | SQL aditivo que `manage.py migrate` aplica sobre el esquema SSNL (002–003) | Sí, en la instalación | Ejecución (`001` es obsoleta) |
 | `backend/manage.py`, `Dockerfile.nucleo`, `requirements*.txt`, `.env.example` | Comandos de administración, imagen del núcleo, dependencias y plantilla de variables | Sí | Ejecución |
 | `backend/tests/` | Pruebas del monolito | No | Desarrollo |
 | `backend/serve_web.py` | Servidor local de Flutter web que usa `iniciar.ps1` | Solo en local | Desarrollo |
@@ -335,7 +352,8 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | `AGENTS.md` | Reglas de desarrollo del proyecto | No | Desarrollo |
 | `pruebas/microservicios/` | Pruebas de integración, independencia, entorno offline, recorrido E2E con Playwright, informes y evidencias de la arquitectura | No | Desarrollo (`evidencias/` e informes: también Académica) |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` | Evidencias de pruebas por sprint | No | Académica |
-| `pruebas/usabilidad/` | Pruebas de usabilidad con capturas antes/después | No | Académica |
+| `pruebas/instalacion/` | Ensayo de instalación sobre la base SSNL de referencia: estructura, cambios permitidos y pruebas con MySQL real | No | Desarrollo |
+| `pruebas/usabilidad/` | Prueba de usabilidad del Ejecutivo con capturas antes/después | No | Académica |
 | `logo/` *(archivada fuera del repo)* | Propuestas de logotipo SIEASAS: ronda 1 (4 conceptos), ronda 2 (4 conceptos y `generar_logos.py`) y las comparativas | **No.** La app usa `assets/nl-logo.png` y ninguna propuesta se integró | Académica |
 | `promocion/` *(archivada fuera del repo)* | Material de difusión: guion del póster, página de producto (`sieasas.html`, `sitio/`), guía para publicarla en Lovable (`LOVABLE.md`), calcomanía con QR y tarjetas para el jurado | **No.** Ningún archivo del sistema la referencia | Académica |
 | `sgsc_salud_desde_cero.sql` | Esquema anterior `sgsc_salud`; contiene `DROP DATABASE` | No | Obsoleta (riesgo si se ejecuta) |
@@ -354,7 +372,7 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | Transporte | HTTP en `127.0.0.1` | HTTPS con un dominio institucional (proxy o TLS en el gateway) |
 | API pública | Render (monolito) | Gateway propio; Render se retira |
 | `API_BASE_URL` de Flutter | `http://localhost:8080` o `http://127.0.0.1:8000` | `https://<dominio>` |
-| CORS | `localhost`; `*.netlify.app` en el núcleo | Solo el dominio institucional |
+| CORS | `localhost` | Solo el dominio institucional |
 | Correo | SMTP configurado localmente; enlaces a `localhost` | SMTP institucional y `RESET_URL` HTTPS |
 | Datos | Expedientes de ejemplo SSNL más algunos registros de prueba marcados «PRUEBA» | Datos reales; depuración previa con autorización |
 | Respaldos y monitoreo | Los del proveedor (Aiven) | Política de TI |
@@ -371,14 +389,14 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 6. SMTP institucional.
 7. Firewall: usuarios → 443; servidor → MySQL; nada más publicado.
 8. Respaldos, bitácoras y actualizaciones de seguridad a cargo de TI.
-9. Decisiones de la Secretaría: transferir o no los datos de Aiven, Ciudadano, el administrador PHP y el aviso de privacidad.
+9. Decisiones de la Secretaría: transferir o no los datos de Aiven, el administrador PHP y el aviso de privacidad.
 
 ## Entrega a la Secretaría
 
 **Necesario para desplegar:**
 - `docker-compose.yml`;
 - `gateway/` (sin `tests/`);
-- `backend/`: `app/`, `libs/sgsc_common/sgsc_common/` (con `pyproject.toml`), `services/*/` (paquete, `Dockerfile` y `requirements.txt`), `migrations/` (002–004), `manage.py`, `Dockerfile.nucleo`, `.dockerignore`, `requirements*.txt` y `.env.example`;
+- `backend/`: `app/`, `libs/sgsc_common/sgsc_common/` (con `pyproject.toml`), `services/*/` (paquete, `Dockerfile` y `requirements.txt`), `migrations/` (002–003), `manage.py`, `Dockerfile.nucleo`, `.dockerignore`, `requirements*.txt` y `.env.example`;
 - la compilación `sgsc_ejecutiva/build/web`, o el código para generarla;
 - esta documentación.
 
@@ -404,7 +422,7 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 | Ruta | Para qué servía | Por qué ya no parece necesario | Referencias | Si se elimina | Recomendación |
 |---|---|---|---|---|---|
 | `sgsc_salud_desde_cero.sql` | Crear el esquema anterior `sgsc_salud` desde cero | Se reemplazó por el esquema SSNL (`siesas-v2`). Contiene `DROP DATABASE`: es un riesgo si alguien lo ejecuta por error. | `backend/README.md` (advertencia), esta documentación | Ningún código lo usa | **Archivar fuera** (junto con la tesis) y quitar del repo |
-| `backend/migrations/001_ejecutivo.sql` | Tablas `ejecutivo_*` para el esquema anterior | `migrate` solo aplica 002–004; 002 recrea lo mismo para SSNL | `docs/MIGRACION_INFRAESTRUCTURA.md` (como histórico) | Ningún efecto en la ejecución | Archivar o eliminar |
+| `backend/migrations/001_ejecutivo.sql` | Tablas `ejecutivo_*` para el esquema anterior | `migrate` solo aplica 002–003; 002 recrea lo mismo para SSNL | `docs/MIGRACION_INFRAESTRUCTURA.md` (como histórico) | Ningún efecto en la ejecución | Archivar o eliminar |
 | `backend/seed_comparison_demo.py` | Insertar solicitudes sintéticas para demostrar la comparación de periodos | Escribe en la base; no se usa en pruebas ni en `manage.py` | Ninguna | Ninguno | Eliminar (o archivar) |
 | `backend/app/routers/catalogos.py`, `dashboard.py`, `indicadores.py`, `solicitudes.py` | Rutas antiguas del Ejecutivo | `main.py` no los publica: no aplicaban la validación de rol y entidad. `executive.py` los sustituye. | No se importan | Ninguno; se elimina código muerto | Eliminar tras revisión |
 | Archivos **vacíos** (0 bytes) del backend: `app/schemas/filtros.py`, `app/schemas/solicitudes.py`, `app/services/indicadores_service.py`, `app/services/solicitudes_service.py` | Esqueletos iniciales | No tienen contenido | No se importan | Ninguno | Eliminar |
@@ -414,9 +432,8 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 | `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma de Flutter | La app es solo web y nunca se compiló en esas plataformas | `flutter` las usa solo al compilar para ellas | Se pierde la opción de compilar a esas plataformas sin regenerarlas (`flutter create .`) | Conservar si se planea móvil; si no, eliminar |
 | `render.yaml` | Desplegar el monolito en Render | Sobra cuando la Secretaría use su infraestructura | Render lo lee desde `dev` | Render deja de actualizarse desde el repo | **Conservar** mientras Render esté en uso |
 | `iniciar.ps1`, `backend/serve_web.py` | Ejecución local sin Docker | Docker Compose cubre el despliegue | `serve_web.py` lo usa `iniciar.ps1` | Se pierde el modo de desarrollo rápido | Conservar (desarrollo) |
-| `backend/app/routers/ciudadano.py`, `services/ciudadano_service.py`, `migrations/004_ciudadano.sql`, `manage.py ciudadano-*` | Prototipo Ciudadano (Netlify) | Fuera del alcance actual; el gateway no lo publica | `main.py`, pruebas del monolito, Render | Se rompe el prototipo publicado en Netlify | **Conservar** hasta decidir sobre Ciudadano |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` (~1.4 MB) | Evidencias de pruebas por sprint | Material de tesis, no de ejecución | Documento de tesis | Se pierde la trazabilidad desde el repo | **Archivar** fuera (con la tesis) |
-| `pruebas/usabilidad/` (~3 MB) | Pruebas de usabilidad y capturas antes/después | Material de tesis | Documento de tesis | Igual | Archivar |
+| `pruebas/usabilidad/` | Prueba de usabilidad del Ejecutivo y capturas antes/después | Material de tesis | Documento de tesis | Igual | Archivar |
 | `logo/` (~2.8 MB), `promocion/` (~5.2 MB) | Diseño del logotipo, póster, sitio y calcomanías | Material de difusión; la app usa sus propios assets | Ninguna desde el código | Ninguno en la app | **Hecho:** archivadas en la carpeta de la tesis y retiradas del repo |
 | `pruebas/microservicios/evidencias/` | Evidencia de la validación de microservicios | Útil para la tesis y como referencia | Informes E2E y Registro | Se pierde la trazabilidad de la validación | Conservar (o archivar con la tesis) |
 

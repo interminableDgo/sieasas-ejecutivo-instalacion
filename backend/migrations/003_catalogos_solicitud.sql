@@ -1,5 +1,6 @@
 -- Catálogos para eliminar la captura libre en el registro de solicitudes del Ejecutivo.
 -- Aditiva: las columnas originales de SSNL se conservan y se siguen llenando con la descripción del catálogo.
+-- Sin charset ni collation fijos: las tablas toman los de la base, igual que las tablas de SSNL.
 CREATE TABLE IF NOT EXISTS Cat_Colonias (
  id INT AUTO_INCREMENT PRIMARY KEY,
  municipio_id INT NOT NULL,
@@ -9,29 +10,29 @@ CREATE TABLE IF NOT EXISTS Cat_Colonias (
  is_active TINYINT(1) NOT NULL DEFAULT 1,
  created INT NULL,
  updated INT NULL,
- -- utf8mb4_unicode_ci compara sin distinguir mayúsculas ni acentos: «Centro» y «centro» son la misma colonia.
+ -- Charset y collation: los de la base donde se instala (las collations de MySQL comparan sin distinguir mayúsculas).
  UNIQUE KEY uq_colonia_ubicacion (municipio_id, codigo_postal, nombre),
  INDEX idx_colonia_cp (codigo_postal),
  CONSTRAINT fk_colonia_municipio FOREIGN KEY (municipio_id) REFERENCES INEGI_Cat_Municipios(id),
  CONSTRAINT chk_colonia_cp CHECK (codigo_postal REGEXP '^[0-9]{5}$')
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS Cat_ConQuienVive (
  id INT AUTO_INCREMENT PRIMARY KEY, descripcion VARCHAR(50) NOT NULL UNIQUE,
  is_active TINYINT(1) NOT NULL DEFAULT 1, created INT NULL, updated INT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS Cat_Ocupaciones (
  id INT AUTO_INCREMENT PRIMARY KEY, descripcion VARCHAR(150) NOT NULL UNIQUE,
  is_active TINYINT(1) NOT NULL DEFAULT 1, created INT NULL, updated INT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS Cat_FuentesIngreso (
  id INT AUTO_INCREMENT PRIMARY KEY, descripcion VARCHAR(150) NOT NULL UNIQUE,
  is_active TINYINT(1) NOT NULL DEFAULT 1, created INT NULL, updated INT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS Cat_AreasEstudio (
  id INT AUTO_INCREMENT PRIMARY KEY, descripcion VARCHAR(150) NOT NULL UNIQUE,
  is_active TINYINT(1) NOT NULL DEFAULT 1, created INT NULL, updated INT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB;
 
 INSERT IGNORE INTO Cat_ConQuienVive (descripcion,created,updated) VALUES
  ('Solo(a)',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),('Pareja',UNIX_TIMESTAMP(),UNIX_TIMESTAMP()),
