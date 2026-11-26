@@ -2,6 +2,8 @@
 
 Esta guía explica cómo montar SGSC en un servidor de la Secretaría de Salud de Nuevo León, desde un servidor vacío hasta tener la aplicación del Ejecutivo funcionando.
 
+> **Servidor asignado.** La Secretaría asignó un **Windows Server 2019 Standard sin internet**, que no ejecuta los contenedores Linux de esta guía. Para ese servidor se usa [`GUIA_INSTALACION_WINDOWS.md`](GUIA_INSTALACION_WINDOWS.md) (paquete sin conexión, Python 3.12 e IIS). Esta guía queda como alternativa si TI proporciona un servidor Linux con Docker; sus secciones sobre base de datos, variables, HTTPS, firewall, pruebas y respaldos aplican a ambos casos.
+
 Sobre la base de datos se complementa con [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): las referencias «Migración §N» apuntan a ese documento.
 
 > **Estado.** La arquitectura se probó **localmente**: Windows 11, Docker Desktop 4.99 con WSL 2, y MySQL 8.4 en Aiven. **No se ha desplegado** en un servidor institucional, con HTTPS, con una base institucional ni con usuarios de privilegios mínimos. Esta guía **no** declara el sistema listo para producción: indica qué falta validar.

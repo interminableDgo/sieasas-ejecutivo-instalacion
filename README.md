@@ -5,7 +5,8 @@
 > **Este repositorio es la versión para instalar.** Proviene del repositorio del proyecto de titulación (SGSC), con su historial, pero **sin el prototipo Ciudadano**: no incluye su código, sus tablas ni su migración. Se instala sobre la base SSNL de referencia (§11).
 
 Documentación complementaria:
-- [`GUIA_DESPLIEGUE_INSTITUCIONAL.md`](GUIA_DESPLIEGUE_INSTITUCIONAL.md): procedimiento de instalación en un servidor de la Secretaría.
+- [`GUIA_INSTALACION_WINDOWS.md`](GUIA_INSTALACION_WINDOWS.md): **instalación en el servidor de la Secretaría** (Windows Server 2019, sin internet, sin Docker), con el paquete sin conexión de `windows/`.
+- [`GUIA_DESPLIEGUE_INSTITUCIONAL.md`](GUIA_DESPLIEGUE_INSTITUCIONAL.md): procedimiento alternativo en un servidor Linux con Docker.
 - [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): cómo dejar Aiven y Render; esquema, privilegios, TLS y corte.
 - [`backend/README.md`](backend/README.md): API, administración y correo.
 - [`pruebas/microservicios/README.md`](pruebas/microservicios/README.md): pruebas de la arquitectura de microservicios.
@@ -294,7 +295,9 @@ Las evidencias de la última validación están en `pruebas/microservicios/evide
 ```
 SGSC/
 ├── README.md                         este documento
-├── GUIA_DESPLIEGUE_INSTITUCIONAL.md  instalación en la Secretaría
+├── GUIA_INSTALACION_WINDOWS.md       instalación en la Secretaría (Windows Server, sin internet)
+├── GUIA_DESPLIEGUE_INSTITUCIONAL.md  alternativa con Docker en Linux
+├── windows/                          instalar.ps1, armar_paquete.ps1, api.ps1 y web.config de IIS
 ├── docs/MIGRACION_INFRAESTRUCTURA.md salida de Aiven y Render
 ├── docker-compose.yml                gateway + núcleo + 4 microservicios
 ├── render.yaml                       despliegue actual del monolito en Render (rama dev)
@@ -345,10 +348,11 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | `sgsc_ejecutiva/lib/`, `web/`, `assets/`, `pubspec.*` | App Flutter del Ejecutivo: código, página web base, logo (`nl-logo.png`), municipios y fuente Mulish | Sí, se compila en `build/web` | Ejecución |
 | `sgsc_ejecutiva/test/` | Pruebas de widgets y servicios de Flutter | No | Desarrollo |
 | `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma generadas por Flutter | No, la app es solo web | Obsoleta salvo que se planee una versión móvil o de escritorio |
-| `docker-compose.yml` | Define los seis contenedores (gateway, núcleo y cuatro microservicios) | Sí | Ejecución |
+| `windows/` | Instalación en Windows Server sin Docker: `armar_paquete.ps1` (paquete sin conexión), `instalar.ps1` (nueve pasos), `api.ps1` (mantiene la API encendida) y `web.config` (IIS en lugar de Nginx) | Sí, en el servidor de la Secretaría | Ejecución |
+| `docker-compose.yml` | Define los seis contenedores (gateway, núcleo y cuatro microservicios) | Sí, en la alternativa con Docker | Ejecución |
 | `render.yaml` | Despliegue actual del monolito en Render desde `dev` | Sí, mientras se use Render | Ejecución temporal |
 | `iniciar.ps1` | Arranque local sin Docker | Solo en local | Desarrollo |
-| `README.md`, `GUIA_DESPLIEGUE_INSTITUCIONAL.md`, `docs/` | Documentación técnica, de despliegue y de migración de infraestructura | — | Ejecución (documentación que se entrega) |
+| `README.md`, `GUIA_INSTALACION_WINDOWS.md`, `GUIA_DESPLIEGUE_INSTITUCIONAL.md`, `docs/` | Documentación técnica, de despliegue y de migración de infraestructura | — | Ejecución (documentación que se entrega) |
 | `AGENTS.md` | Reglas de desarrollo del proyecto | No | Desarrollo |
 | `pruebas/microservicios/` | Pruebas de integración, independencia, entorno offline, recorrido E2E con Playwright, informes y evidencias de la arquitectura | No | Desarrollo (`evidencias/` e informes: también Académica) |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` | Evidencias de pruebas por sprint | No | Académica |
@@ -366,7 +370,7 @@ Cada carpeta tiene una de cuatro clasificaciones:
 
 | Aspecto | Desarrollo (probado) | Producción institucional (pendiente) |
 |---|---|---|
-| Ejecución | `iniciar.ps1` (monolito en `:8000`, Flutter en `:5173`) o Docker Desktop | Docker Engine en un servidor (Linux recomendado) |
+| Ejecución | `iniciar.ps1` (monolito en `:8000`, Flutter en `:5173`) o Docker Desktop | Windows Server 2019 sin internet: monolito como tarea de inicio e IIS como proxy ([guía](GUIA_INSTALACION_WINDOWS.md)); Docker solo en un servidor Linux |
 | Base de datos | MySQL 8.4 en Aiven (`siesas-v2`) | MySQL 8 institucional con el esquema SSNL |
 | Usuario de MySQL | Uno solo para todos los servicios | Uno por función, con privilegios mínimos |
 | Transporte | HTTP en `127.0.0.1` | HTTPS con un dominio institucional (proxy o TLS en el gateway) |
@@ -379,10 +383,10 @@ Cada carpeta tiene una de cuatro clasificaciones:
 
 ## 20. Requisitos para desplegarlo institucionalmente
 
-En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y en [la migración](docs/MIGRACION_INFRAESTRUCTURA.md):
+En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS.md), en la [guía con Docker](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y en [la migración](docs/MIGRACION_INFRAESTRUCTURA.md):
 
 1. **Cambiar variables de entorno no basta.** Se necesita la base SSNL de la Secretaría, a la que luego se aplican las migraciones de SGSC, el catálogo de colonias y las cuentas Ejecutivo.
-2. Un servidor con Docker y Compose, o la alternativa que defina TI.
+2. El servidor asignado es Windows Server 2019 sin internet: se instala con el paquete de `windows/armar_paquete.ps1` y `windows/instalar.ps1` (Python 3.12, IIS con URL Rewrite y ARR). En un servidor Linux, Docker y Compose.
 3. MySQL 8 configurado como indica la migración (§3), con TLS y su CA.
 4. Dominio y certificado HTTPS. Si hay un proxy delante del gateway, ajustar `real_ip` en Nginx.
 5. Flutter web compilado con la URL HTTPS.
@@ -393,7 +397,9 @@ En resumen; el detalle está en la [guía](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y e
 
 ## Entrega a la Secretaría
 
-**Necesario para desplegar:**
+**Necesario para desplegar en el servidor de la Secretaría (Windows):** el paquete `paquete_sieasas.zip` que genera `windows/armar_paquete.ps1` (código, app compilada, librerías e instaladores), y `backend/.env` y la CA entregados por un canal seguro.
+
+**Necesario para desplegar con Docker (Linux):**
 - `docker-compose.yml`;
 - `gateway/` (sin `tests/`);
 - `backend/`: `app/`, `libs/sgsc_common/sgsc_common/` (con `pyproject.toml`), `services/*/` (paquete, `Dockerfile` y `requirements.txt`), `migrations/` (002–003), `manage.py`, `Dockerfile.nucleo`, `.dockerignore`, `requirements*.txt` y `.env.example`;

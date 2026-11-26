@@ -45,3 +45,7 @@ CLAUDE.local.md
 SKILL.md
 SKILLS.md
 *ClaudeCode*.txt
+
+# Instalacion en Windows: bitacoras de la API y respaldos de la base
+backend/logs/
+backend/respaldos/
