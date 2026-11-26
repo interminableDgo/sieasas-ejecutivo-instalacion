@@ -79,13 +79,13 @@ Se realizaron pruebas enfocadas en la conservación de los filtros, la generaci�
 
 La siguiente captura muestra la ventana de exportación con el periodo aplicado, la selección de formato y la indicación de que el reporte contiene información agregada.
 
-![Ventana de exportación con periodo aplicado y selección de formato](C:/Users/aldop/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/evidencias/interfaz/HU6-exportacion-filtros-datos-sinteticos.png)
+![Ventana de exportación con periodo aplicado y selección de formato](evidencias/interfaz/HU6-exportacion-filtros-datos-sinteticos.png)
 
 *Figura [número pendiente]. Exportación de reportes con el periodo aplicado. Prueba de interfaz con datos sintéticos y API simulada. Fuente: elaboración propia.*
 
 La segunda captura muestra el mensaje presentado ante un error de generación. El periodo y el formato seleccionado permanecen visibles para permitir el reintento.
 
-![Mensaje de error de exportación y opción de reintento](C:/Users/aldop/Documents/Codex/2026-10-02/referenced-chatgpt-conversation-this-is-an/outputs/evidencias/interfaz/HU6-error-reintento-datos-sinteticos.png)
+![Mensaje de error de exportación y opción de reintento](evidencias/interfaz/HU6-error-reintento-datos-sinteticos.png)
 
 *Figura [número pendiente]. Manejo de un error de exportación y disponibilidad del reintento. Prueba de interfaz con respuesta de error simulada. Fuente: elaboración propia.*
 

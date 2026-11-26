@@ -77,7 +77,7 @@ def live():
     transaction=connection.begin()
     connection.exec_driver_sql('START TRANSACTION')
     db=Session(bind=connection,join_transaction_mode='create_savepoint')
-    address=f'codex-test-{uuid.uuid4().hex}@example.com'
+    address=f'prueba-{uuid.uuid4().hex}@example.com'
     password='Una frase de prueba segura 2026'
     uid=db.execute(text("INSERT INTO Tbl_Users (us_name,us_lastname,us_email,us_account,us_pwd,us_phone,us_rol,is_active,createdBy,updatedBy) VALUES (:n,:a,:e,:e,:p,'','Ejecutivo',1,0,0)"),
       {'n':'Prueba temporal','a':'Transacción','e':address,'p':hasher.hash(password)}).lastrowid

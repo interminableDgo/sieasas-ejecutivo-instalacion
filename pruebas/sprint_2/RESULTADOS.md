@@ -49,7 +49,7 @@ Los registros completos están en `evidencias/`. `ejecucion.json` registra la pr
 
 - Una aserción inicial tomaba la definición textual «Otros estatus» en lugar del indicador numérico homónimo. Se corrigió la selección de celdas numéricas en la prueba.
 - La primera prueba del calendario encontró que su botón en modo de entrada textual utilizaba otra etiqueta. Se configuró `confirmText` junto con `saveText` y el flujo completo pasó.
-- El entorno backend no tenía un lector PDF y la instalación intentada falló por una ruta de certificados de la máquina. No se alteraron certificados ni se deshabilitó TLS. La lectura se resolvió mediante el Python incluido en Codex, que ya contiene pypdf; las pruebas finales de PDF no se omitieron.
+- El entorno backend no tenía un lector PDF y la instalación intentada falló por una ruta de certificados de la máquina. No se alteraron certificados ni se deshabilitó TLS. La lectura se resolvió con otro Python que ya contenía pypdf; las pruebas finales de PDF no se omitieron.
 - El renderizador Poppler emitió avisos de fuentes opcionales Symbol/ArialUnicode. Las dos páginas se generaron y se inspeccionaron visualmente sin defectos observados.
 - Permanecen dos advertencias de deprecación en Starlette/httpx/AnyIO. No son fallos de las pruebas y no se actualizaron dependencias ajenas a HU6.
 
@@ -65,7 +65,7 @@ Los registros completos están en `evidencias/`. `ejecucion.json` registra la pr
 
 ## Repetición de la verificación
 
-Desde la raíz del proyecto, definir `PDF_TEST_PYTHON` con un Python que disponga de `pypdf` si no está instalado en el entorno backend. En esta máquina se utilizó el runtime de Codex indicado en los registros de la sesión. Ejecutar:
+Desde la raíz del proyecto, definir `PDF_TEST_PYTHON` con un Python que disponga de `pypdf` si no está instalado en el entorno backend. En esta máquina se utilizó otro Python con pypdf instalado. Ejecutar:
 
 ```powershell
 & backend/.venv/Scripts/python.exe pruebas/sprint_2/ejecutar_hu6.py

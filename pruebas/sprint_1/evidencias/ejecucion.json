@@ -16,7 +16,7 @@
     "inicio_utc": "2026-09-28T22:29:03.460534+00:00",
     "codigo_salida": 0,
     "comando": [
-      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "flutter/bin/flutter.bat",
       "test",
       "--no-pub",
       "--reporter",
@@ -28,7 +28,7 @@
     "inicio_utc": "2026-09-28T22:29:39.940900+00:00",
     "codigo_salida": 0,
     "comando": [
-      "C:/Users/aldop/Documents/Codex/2026-09-20/referenced-chatgpt-conversation-this-is-an/work/flutter/bin/flutter.bat",
+      "flutter/bin/flutter.bat",
       "analyze",
       "--no-pub"
     ]

@@ -302,7 +302,6 @@ SGSC/
 ├── docker-compose.yml                gateway + núcleo + 4 microservicios
 ├── render.yaml                       despliegue actual del monolito en Render (rama dev)
 ├── iniciar.ps1                       arranque local sin Docker
-├── AGENTS.md                         instrucciones de desarrollo del proyecto
 ├── sgsc_salud_desde_cero.sql         esquema ANTERIOR (no usar; ver la última sección)
 ├── gateway/                          Nginx: nginx.conf, Dockerfile, pruebas de rutas
 ├── backend/
@@ -353,7 +352,6 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | `render.yaml` | Despliegue actual del monolito en Render desde `dev` | Sí, mientras se use Render | Ejecución temporal |
 | `iniciar.ps1` | Arranque local sin Docker | Solo en local | Desarrollo |
 | `README.md`, `GUIA_INSTALACION_WINDOWS.md`, `GUIA_DESPLIEGUE_INSTITUCIONAL.md`, `docs/` | Documentación técnica, de despliegue y de migración de infraestructura | — | Ejecución (documentación que se entrega) |
-| `AGENTS.md` | Reglas de desarrollo del proyecto | No | Desarrollo |
 | `pruebas/microservicios/` | Pruebas de integración, independencia, entorno offline, recorrido E2E con Playwright, informes y evidencias de la arquitectura | No | Desarrollo (`evidencias/` e informes: también Académica) |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` | Evidencias de pruebas por sprint | No | Académica |
 | `pruebas/instalacion/` | Ensayo de instalación sobre la base SSNL de referencia: estructura, cambios permitidos y pruebas con MySQL real | No | Desarrollo |
@@ -410,8 +408,7 @@ En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS
 - `sgsc_ejecutiva/` completo, con `test/`;
 - todas las pruebas (`backend/tests`, `backend/services/*/tests`, `backend/libs/sgsc_common/tests`, `gateway/tests`, `pruebas/microservicios/`);
 - `backend/pytest.ini` e `iniciar.ps1`;
-- `backend/serve_web.py`;
-- `AGENTS.md`.
+- `backend/serve_web.py`.
 
 **No se entregan dentro del repositorio:**
 - `backend/.env`, la CA y cualquier credencial (se entregan por un canal seguro o los genera TI);
