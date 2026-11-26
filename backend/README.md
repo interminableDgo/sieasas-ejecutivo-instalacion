@@ -12,7 +12,7 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Antes de migrar, completar `.env`: host, puerto, usuario y contraseña de Aiven, DB_NAME=siesas-v2, DB_SSL=true y DB_SSL_CA con la ruta de ca.pem. La conexión valida el certificado y nombre de servidor. No ejecutar `sgsc_salud_desde_cero.sql` sobre una base con datos: contiene DROP DATABASE. La migración nueva es aditiva.
+Antes de migrar, completar `.env`: host, puerto, usuario y contraseña de MySQL, DB_NAME=siesas-v2, DB_SSL=true y DB_SSL_CA con la ruta de ca.pem. La conexión valida el certificado y nombre de servidor. No ejecutar `sgsc_salud_desde_cero.sql` sobre una base con datos: contiene DROP DATABASE. La migración nueva es aditiva.
 
 ## Administración local
 
@@ -88,7 +88,7 @@ La base `sgsc_salud` permanece intacta. Para volver también hay que restaurar e
 
 ## Ejecución con Docker (gateway y microservicios)
 
-Arquitectura de la tesis (2.8.4, 3.9 y Figura 53): App Ejecutiva → API Gateway Nginx → cuatro microservicios FastAPI, más el núcleo (`app/`, sin cambios) para `/auth/*`. La ejecución local con `iniciar.ps1` y el despliegue de Render siguen usando `app/` sin cambios.
+Arquitectura de la tesis (2.8.4, 3.9 y Figura 53): App Ejecutiva → API Gateway Nginx → cuatro microservicios FastAPI, más el núcleo (`app/`, sin cambios) para `/auth/*`. La ejecución local con `iniciar.ps1` sigue usando `app/` sin cambios.
 
 | Servicio | Carpeta | Rutas |
 |---|---|---|

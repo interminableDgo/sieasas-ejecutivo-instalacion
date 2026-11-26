@@ -6,7 +6,7 @@ deben devolver exactamente el mismo JSON para las mismas consultas. Solo hace GE
     $env:SGSC_TEST_TOKEN = '<token de sesión emitido manualmente>'
     python -m pytest pruebas/microservicios/integracion/test_paridad.py -q
 
-Ambos despliegues usan la misma base de Aiven y validan el mismo token.
+Ambos despliegues usan la misma base de datos y validan el mismo token.
 """
 import io
 import os

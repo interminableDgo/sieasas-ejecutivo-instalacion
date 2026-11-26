@@ -4,9 +4,8 @@ Esta guía explica cómo montar SGSC en un servidor de la Secretaría de Salud d
 
 > **Servidor asignado.** La Secretaría asignó un **Windows Server 2019 Standard sin internet**, que no ejecuta los contenedores Linux de esta guía. Para ese servidor se usa [`GUIA_INSTALACION_WINDOWS.md`](GUIA_INSTALACION_WINDOWS.md) (paquete sin conexión, Python 3.12 e IIS). Esta guía queda como alternativa si TI proporciona un servidor Linux con Docker; sus secciones sobre base de datos, variables, HTTPS, firewall, pruebas y respaldos aplican a ambos casos.
 
-Sobre la base de datos se complementa con [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): las referencias «Migración §N» apuntan a ese documento.
 
-> **Estado.** La arquitectura se probó **localmente**: Windows 11, Docker Desktop 4.99 con WSL 2, y MySQL 8.4 en Aiven. **No se ha desplegado** en un servidor institucional, con HTTPS, con una base institucional ni con usuarios de privilegios mínimos. Esta guía **no** declara el sistema listo para producción: indica qué falta validar.
+> **Estado.** La arquitectura se probó **localmente**: Windows 11, Docker Desktop 4.99 con WSL 2, y MySQL 8.4 de desarrollo. **No se ha desplegado** en un servidor institucional, con HTTPS, con una base institucional ni con usuarios de privilegios mínimos. Esta guía **no** declara el sistema listo para producción: indica qué falta validar.
 
 Leyenda: ✅ probado localmente · ⏳ pendiente de validar en la infraestructura institucional · ❓ decisión que debe confirmar la Secretaría o TI.
 
@@ -18,7 +17,7 @@ Leyenda: ✅ probado localmente · ⏳ pendiente de validar en la infraestructur
 |---|---|---|
 | Servidor de aplicación | Linux x86-64 con Docker Engine y Docker Compose v2 o posterior. Las imágenes son Linux (`python:3.12-slim`, `nginx:1.27-alpine`). Windows con Docker Desktop solo se probó para desarrollo. | ✅ en Docker Desktop · ⏳ en servidor Linux · ❓ SO y si se permite Docker |
 | Recursos orientativos | 2 vCPU, 4 GB de RAM y 20 GB de disco para seis contenedores, imágenes y bitácoras. Es una estimación; no se midió con carga. | ⏳ |
-| Base de datos | MySQL 8.x con el esquema **SSNL** y las migraciones de SGSC (Migración §3–§7) | ✅ MySQL 8.4.11 (Aiven) · ⏳ institucional |
+| Base de datos | MySQL 8.x con el esquema **SSNL** y las migraciones de SGSC | ✅ MySQL 8.4.11 (desarrollo) · ⏳ institucional |
 | Dominio y certificado HTTPS | Por ejemplo `sgsc.<dominio institucional>`, con su certificado | ❓ |
 | Correo SMTP | Para recuperar contraseñas | ✅ con el SMTP actual · ❓ institucional |
 | Equipo de compilación | Flutter SDK (canal estable) para generar `sgsc_ejecutiva/build/web`. Puede ser otro equipo; solo se copia la carpeta resultante. | ✅ |
@@ -40,7 +39,6 @@ Leyenda: ✅ probado localmente · ⏳ pendiente de validar en la infraestructur
 - **No incluidos:**
   - el prototipo **Ciudadano**: no forma parte de este repositorio; el gateway responde 404 en `/ciudadano/*`;
   - el administrador PHP/Yii 2 de SSNL;
-  - la base de datos (Migración, sección «Sustitución de Render y Aiven»).
 
 ## 3. Preparación del servidor
 
@@ -63,7 +61,7 @@ git clone https://github.com/interminableDgo/sieasas-ejecutivo-instalacion.git .
 
 ## 5. Base de datos institucional
 
-Seguir Migración §3 (requisitos), §6 (preparación) y §10 (usuarios). En resumen:
+En resumen:
 
 - MySQL 8.x con InnoDB, `utf8mb4`, un `sql_mode` equivalente, `lower_case_table_names=0` y UTC. Las tablas de SGSC toman la collation de la base.
 - **La base SSNL la administra el sistema SSNL Gestoría de Apoyos.** La versión de referencia es la que generan sus migraciones en el commit `710a73a` (13/11/2026) de [`TheRadikalStyle/ssnl-gestoria-apoyos`](https://github.com/TheRadikalStyle/ssnl-gestoria-apoyos) (README §11).
@@ -87,7 +85,6 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 - Solo agrega 5 catálogos y 2 columnas opcionales; no modifica nada de SSNL (README §11.1).
 - No ejecutar `sgsc_salud_desde_cero.sql` ni `backend/migrations/001_ejecutivo.sql`.
 - El archivo de SEPOMEX se descarga del sitio de Correos de México (formato TXT, separado por «|»).
-- Si se transfieren datos desde Aiven, solo con autorización: Migración §8 y §9.
 
 ## 7. Variables de entorno
 
@@ -96,7 +93,7 @@ cp backend/.env.example backend/.env
 chmod 600 backend/.env
 ```
 
-Completar según Migración §12:
+Completar las variables:
 - `DB_*` con el usuario **de ejecución**;
 - `CORS_ORIGINS` y `RESET_URL` con el dominio HTTPS;
 - `SMTP_*`;
@@ -115,8 +112,8 @@ Completar según Migración §12:
 
 ## 8. Certificados
 
-- **CA de MySQL:** copiar el PEM de la CA institucional, o la cadena completa, a `backend/ca.pem` con `chmod 600`. Compose lo monta como secreto en `/run/secrets/db_ca`. El nombre del certificado del servidor debe coincidir con `DB_HOST` (Migración §11).
-  - ✅ con la CA de Aiven.
+- **CA de MySQL:** copiar el PEM de la CA institucional, o la cadena completa, a `backend/ca.pem` con `chmod 600`. Compose lo monta como secreto en `/run/secrets/db_ca`. El nombre del certificado del servidor debe coincidir con `DB_HOST`.
+  - ✅ con la CA de la base de desarrollo.
   - ⏳ con una CA institucional.
 - **Certificado HTTPS** del dominio: ver §10.
 - Ningún certificado ni `.env` entra a git ni a las imágenes ✅ (verificado por `independencia.ps1`).
@@ -185,7 +182,6 @@ En ambos casos:
 | Servidor SGSC → MySQL | Puerto de MySQL | Permitir **solo** desde el servidor de SGSC |
 | Servidor SGSC → SMTP | Puerto SMTP | Permitir |
 | Cualquier origen → puertos 8000 de los servicios | — | No están publicados (✅). La red `sgsc` es interna de Docker. |
-| Servidor SGSC → `*.aivencloud.com` | — | **Bloquear** después del corte (Migración §15) |
 | Administración (SSH) | 22/TCP | Solo desde la red de administración de TI |
 
 Si la subred `172.30.0.0/24` choca con la red institucional, cambiarla en `docker-compose.yml`, junto con la IP del gateway y `FORWARDED_ALLOW_IPS`.
@@ -217,7 +213,7 @@ Las pruebas automatizadas de `pruebas/microservicios/` (§13) se pueden ejecutar
 |---|---|---|
 | Pruebas unitarias de los cuatro servicios, la librería común, el gateway (tabla de rutas de Nginx), la paridad con el monolito y el monolito | `pruebas/microservicios/ejecutar_pruebas_locales.ps1` (sin base de datos) | ✅ |
 | Pruebas dentro de cada imagen | `docker build -f backend/services/<s>/Dockerfile --target test backend` | ✅ |
-| Enrutamiento real, 401 y 404 | `pruebas/microservicios/integracion/test_gateway.py` | ✅ (Aiven y entorno offline) |
+| Enrutamiento real, 401 y 404 | `pruebas/microservicios/integracion/test_gateway.py` | ✅ (base de desarrollo y entorno offline) |
 | Independencia: un servicio caído, reconstruir solo uno, sin puertos ni secretos | `pruebas/microservicios/independencia.ps1` | ✅ (36/36 con Windows PowerShell 5.1) |
 | Mismas respuestas que el monolito | `integracion/test_paridad.py` | ✅ |
 | Recorrido en Flutter (inicio de sesión, tablero, filtros, detalle, exportación, cierre de sesión) | `pruebas/microservicios/e2e/` (Playwright y Chrome) | ✅ (`INFORME_E2E_FLUTTER.md`) |
@@ -225,12 +221,12 @@ Las pruebas automatizadas de `pruebas/microservicios/` (§13) se pueden ejecutar
 | Pruebas de Flutter | `cd sgsc_ejecutiva && flutter analyze && flutter test` | ✅ (76/76) |
 | Todo lo anterior contra la base institucional y con HTTPS | Igual | ⏳ |
 | Seguridad: escaneo de vulnerabilidades de imágenes y dependencias, configuración TLS, cabeceras, prueba de penetración | Herramientas de TI | ⏳ ❓ |
-| Usuarios de base de datos con privilegios mínimos | Migración §10 | ⏳ |
+| Usuarios de base de datos con privilegios mínimos | README §11.1 | ⏳ |
 | Carga y concurrencia | No realizada | ⏳ |
 
 ## 14. Respaldos y mantenimiento
 
-- **Base de datos:** respaldo diario cifrado y prueba periódica de restauración (Migración §18).
+- **Base de datos:** respaldo diario cifrado y prueba periódica de restauración.
 - **Configuración:** respaldar `backend/.env`, `backend/ca.pem`, el certificado HTTPS y `AUTH_ENCRYPTION_KEY` en la bóveda de TI. Los contenedores no guardan datos.
 - **Bitácoras:** `docker compose logs`. Configurar rotación en el demonio de Docker (`log-opts` `max-size` y `max-file`) ⏳. El gateway no registra consultas, para no guardar tokens de recuperación.
 - **Actualizaciones de seguridad:** reconstruir periódicamente las imágenes con `--pull` para recibir parches de `python:3.12-slim` y `nginx:1.27-alpine`, y revisar las dependencias de `requirements.txt` ❓.
@@ -281,16 +277,14 @@ Se recomienda que TI etiquete cada versión desplegada (`git tag`).
 | SMTP institucional y `RESET_URL` | TI | ❓ |
 | `CORS_ORIGINS` y `GATEWAY_ORIGINS` con el dominio institucional | TI | ⏳ |
 | Cuentas Ejecutivo iniciales y entidad de cada una | Secretaría | ❓ |
-| Transferencia de datos desde Aiven y depuración de datos de prueba | Secretaría (autorización), TI | ❓ |
-| Retiro de Render y revocación del usuario de Aiven | Responsables actuales del proyecto | ⏳ |
 | Administrador PHP/Yii 2 de SSNL | TI | ❓ |
 | Pruebas de seguridad, de carga y de restauración | TI | ⏳ |
-| Aviso de privacidad y tratamiento de datos personales (Migración §20) | Jurídico, Transparencia | ❓ |
+| Aviso de privacidad y tratamiento de datos personales | Jurídico, Transparencia | ❓ |
 
 ### Qué está probado y qué falta
 
 **Probado localmente:**
-- Seis contenedores con Docker Compose en Docker Desktop (Windows 11 y WSL 2), conectados a MySQL 8.4 en Aiven con TLS verificado.
+- Seis contenedores con Docker Compose en Docker Desktop (Windows 11 y WSL 2), conectados a MySQL 8.4 de desarrollo con TLS verificado.
 - El gateway sirve Flutter web y enruta a cada servicio; un servicio caído no afecta a los demás.
 - Recorrido completo del Ejecutivo en Flutter: inicio de sesión, tablero, filtros, comparación, detalle, exportación, registro con idempotencia y cierre de sesión.
 - Imágenes sin secretos; solo el gateway publica un puerto.
@@ -304,4 +298,3 @@ Se recomienda que TI etiquete cada versión desplegada (`git tag`).
 - Rotación de bitácoras.
 - Pruebas de seguridad, carga y restauración.
 - Decisión sobre el administrador PHP.
-- Retiro de Render y Aiven.

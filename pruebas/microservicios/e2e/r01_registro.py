@@ -2,7 +2,7 @@
 
 Uso: r01_registro.py <salida.json> <hasta_paso 1..8> [enviar]
 - Sin «enviar» solo llena hasta el paso indicado y se detiene: no hay ninguna escritura de negocio.
-- Con «enviar» pulsa «Registrar solicitud» (POST Flutter -> Nginx -> registro -> Aiven) y después
+- Con «enviar» pulsa «Registrar solicitud» (POST Flutter -> Nginx -> registro -> MySQL) y después
   reenvía EXACTAMENTE el mismo cuerpo (misma clave de idempotencia) por el gateway, con el token
   de la sesión solo en memoria. Nunca imprime ni guarda el token.
 Datos 100 % sintéticos autorizados por el usuario (sin CURP, teléfono 0000000000).

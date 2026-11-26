@@ -7,7 +7,7 @@
 #   .\pruebas\microservicios\ejecutar_pruebas_locales.ps1 -Recrear   # los vuelve a crear
 #
 # Las variables DB_* apuntan a un servidor inexistente para garantizar que ninguna prueba
-# toque Aiven. Los resultados se guardan en pruebas/microservicios/evidencias/.
+# toque la base de desarrollo. Los resultados se guardan en pruebas/microservicios/evidencias/.
 param([switch]$Recrear, [string]$Python = 'python')
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
@@ -50,7 +50,7 @@ foreach ($s in 'indicadores', 'detalle', 'registro', 'reportes') {
 $resultados += Invoke-Suite 'gateway' (Join-Path $root 'gateway') @((Join-Path $servicios 'indicadores\requirements-test.txt'))
 # Paridad monolito/microservicios: necesita las dependencias del monolito (requirements.lock.txt).
 $resultados += Invoke-Suite 'paridad_codigo' (Join-Path $PSScriptRoot 'codigo') @((Join-Path $backend 'requirements.lock.txt'))
-# Regresión del monolito (Render): sus pruebas deben seguir pasando sin cambios.
+# Regresión del monolito: sus pruebas deben seguir pasando sin cambios.
 $resultados += Invoke-Suite 'monolito' $backend @((Join-Path $backend 'requirements.lock.txt'))
 $resultados | Format-Table -AutoSize | Out-String | Tee-Object -FilePath (Join-Path $evidencias 'resumen_pruebas_locales.txt')
 if ($resultados.Resultado -ne 'OK') { exit 1 }

@@ -1,5 +1,5 @@
 # SIEASAS: API Gateway Nginx + núcleo de autenticación + cuatro microservicios del Ejecutivo
-# (tesis 2.8.4, 3.9, 3.17, 3.18 y Figura 53). MySQL sigue siendo la base de Aiven.
+# (tesis 2.8.4, 3.9, 3.17, 3.18 y Figura 53). MySQL es la base de datos externa.
 #
 # Uso (desde la raíz del repositorio; las variables salen de backend/.env, que no entra a
 # ninguna imagen):
@@ -20,7 +20,7 @@ x-db-env: &db-env
   DB_SSL: ${DB_SSL:-true}
   # ca.pem se monta como secreto; la ruta de Windows del .env no aplica dentro de Linux.
   DB_SSL_CA: /run/secrets/db_ca
-  # Conexiones a Aiven: 2 + 2 por microservicio (16 en total) más las del núcleo.
+  # Conexiones a MySQL: 2 + 2 por microservicio (16 en total) más las del núcleo.
   DB_POOL_SIZE: ${MS_DB_POOL_SIZE:-2}
   DB_MAX_OVERFLOW: ${MS_DB_MAX_OVERFLOW:-2}
   CORS_ORIGINS: ${GATEWAY_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}

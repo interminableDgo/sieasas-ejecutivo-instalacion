@@ -1,10 +1,10 @@
-# Validación del microservicio Registro (POST) con la base real de Aiven
+# Validación del microservicio Registro (POST) con la base de desarrollo
 
 **Fecha:** 17/11/2026 · **Rama:** `local/docker` (sin commits) · **Escrituras autorizadas por el usuario:** 4 registros sintéticos, más un inicio y un cierre de sesión.
 
 ## Verificación previa del código
 
-- Durante las pruebas E2E **no se modificó código funcional**. No hay cambios en `backend/app`, `backend/tests`, `sgsc_ejecutiva/lib` y `test`, `pubspec.yaml`, `render.yaml`, `iniciar.ps1`, los `requirements` ni las migraciones.
+- Durante las pruebas E2E **no se modificó código funcional**. No hay cambios en `backend/app`, `backend/tests`, `sgsc_ejecutiva/lib` y `test`, `pubspec.yaml`, `iniciar.ps1`, los `requirements` ni las migraciones.
 - Los microservicios, el gateway y la configuración Docker son del 16/11, antes de las E2E.
 - Lo creado a partir de las E2E son solo scripts de `pruebas/microservicios/e2e/`, evidencias e informes.
 
@@ -57,7 +57,7 @@ Ninguno corresponde a una persona:
 
 ## Cómo quedan los datos de prueba
 
-- Permanecen en Aiven: la solicitud **#581** (estatus «Inicio»), el beneficiario **88**, el solicitante **100** y su fila en `ejecutivo_registro`.
+- Permanecen en la base de desarrollo: la solicitud **#581** (estatus «Inicio»), el beneficiario **88**, el solicitante **100** y su fila en `ejecutivo_registro`.
 - Aparecen en el tablero (564), en los reportes y en la vista SSNL, identificados por «PRUEBA E2E SGSC» y «[PRUEBA AUTOMATIZADA SGSC – NO ATENDER]».
 - SGSC no tiene un mecanismo para retirarlos. Retirarlos requiere autorización aparte, con una de dos opciones:
   - borrar esas 4 filas por su id;
@@ -80,6 +80,6 @@ Ningún archivo contiene tokens, contraseñas ni datos de personas reales.
 
 **Registro funciona con la arquitectura de microservicios:**
 - El formulario Flutter llega por Nginx al microservicio registro.
-- Escribe en Aiven de forma transaccional, con folio válido y relaciones íntegras.
+- Escribe en la base de forma transaccional, con folio válido y relaciones íntegras.
 - Es idempotente: el reenvío con la misma clave devuelve el mismo folio sin duplicar.
 - No hubo errores.

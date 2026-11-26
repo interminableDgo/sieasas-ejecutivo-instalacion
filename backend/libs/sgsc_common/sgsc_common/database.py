@@ -3,7 +3,7 @@
 Misma configuración que app/database.py (TLS con CERT_REQUIRED y verificación del nombre
 del servidor). Diferencias: el archivo .env solo se carga si SGSC_ENV_FILE lo indica (en los
 contenedores las variables llegan de Docker Compose) y el pool se ajusta por variables para
-no exceder el límite de conexiones de Aiven al ejecutar varios servicios.
+no exceder el límite de conexiones de MySQL al ejecutar varios servicios.
 """
 import os
 import ssl

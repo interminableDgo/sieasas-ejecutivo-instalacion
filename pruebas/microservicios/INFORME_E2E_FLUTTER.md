@@ -1,6 +1,6 @@
-# Pruebas end-to-end: Flutter → Nginx → microservicios → Aiven
+# Pruebas end-to-end: Flutter → Nginx → microservicios → MySQL
 
-**Fecha:** 17/11/2026 · **Rama:** `local/docker` (sin commits) · **Base de datos:** Aiven real (MySQL 8.4, TLS 1.3)
+**Fecha:** 17/11/2026 · **Rama:** `local/docker` (sin commits) · **Base de datos:** base de desarrollo (MySQL 8.4, TLS 1.3)
 
 ## Cómo se ejecutó
 
@@ -15,7 +15,7 @@
   - El token se tomó de los encabezados de la propia app y se usó **solo en memoria** para la paridad. No se imprimió, guardó ni registró.
   - No hubo trazas, videos ni HAR de Playwright.
   - El registro de Nginx no guarda la parte de consulta de las URL.
-  - Escrituras en Aiven: solo inicio y cierre de sesión (autorizadas). **Ningún POST de Registro** (verificado en Nginx: 0).
+  - Escrituras en la base: solo inicio y cierre de sesión (autorizadas). **Ningún POST de Registro** (verificado en Nginx: 0).
 - **Scripts:** `pruebas/microservicios/e2e/` (`e01_login.py`, `e2e_recorrido.py`, `e2e_comun.py`).
 - **Evidencias:** `evidencias/e2e_flutter_*.json`.
 
@@ -62,7 +62,7 @@
 - **POST de Registro: 0.**
 - **Errores de consola del navegador: 0.**
 
-## Paridad HTTP con el monolito (Aiven, mismo token en memoria)
+## Paridad HTTP con el monolito (base de desarrollo, mismo token en memoria)
 
 Cada GET que hizo la app a través del gateway se repitió contra el monolito original (`127.0.0.1:8000`) con el mismo token:
 

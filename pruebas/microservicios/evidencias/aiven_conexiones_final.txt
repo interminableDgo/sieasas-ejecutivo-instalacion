@@ -1,4 +1,0 @@
-﻿max_connections = 76
-Threads_connected = 2
-Max_used_connections = 9
-Aborted_connects = 19

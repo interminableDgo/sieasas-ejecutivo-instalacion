@@ -11,7 +11,7 @@ for path in [BACKEND, BACKEND / 'libs' / 'sgsc_common', *(BACKEND / 'services' /
     sys.path.insert(0, str(path))
 
 # Variables definidas antes de importar: load_dotenv no las reemplaza, así que ningún import
-# puede conectarse a Aiven aunque exista backend/.env.
+# puede conectarse a la base de desarrollo aunque exista backend/.env.
 for key, value in {'DB_HOST': 'db.invalid', 'DB_PORT': '1', 'DB_USER': 'sin-acceso',
                    'DB_PASSWORD': 'sin-acceso', 'DB_SSL': 'false'}.items():
     os.environ[key] = value

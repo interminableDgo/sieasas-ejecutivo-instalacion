@@ -54,5 +54,5 @@ for name, service in source['services'].items():
 
 text = yaml.safe_dump(compose, sort_keys=False, allow_unicode=True)
 assert '${' not in text, 'Quedó una interpolación'
-(OUT / 'compose.offline.yml').write_text('# Generado por generar_offline.py: SGSC sin Aiven.\n' + text, encoding='utf-8')
+(OUT / 'compose.offline.yml').write_text('# Generado por generar_offline.py: SGSC sin base externa.\n' + text, encoding='utf-8')
 print('Generado', OUT / 'compose.offline.yml')

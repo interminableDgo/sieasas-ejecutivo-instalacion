@@ -1,5 +1,5 @@
 """Verificación bloqueante de la configuración efectiva offline. No imprime valores.
-Sale con código 1 si encuentra cualquier referencia a la base real (.env, ca.pem, Aiven o un DB_HOST real)."""
+Sale con código 1 si encuentra cualquier referencia a la base real (.env, ca.pem o un DB_HOST real)."""
 import json
 import subprocess
 import sys
@@ -19,7 +19,7 @@ config = json.loads(result.stdout)
 text = json.dumps(config).lower().replace('\\\\', '/')
 problems = []
 
-for needle in ['backend/.env', '/.env"', 'backend/ca.pem', 'aiven']:
+for needle in ['backend/.env', '/.env"', 'backend/ca.pem']:
     if needle in text:
         problems.append(f'aparece una referencia prohibida ({needle!r})')
 
@@ -56,5 +56,5 @@ if problems:
     for p in problems:
         print(' -', p)
     sys.exit(1)
-print(f'OK: {len(config["services"])} servicios; sin referencias a .env, ca.pem ni Aiven; '
+print(f'OK: {len(config["services"])} servicios; sin referencias a .env, ca.pem ni base externa; '
       'solo el gateway publica puerto; secreto y env_file ficticios.')

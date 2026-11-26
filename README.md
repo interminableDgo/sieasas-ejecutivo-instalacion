@@ -7,7 +7,6 @@
 Documentación complementaria:
 - [`GUIA_INSTALACION_WINDOWS.md`](GUIA_INSTALACION_WINDOWS.md): **instalación en el servidor de la Secretaría** (Windows Server 2019, sin internet, sin Docker), con el paquete sin conexión de `windows/`.
 - [`GUIA_DESPLIEGUE_INSTITUCIONAL.md`](GUIA_DESPLIEGUE_INSTITUCIONAL.md): procedimiento alternativo en un servidor Linux con Docker.
-- [`docs/MIGRACION_INFRAESTRUCTURA.md`](docs/MIGRACION_INFRAESTRUCTURA.md): cómo dejar Aiven y Render; esquema, privilegios, TLS y corte.
 - [`backend/README.md`](backend/README.md): API, administración y correo.
 - [`pruebas/microservicios/README.md`](pruebas/microservicios/README.md): pruebas de la arquitectura de microservicios.
 
@@ -65,7 +64,7 @@ SGSC ofrece:
 | API | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2, PyMySQL |
 | Seguridad | argon2-cffi, bcrypt, pyotp, cryptography (Fernet), tokens opacos guardados como hash SHA-256 |
 | Reportes | openpyxl (Excel), reportlab (PDF) |
-| Base de datos | MySQL 8.4 (hoy en Aiven, con TLS verificado) |
+| Base de datos | MySQL 8.4 (con TLS verificado) |
 | Contenedores | Docker, Docker Compose v2 |
 | Pruebas | pytest, httpx, flutter_test, Playwright (recorridos en navegador) |
 
@@ -133,7 +132,6 @@ SGSC ofrece:
   - todas las consultas se limitan a esa entidad.
 - Límite de intentos por IP y por cuenta (`ejecutivo_limite`).
 - El núcleo es el único contenedor que recibe las variables SMTP y `AUTH_ENCRYPTION_KEY`.
-- **Render** publica hoy este mismo monolito, con todas sus rutas, desde la rama `dev` (`render.yaml`).
   - La prueba de paridad (`pruebas/microservicios/codigo/`) exige que la lógica copiada en los microservicios siga siendo idéntica a la del monolito.
 
 ## 10. Microservicios
@@ -166,7 +164,7 @@ SGSC ofrece:
   - `003_catalogos_solicitud.sql`: `Cat_Colonias` y los catálogos socioeconómicos (`Cat_ConQuienVive`, `Cat_Ocupaciones`, `Cat_FuentesIngreso`, `Cat_AreasEstudio`);
   - las columnas `Tbl_Beneficiarios.ben_dom_colonia_id` y `Tbl_Solicitantes.sol_colonia_id`, opcionales y con FK a `Cat_Colonias`.
 - Las tablas nuevas toman el charset y la collation de la base, igual que las tablas de SSNL. Se requiere MySQL 8 con InnoDB, UTC, `lower_case_table_names=0` y TLS.
-- Las tablas, relaciones, índices y catálogos indispensables se detallan en `docs/MIGRACION_INFRAESTRUCTURA.md`.
+- Las tablas, relaciones, índices y catálogos indispensables se detallan en `README.md §11`.
 - `sgsc_salud_desde_cero.sql` y `backend/migrations/001_ejecutivo.sql` corresponden a un esquema anterior. **No deben ejecutarse sobre una base con datos**: el primero contiene `DROP DATABASE`.
 
 ### 11.1 Qué cambia la instalación en la base SSNL
@@ -298,9 +296,7 @@ SGSC/
 ├── GUIA_INSTALACION_WINDOWS.md       instalación en la Secretaría (Windows Server, sin internet)
 ├── GUIA_DESPLIEGUE_INSTITUCIONAL.md  alternativa con Docker en Linux
 ├── windows/                          instalar.ps1, armar_paquete.ps1, api.ps1 y web.config de IIS
-├── docs/MIGRACION_INFRAESTRUCTURA.md salida de Aiven y Render
 ├── docker-compose.yml                gateway + núcleo + 4 microservicios
-├── render.yaml                       despliegue actual del monolito en Render (rama dev)
 ├── iniciar.ps1                       arranque local sin Docker
 ├── sgsc_salud_desde_cero.sql         esquema ANTERIOR (no usar; ver la última sección)
 ├── gateway/                          Nginx: nginx.conf, Dockerfile, pruebas de rutas
@@ -349,7 +345,6 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma generadas por Flutter | No, la app es solo web | Obsoleta salvo que se planee una versión móvil o de escritorio |
 | `windows/` | Instalación en Windows Server sin Docker: `armar_paquete.ps1` (paquete sin conexión), `instalar.ps1` (nueve pasos), `api.ps1` (mantiene la API encendida) y `web.config` (IIS en lugar de Nginx) | Sí, en el servidor de la Secretaría | Ejecución |
 | `docker-compose.yml` | Define los seis contenedores (gateway, núcleo y cuatro microservicios) | Sí, en la alternativa con Docker | Ejecución |
-| `render.yaml` | Despliegue actual del monolito en Render desde `dev` | Sí, mientras se use Render | Ejecución temporal |
 | `iniciar.ps1` | Arranque local sin Docker | Solo en local | Desarrollo |
 | `README.md`, `GUIA_INSTALACION_WINDOWS.md`, `GUIA_DESPLIEGUE_INSTITUCIONAL.md`, `docs/` | Documentación técnica, de despliegue y de migración de infraestructura | — | Ejecución (documentación que se entrega) |
 | `pruebas/microservicios/` | Pruebas de integración, independencia, entorno offline, recorrido E2E con Playwright, informes y evidencias de la arquitectura | No | Desarrollo (`evidencias/` e informes: también Académica) |
@@ -369,29 +364,28 @@ Cada carpeta tiene una de cuatro clasificaciones:
 | Aspecto | Desarrollo (probado) | Producción institucional (pendiente) |
 |---|---|---|
 | Ejecución | `iniciar.ps1` (monolito en `:8000`, Flutter en `:5173`) o Docker Desktop | Windows Server 2019 sin internet: monolito como tarea de inicio e IIS como proxy ([guía](GUIA_INSTALACION_WINDOWS.md)); Docker solo en un servidor Linux |
-| Base de datos | MySQL 8.4 en Aiven (`siesas-v2`) | MySQL 8 institucional con el esquema SSNL |
+| Base de datos | MySQL 8.4 de desarrollo (`siesas-v2`) | MySQL 8 institucional con el esquema SSNL |
 | Usuario de MySQL | Uno solo para todos los servicios | Uno por función, con privilegios mínimos |
 | Transporte | HTTP en `127.0.0.1` | HTTPS con un dominio institucional (proxy o TLS en el gateway) |
-| API pública | Render (monolito) | Gateway propio; Render se retira |
 | `API_BASE_URL` de Flutter | `http://localhost:8080` o `http://127.0.0.1:8000` | `https://<dominio>` |
 | CORS | `localhost` | Solo el dominio institucional |
 | Correo | SMTP configurado localmente; enlaces a `localhost` | SMTP institucional y `RESET_URL` HTTPS |
 | Datos | Expedientes de ejemplo SSNL más algunos registros de prueba marcados «PRUEBA» | Datos reales; depuración previa con autorización |
-| Respaldos y monitoreo | Los del proveedor (Aiven) | Política de TI |
+| Respaldos y monitoreo | Los del proveedor de desarrollo | Política de TI |
 
 ## 20. Requisitos para desplegarlo institucionalmente
 
-En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS.md), en la [guía con Docker](GUIA_DESPLIEGUE_INSTITUCIONAL.md) y en [la migración](docs/MIGRACION_INFRAESTRUCTURA.md):
+En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS.md) y en la [guía con Docker](GUIA_DESPLIEGUE_INSTITUCIONAL.md):
 
 1. **Cambiar variables de entorno no basta.** Se necesita la base SSNL de la Secretaría, a la que luego se aplican las migraciones de SGSC, el catálogo de colonias y las cuentas Ejecutivo.
 2. El servidor asignado es Windows Server 2019 sin internet: se instala con el paquete de `windows/armar_paquete.ps1` y `windows/instalar.ps1` (Python 3.12, IIS con URL Rewrite y ARR). En un servidor Linux, Docker y Compose.
-3. MySQL 8 configurado como indica la migración (§3), con TLS y su CA.
+3. MySQL 8 con TLS y su CA.
 4. Dominio y certificado HTTPS. Si hay un proxy delante del gateway, ajustar `real_ip` en Nginx.
 5. Flutter web compilado con la URL HTTPS.
 6. SMTP institucional.
 7. Firewall: usuarios → 443; servidor → MySQL; nada más publicado.
 8. Respaldos, bitácoras y actualizaciones de seguridad a cargo de TI.
-9. Decisiones de la Secretaría: transferir o no los datos de Aiven, el administrador PHP y el aviso de privacidad.
+9. Decisiones de la Secretaría: el administrador PHP y el aviso de privacidad.
 
 ## Entrega a la Secretaría
 
@@ -425,7 +419,7 @@ En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS
 | Ruta | Para qué servía | Por qué ya no parece necesario | Referencias | Si se elimina | Recomendación |
 |---|---|---|---|---|---|
 | `sgsc_salud_desde_cero.sql` | Crear el esquema anterior `sgsc_salud` desde cero | Se reemplazó por el esquema SSNL (`siesas-v2`). Contiene `DROP DATABASE`: es un riesgo si alguien lo ejecuta por error. | `backend/README.md` (advertencia), esta documentación | Ningún código lo usa | **Archivar fuera** (junto con la tesis) y quitar del repo |
-| `backend/migrations/001_ejecutivo.sql` | Tablas `ejecutivo_*` para el esquema anterior | `migrate` solo aplica 002–003; 002 recrea lo mismo para SSNL | `docs/MIGRACION_INFRAESTRUCTURA.md` (como histórico) | Ningún efecto en la ejecución | Archivar o eliminar |
+| `backend/migrations/001_ejecutivo.sql` | Tablas `ejecutivo_*` para el esquema anterior | `migrate` solo aplica 002–003; 002 recrea lo mismo para SSNL | Ninguna | Ningún efecto en la ejecución | Archivar o eliminar |
 | `backend/seed_comparison_demo.py` | Insertar solicitudes sintéticas para demostrar la comparación de periodos | Escribe en la base; no se usa en pruebas ni en `manage.py` | Ninguna | Ninguno | Eliminar (o archivar) |
 | `backend/app/routers/catalogos.py`, `dashboard.py`, `indicadores.py`, `solicitudes.py` | Rutas antiguas del Ejecutivo | `main.py` no los publica: no aplicaban la validación de rol y entidad. `executive.py` los sustituye. | No se importan | Ninguno; se elimina código muerto | Eliminar tras revisión |
 | Archivos **vacíos** (0 bytes) del backend: `app/schemas/filtros.py`, `app/schemas/solicitudes.py`, `app/services/indicadores_service.py`, `app/services/solicitudes_service.py` | Esqueletos iniciales | No tienen contenido | No se importan | Ninguno | Eliminar |
@@ -433,7 +427,6 @@ En resumen; el detalle está en la [guía para Windows](GUIA_INSTALACION_WINDOWS
 | `sgsc_ejecutiva/lib/screens/perfil/perfil_screen.dart │` | Ninguno: archivo vacío con el carácter «│» en el nombre, creado por error | Nombre inválido en la práctica; puede causar problemas en algunas herramientas | Ninguna | Ninguno | Eliminar |
 | `sgsc_ejecutiva/lib/services/api_service.dart`, `dashboard_service.dart` | Clientes HTTP de la primera versión | Los reemplaza `executive_api.dart`; nadie los importa | Ninguna | Ninguno | Eliminar tras revisión |
 | `sgsc_ejecutiva/android/`, `ios/`, `linux/`, `macos/`, `windows/` | Plantillas de plataforma de Flutter | La app es solo web y nunca se compiló en esas plataformas | `flutter` las usa solo al compilar para ellas | Se pierde la opción de compilar a esas plataformas sin regenerarlas (`flutter create .`) | Conservar si se planea móvil; si no, eliminar |
-| `render.yaml` | Desplegar el monolito en Render | Sobra cuando la Secretaría use su infraestructura | Render lo lee desde `dev` | Render deja de actualizarse desde el repo | **Conservar** mientras Render esté en uso |
 | `iniciar.ps1`, `backend/serve_web.py` | Ejecución local sin Docker | Docker Compose cubre el despliegue | `serve_web.py` lo usa `iniciar.ps1` | Se pierde el modo de desarrollo rápido | Conservar (desarrollo) |
 | `pruebas/sprint_1/`, `sprint_2/`, `sprint_3/` (~1.4 MB) | Evidencias de pruebas por sprint | Material de tesis, no de ejecución | Documento de tesis | Se pierde la trazabilidad desde el repo | **Archivar** fuera (con la tesis) |
 | `pruebas/usabilidad/` | Prueba de usabilidad del Ejecutivo y capturas antes/después | Material de tesis | Documento de tesis | Igual | Archivar |

@@ -90,11 +90,11 @@ Se comprobaron selección múltiple, aplicación y limpieza de filtros, estado s
 - Después: el resumen devuelve 2 y la tendencia contiene `2020-01`, con 2 registradas y 1 resuelta. La prueba original aprueba.
 - Regresión adicional: siete variantes de backend verifican cambio de año, intervalo de trece meses, extremos abiertos y periodos vacíos. Una prueba Flutter comprueba que la gráfica presenta y permite seleccionar un único mes histórico.
 - Evidencia anterior: `evidencias/antes_correccion_HU3/backend_aislado.txt` y `.xml` conservan el fallo original. La evidencia final está en `evidencias/backend_aislado.txt` y `.xml`.
-- Estado: **corregida y verificada mediante pruebas aisladas**. No se modificó Aiven ni se ejecutaron las cinco pruebas de integración omitidas.
+- Estado: **corregida y verificada mediante pruebas aisladas**. No se modificó la base de desarrollo ni se ejecutaron las cinco pruebas de integración omitidas.
 
 ![Gráfica de un mes histórico](evidencias/interfaz/HU3-tendencia-historica-corregida.png)
 
-*Figura de prueba HU3-B. Componente real de tendencia con el resultado ficticio de enero de 2020. La etiqueta seleccionada muestra 2 registradas y 1 resuelta. Es una prueba del componente aislado, no una captura del servidor conectado a Aiven.*
+*Figura de prueba HU3-B. Componente real de tendencia con el resultado ficticio de enero de 2020. La etiqueta seleccionada muestra 2 registradas y 1 resuelta. Es una prueba del componente aislado, no una captura del servidor conectado a la base.*
 
 ## Trazabilidad de los 19 casos del plan inicial
 
@@ -127,7 +127,7 @@ Se comprobaron selección múltiple, aplicación y limpieza de filtros, estado s
 - Revisión base: `86f1dc0cee1157bdec9390dace5a8edf53046d8a`, más los archivos de prueba y la corrección de HU3 de esta entrega.
 - Windows; Python 3.12.14; pytest 9.1.1; FastAPI 0.141.1; SQLAlchemy 2.0.54; Pydantic 2.13.5.
 - Flutter 3.47.5; Dart 3.13.4.
-- Backend aislado: `.env` deshabilitado, conexión configurada a un puerto local no utilizado y `RUN_DB_TESTS=0`; no se utilizaron credenciales de Aiven.
+- Backend aislado: `.env` deshabilitado, conexión configurada a un puerto local no utilizado y `RUN_DB_TESTS=0`; no se utilizaron credenciales de la base.
 - Las pruebas de componentes usan `MockClient`; no se probaron Android/iOS en dispositivos ni navegador con backend real.
 
 Desde la carpeta del proyecto:
@@ -138,7 +138,7 @@ Desde la carpeta del proyecto:
 
 El ejecutor llama a pytest, a toda la suite Flutter y al análisis estático. Conserva logs, resultados JUnit, capturas y códigos de salida en `evidencias/`. Tras la corrección de HU3, las comprobaciones ejecutadas terminan con código 0; los casos MySQL se siguen registrando como omitidos. La configuración de Flutter se toma de `tools.local.json`.
 
-Los cinco casos MySQL preexistentes permanecen omitidos; esta corrección se limita a HU3 y se verificó sin conexión a Aiven. No se ejecutaron migraciones ni cambios sobre bases existentes. La suite emite dos avisos de deprecación de dependencias, sin fallos funcionales en la ejecución final.
+Los cinco casos MySQL preexistentes permanecen omitidos; esta corrección se limita a HU3 y se verificó sin conexión a la base. No se ejecutaron migraciones ni cambios sobre bases existentes. La suite emite dos avisos de deprecación de dependencias, sin fallos funcionales en la ejecución final.
 
 ## Archivos de evidencia y uso en la tesis
 

@@ -1,4 +1,4 @@
-"""Recorrido E2E automatizado de SGSC: Flutter (Chrome real) -> Nginx -> microservicios -> Aiven.
+"""Recorrido E2E automatizado de SGSC: Flutter (Chrome real) -> Nginx -> microservicios -> MySQL.
 
 Requiere una sesión ya iniciada en el Chrome visible (CDP 127.0.0.1:9223). Solo realiza
 consultas de lectura desde la interfaz y, al final, el cierre de sesión (escritura autorizada).

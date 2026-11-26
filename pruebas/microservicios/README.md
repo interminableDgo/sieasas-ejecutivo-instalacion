@@ -8,21 +8,21 @@ Comprueban que los cuatro microservicios de la Figura 53 (Indicadores y Filtros,
 .\pruebas\microservicios\ejecutar_pruebas_locales.ps1          # -Recrear vuelve a crear los entornos
 ```
 
-Cada suite corre en su propio entorno virtual (`.venv` dentro de su carpeta, ignorado por git), con las variables `DB_*` apuntando a un servidor inexistente. Así ninguna prueba llega a Aiven.
+Cada suite corre en su propio entorno virtual (`.venv` dentro de su carpeta, ignorado por git), con las variables `DB_*` apuntando a un servidor inexistente. Así ninguna prueba llega a la base de desarrollo.
 
 | Suite | Qué demuestra |
 |---|---|
 | `sgsc_common` | Contrato de filtros y agregados, validación de sesión de solo lectura (token opaco, rol Ejecutivo, entidad), cabeceras, 503 ante fallas de MySQL, `/health`, CORS sin el patrón de Netlify y documentación desactivada |
 | `indicadores`, `detalle`, `registro`, `reportes` | Rutas, 401 sin sesión, 422 con parámetros inválidos, alcance por entidad y reglas de negocio. Cada servicio se instala **solo** con sus dependencias y la librería: si sus pruebas pasan, no necesita el monolito ni otro servicio. `test_isolation.py` además rechaza imports de `app`, de otro `sgsc_*` y de clientes HTTP |
 | `gateway` | Simula la selección de `location` de Nginx sobre `gateway/nginx.conf`: cada una de las 16 rutas que usa Flutter (extraídas de `sgsc_ejecutiva/lib`) llega a su servicio; el `/ejecutivo/` final no oculta las regex; `/ciudadano`, `/docs` y rutas desconocidas responden 404; el registro de accesos no guarda consultas (tokens) |
-| `paridad_codigo` | Mientras Render use el monolito, la lógica copiada es **textualmente idéntica** a la de `backend/app`, y cada endpoint del Ejecutivo existe en exactamente un servicio con el mismo contrato OpenAPI (método, parámetros, cuerpo, respuestas) |
-| `monolito` | `backend/tests` sin cambios: Render no se afecta |
+| `paridad_codigo` | La lógica copiada es **textualmente idéntica** a la de `backend/app`, y cada endpoint del Ejecutivo existe en exactamente un servicio con el mismo contrato OpenAPI (método, parámetros, cuerpo, respuestas) |
+| `monolito` | `backend/tests` sin cambios: el monolito no se afecta |
 
 Los resultados quedan en `evidencias/`.
 
 ## 2. Con los contenedores
 
-Requisitos: Docker con Compose v2 (en Windows: virtualización habilitada, WSL 2 y Docker Desktop). Ejecutado y aprobado en Docker Desktop 4.99 contra Aiven: ver `evidencias/`.
+Requisitos: Docker con Compose v2 (en Windows: virtualización habilitada, WSL 2 y Docker Desktop). Ejecutado y aprobado en Docker Desktop 4.99 contra la base de desarrollo: ver `evidencias/`.
 
 ```powershell
 cd sgsc_ejecutiva; flutter build web --dart-define=API_BASE_URL=http://localhost:8080; cd ..
@@ -55,7 +55,7 @@ Genera, a partir de `docker-compose.yml` y sin modificarlo, un Compose independi
 
 ```powershell
 python pruebas/microservicios/offline/generar_offline.py     # escribe offline/salida/ (ignorada por git)
-python pruebas/microservicios/offline/verificar_offline.py   # sale con 1 si encuentra .env, ca.pem o Aiven
+python pruebas/microservicios/offline/verificar_offline.py   # sale con 1 si encuentra .env o ca.pem
 docker compose -p sgsc-offline -f pruebas/microservicios/offline/salida/compose.offline.yml `
   --env-file pruebas/microservicios/offline/salida/offline.env up -d --build
 ```
@@ -79,7 +79,7 @@ python pruebas/microservicios/e2e/r01_registro.py salida_registro.json 8  # llen
 - `registro_d1…d4_*.py` son consultas de solo lectura dentro del contenedor `registro` (índices, catálogos y conteos antes y después, verificación del registro).
 - Los resultados están en `INFORME_E2E_FLUTTER.md` e `INFORME_REGISTRO_POST.md`.
 
-## 5. Requieren autorización expresa (escriben en Aiven)
+## 5. Requieren autorización expresa (escriben en la base de desarrollo)
 
 - Iniciar sesión, porque escribe en `ejecutivo_token`, `ejecutivo_limite` y `ultimo_acceso`.
 - Registrar una solicitud por el gateway (dos veces con la misma `idempotencia` debe devolver el mismo folio).

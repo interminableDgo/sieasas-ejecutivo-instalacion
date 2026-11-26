@@ -1,6 +1,6 @@
 """Paridad entre el monolito y los microservicios mientras ambos coexisten.
 
-Render sigue desplegando backend/app y Docker despliega los microservicios. Hasta la etapa 8
+El monolito (backend/app) y los microservicios deben mantener la misma lógica. Hasta la etapa 8
 (consolidación) la lógica del Ejecutivo existe en los dos lugares; estas pruebas fallan si
 alguna copia se modifica sin la otra:
 - la lógica de negocio copiada es textualmente idéntica;
